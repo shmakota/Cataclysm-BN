@@ -53,6 +53,8 @@ static const skill_id skill_driving( "driving" );
 
 static const trait_id trait_DEFT("DEFT");
 static const trait_id trait_PROF_SKATER("PROF_SKATER");
+static const trait_id trait_DEFT( "DEFT" );
+static const trait_id trait_PROF_SKATER( "PROF_SKATER" );
 
 static const efftype_id effect_harnessed( "harnessed" );
 static const efftype_id effect_pet( "pet" );
@@ -1690,14 +1692,14 @@ units::angle map::shake_vehicle( vehicle &veh, const int velocity_before,
         if( psg ) {
             ///\EFFECT_STR reduces chance of being thrown from your seat when not wearing a seatbelt
             move_resist = psg->str_cur * 150 + 500;
-            if (veh.part(ps).info().has_flag("SEAT_REQUIRES_BALANCE")) {
+            if( veh.part( ps ).info().has_flag( "SEAT_REQUIRES_BALANCE" ) ) {
                 // Much harder to resist being thrown on a skateboard-like vehicle.
                 // Penalty mitigated by Deft and Skater.
                 int resist_penalty = 500;
-                if (psg->has_trait(trait_PROF_SKATER)) {
+                if( psg->has_trait( trait_PROF_SKATER ) ) {
                     resist_penalty -= 150;
                 }
-                if (psg->has_trait(trait_DEFT)) {
+                if( psg->has_trait( trait_DEFT ) ) {
                     resist_penalty -= 150;
                 }
                 move_resist -= resist_penalty;
