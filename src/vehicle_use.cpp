@@ -887,7 +887,7 @@ void vehicle::use_controls( const tripoint &pos )
 bool vehicle::fold_up()
 {
     const bool can_be_folded = is_foldable();
-    
+
     const bool is_convertible = ( tags.contains( "convertible" ) );
     if( !( can_be_folded || is_convertible ) ) {
         debugmsg( _( "Tried to fold non-folding vehicle %s" ), name );
@@ -915,23 +915,23 @@ bool vehicle::fold_up()
 
     std::string itype_id = "generic_folded_vehicle";
     // Determine the item type from tags
-    for (const auto &elem : tags) {
-        if (elem.compare(0, 12, "convertible:") == 0) {
-            itype_id = elem.substr(12);
+    for( const auto &elem : tags ) {
+        if( elem.compare( 0, 12, "convertible:" ) == 0 ) {
+            itype_id = elem.substr( 12 );
             break;
         }
     }
 
     // Decide the spawn type based on item and folding state
     std::string spawn_type;
-    if (itype_id == "folding_bicycle" || itype_id == "folding_skateboard") {
+    if( itype_id == "folding_bicycle" || itype_id == "folding_skateboard" ) {
         spawn_type = itype_id;
     } else {
         spawn_type = "generic_folded_vehicle";  // Handle unexpected cases
     }
 
     // Create the item
-    detached_ptr<item> bicycle = item::spawn(spawn_type, calendar::turn);
+    detached_ptr<item> bicycle = item::spawn( spawn_type, calendar::turn );
 
     // Drop stuff in containers on ground
     for( const vpart_reference &vp : get_any_parts( "CARGO" ) ) {
@@ -958,16 +958,18 @@ bool vehicle::fold_up()
     }
 
     // i dont understand what the can_be_folded check was for here.
-    // seems to only evaluate true if vehicle has a part with FOLDING tag. 
+    // seems to only evaluate true if vehicle has a part with FOLDING tag.
     // the folding bicycle does not? instead the item itself seems to turn the vehicle into folding
-    if( spawn_type == "generic_folded_vehicle") {
+    if( spawn_type == "generic_folded_vehicle" ) {
         bicycle->set_var( "weight", to_milligram( total_mass() ) );
         bicycle->set_var( "volume", total_folded_volume() / units::legacy_volume_factor );
         // remove "folded" from name to allow for more flexibility with folded vehicle names. also lowers first character
-        bicycle->set_var("name", string_format(_("%s"), (name.empty() ? name : std::string(1, std::tolower(name[0])) + name.substr(1))));
+        bicycle->set_var( "name", string_format( _( "%s" ), ( name.empty() ? name : std::string( 1,
+                          std::tolower( name[0] ) ) + name.substr( 1 ) ) ) );
         bicycle->set_var( "vehicle_name", name );
         // TODO: a better description?
-        bicycle->set_var( "description", string_format( _( "A folded %s." ), (name.empty() ? name : std::string(1, std::tolower(name[0])) + name.substr(1))) );
+        bicycle->set_var( "description", string_format( _( "A folded %s." ),
+                          ( name.empty() ? name : std::string( 1, std::tolower( name[0] ) ) + name.substr( 1 ) ) ) );
     }
 
     g->m.add_item_or_charges( global_part_pos3( 0 ), std::move( bicycle ) );

@@ -8743,13 +8743,13 @@ void Character::on_hit( Creature *source, bodypart_id bp_hit,
         }
     }
 
-    map& here = get_map();
-    const optional_vpart_position veh_part = here.veh_at(pos());
-    bool in_skater_vehicle = in_vehicle && veh_part.part_with_feature("SEAT_REQUIRES_BALANCE", false);
+    map &here = get_map();
+    const optional_vpart_position veh_part = here.veh_at( pos() );
+    bool in_skater_vehicle = in_vehicle && veh_part.part_with_feature( "SEAT_REQUIRES_BALANCE", false );
 
-    if ((worn_with_flag(flag_REQUIRES_BALANCE) || in_skater_vehicle) && !is_on_ground()) {
+    if( ( worn_with_flag( flag_REQUIRES_BALANCE ) || in_skater_vehicle ) && !is_on_ground() ) {
         int rolls = 4;
-        if (worn_with_flag(flag_ROLLER_ONE) && !in_skater_vehicle) {
+        if( worn_with_flag( flag_ROLLER_ONE ) && !in_skater_vehicle ) {
             rolls += 2;
         }
         if( has_trait( trait_PROF_SKATER ) ) {
@@ -8767,8 +8767,8 @@ void Character::on_hit( Creature *source, bodypart_id bp_hit,
             } else {
                 add_msg( m_bad, _( "You lose your balance while being hit!" ) );
             }
-            if (in_skater_vehicle) {
-                g->fling_creature(this, rng_float(0_degrees, 360_degrees), 10);
+            if( in_skater_vehicle ) {
+                g->fling_creature( this, rng_float( 0_degrees, 360_degrees ), 10 );
             }
             // This kind of downing is not subject to immunity.
             add_effect( effect_downed, 2_turns, bodypart_str_id::NULL_ID(), 0, true );
