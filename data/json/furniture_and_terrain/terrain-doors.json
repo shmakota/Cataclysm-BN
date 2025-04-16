@@ -2256,6 +2256,38 @@
   },
   {
     "type": "terrain",
+    "id": "t_door_metal_locked_underwater",
+    "name": "closed metal door",
+    "description": "A galvanized steel door, forged to withstand punishment and impede anyone or anything.  Typically used in conjunction with automated electronic locking mechanisms that require an external source to unlock.",
+    "//": "Actually locked",
+    "symbol": "+",
+    "looks_like": "t_door_metal_locked",
+    "color": "cyan",
+    "move_cost": 0,
+    "coverage": 95,
+    "roof": "t_flat_roof",
+    "oxytorch": {
+      "result": "t_water_cube",
+      "duration": "14 seconds",
+      "byproducts": [ { "item": "steel_plate", "count": [ 0, 1 ] }, { "item": "steel_chunk", "count": [ 3, 8 ] } ]
+    },
+    "flags": [ "NOITEM", "REDUCE_SCENT", "CONNECT_TO_WALL", "LOCKED", "MINEABLE", "BLOCK_WIND", "LIQUID", "NO_SCENT", "DEEP_WATER" ],
+    "bash": {
+      "str_min": 90,
+      "str_max": 250,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "ter_set": "t_water_cube",
+      "items": [
+        { "item": "scrap", "count": [ 12, 24 ] },
+        { "item": "steel_plate", "prob": 75 },
+        { "item": "hinge", "count": [ 1, 3 ] }
+      ],
+      "ranged": { "reduction": [ 90, 90 ], "destroy_threshold": 250 }
+    }
+  },
+  {
+    "type": "terrain",
     "id": "t_door_metal_locked_o",
     "name": "open metal door",
     "description": "A hanging metal gate.  Typically used in conjunction with mechanical winch.  Probably shouldn't be underneath when it comes down.",
@@ -2271,6 +2303,30 @@
       "sound": "metal screeching!",
       "sound_fail": "clang!",
       "ter_set": "t_null",
+      "items": [
+        { "item": "scrap", "count": [ 12, 24 ] },
+        { "item": "steel_plate", "prob": 75 },
+        { "item": "hinge", "count": [ 1, 3 ] }
+      ]
+    }
+  },
+  {
+    "type": "terrain",
+    "id": "t_door_metal_locked_o_underwater",
+    "name": "open metal door",
+    "description": "A hanging metal gate.  Typically used in conjunction with mechanical winch.  Probably shouldn't be underneath when it comes down.",
+    "symbol": "+",
+    "looks_like": "t_door_metal_locked_o",
+    "color": "cyan",
+    "move_cost": 2,
+    "roof": "t_flat_roof",
+    "flags": [ "TRANSPARENT", "FLAT", "CONNECT_TO_WALL", "SUPPORTS_ROOF", "ROAD", "INDOORS", "BURROWABLE", "LIQUID", "NO_SCENT", "SWIMMABLE", "DEEP_WATER" ],
+    "bash": {
+      "str_min": 90,
+      "str_max": 250,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "ter_set": "t_water_cube",
       "items": [
         { "item": "scrap", "count": [ 12, 24 ] },
         { "item": "steel_plate", "prob": 75 },
@@ -2631,6 +2687,29 @@
   },
   {
     "type": "terrain",
+    "id": "t_door_metal_bulkhead_c_underwater",
+    "name": "closed bulkhead door",
+    "description": "An extremely resilient door of cast metal, it is watertight and opened using the fly wheel.",
+    "symbol": "+",
+    "looks_like": "t_door_metal_bulkhead_c",
+    "color": "light_gray",
+    "move_cost": 0,
+    "coverage": 95,
+    "roof": "t_metal_flat_roof",
+    "flags": [ "NOITEM", "DOOR", "CONNECT_TO_WALL", "MINEABLE", "BLOCK_WIND", "LIQUID", "NO_SCENT", "DEEP_WATER", "GOES_UP" ],
+    "open": "t_door_metal_bulkhead_o_underwater",
+    "bash": {
+      "str_min": 90,
+      "str_max": 250,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "ter_set": "t_water_cube",
+      "items": [ { "item": "scrap", "count": [ 12, 24 ] }, { "item": "steel_plate", "prob": 75 } ],
+      "ranged": { "reduction": [ 90, 90 ], "destroy_threshold": 250 }
+    }
+  },
+  {
+    "type": "terrain",
     "id": "t_door_metal_bulkhead_o",
     "name": "open bulkhead door",
     "description": "An extremely resilient door of cast metal, it is watertight and opened using the fly wheel.",
@@ -2648,6 +2727,28 @@
       "sound": "metal screeching!",
       "sound_fail": "clang!",
       "ter_set": "t_mdoor_frame",
+      "items": [ { "item": "scrap", "count": [ 12, 24 ] }, { "item": "steel_plate", "prob": 75 } ]
+    }
+  },
+  {
+    "type": "terrain",
+    "id": "t_door_metal_bulkhead_o_underwater",
+    "name": "open bulkhead door",
+    "description": "An extremely resilient door of cast metal, it is watertight and opened using the fly wheel.",
+    "symbol": "+",
+    "looks_like": "t_door_metal_bulkhead_o",
+    "color": "light_gray",
+    "move_cost": 2,
+    "coverage": 95,
+    "roof": "t_metal_flat_roof",
+    "flags": [ "TRANSPARENT", "INDOORS", "FLAT", "ROAD", "LIQUID", "NO_SCENT", "SWIMMABLE", "DEEP_WATER", "GOES_UP" ],
+    "close": "t_door_metal_bulkhead_c_underwater",
+    "bash": {
+      "str_min": 90,
+      "str_max": 250,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "ter_set": "t_water_cube",
       "items": [ { "item": "scrap", "count": [ 12, 24 ] }, { "item": "steel_plate", "prob": 75 } ]
     }
   }
