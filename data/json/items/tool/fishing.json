@@ -78,6 +78,23 @@
     "flags": [ "FISH_POOR" ]
   },
   {
+    "id": "fishing_rod_magnet",
+    "type": "GENERIC",
+    "category": "tools",
+    "name": { "str": "fishing magnet" },
+    "description": "'Fishing rod' might be a bit too charitable of a description.  In truth, this is a magnet tied to a rope.",
+    "weight": "1700 g",
+    "volume": "1250 ml",
+    "price": "0 cent",
+    "price_postapoc": "10 cent",
+    "to_hit": -3,
+    "bashing": 12,
+    "material": "steel",
+    "symbol": "/",
+    "color": "cyan",
+    "use_action": { "type": "foraging_item", "item_category_name": "fishing_items_trash", "required_tile": ["t_water_dp", "t_water_sh"], "one_in_amount": 10 }
+  },
+  {
     "id": "fishing_rod_professional",
     "type": "GENERIC",
     "category": "tools",

@@ -436,6 +436,11 @@
   },
   {
     "type": "item_action",
+    "id": "foraging_item",
+    "name": { "str": "Use" }
+  },
+  {
+    "type": "item_action",
     "id": "FISH_TRAP",
     "name": { "str": "Set" }
   },

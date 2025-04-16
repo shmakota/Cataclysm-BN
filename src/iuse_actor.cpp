@@ -1139,6 +1139,58 @@ int place_monster_iuse::use( player &p, item &it, bool, const tripoint &pos ) co
     return 1;
 }
 
+std::unique_ptr<iuse_actor> foraging_item_iuse::clone() const
+{
+    return std::make_unique<foraging_item_iuse>( *this );
+}
+
+
+void foraging_item_iuse::load( const JsonObject &obj )
+{
+    obj.read( "item_category_name", item_category_name );
+    obj.read( "required_tile", required_tile );
+    obj.read( "one_in_amount", one_in_amount );
+}
+
+int foraging_item_iuse::use( player &p, item &, bool, const tripoint & ) const
+{
+    map &here = get_map();
+    std::optional<tripoint> target_pos;
+    const std::string query = _( "Where?" );
+    target_pos = choose_adjacent( _( "Where?" ) );
+    if( !target_pos ) {
+        return 0;
+    }
+
+    //p.add_msg_if_player( m_info, _( "%s" ), here.ter( target_pos.value() ).id() );
+    bool valid_tile = false;
+    for( const std::string &req_tile_name : required_tile ) {
+        if( here.ter( target_pos.value() ).id().c_str() == req_tile_name ) {
+            valid_tile = true;
+            break;
+        }
+    }
+
+    if( !here.passable( target_pos.value() ) || !valid_tile ) {
+        p.add_msg_if_player( m_info, _( "You did not select a valid spot!" ) );
+        return 0;
+    }
+
+    tripoint player_pos = p.pos();
+
+    if( one_in( one_in_amount ) ) {
+        const std::vector<item *> dropped = here.put_items_from_loc( item_group_id( item_category_name ),
+                                            target_pos.value(), calendar::turn );
+        p.add_msg_if_player( m_info, "You found %s", _( item_category_name ) );
+    } else {
+        p.add_msg_if_player( m_info, _( "You found nothing." ) );
+        return 0;
+    }
+
+
+    return 1;
+}
+
 std::unique_ptr<iuse_actor> place_npc_iuse::clone() const
 {
     return std::make_unique<place_npc_iuse>( *this );
@@ -1306,6 +1358,8 @@ void reveal_map_actor::load( const JsonObject &obj )
         omt_types.emplace_back( ter, ter_match_type );
     }
 }
+
+
 
 void reveal_map_actor::reveal_targets( const tripoint_abs_omt &center,
                                        const std::pair<std::string, ot_match_type> &target,

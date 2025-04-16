@@ -437,6 +437,24 @@ class change_scent_iuse : public iuse_actor
 /**
  * This iuse contains the logic to summon an npc on the map.
  */
+class foraging_item_iuse : public iuse_actor
+{
+    public:
+        std::string item_category_name;
+        std::vector<std::string> required_tile;
+        int one_in_amount = 10;
+
+
+        foraging_item_iuse() : iuse_actor( "foraging_item" ) { }
+        ~foraging_item_iuse() override = default;
+        void load( const JsonObject &obj ) override;
+        int use( player &, item &, bool, const tripoint & ) const override;
+        std::unique_ptr<iuse_actor> clone() const override;
+};
+
+/**
+ * This iuse contains the logic to summon an npc on the map.
+ */
 class place_npc_iuse : public iuse_actor
 {
     public:
