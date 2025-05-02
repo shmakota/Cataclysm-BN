@@ -81,8 +81,9 @@
     "id": "fishing_rod_magnet",
     "type": "GENERIC",
     "category": "tools",
+    "looks_like": "rope_30",
     "name": { "str": "fishing magnet" },
-    "description": "'Fishing rod' might be a bit too charitable of a description.  In truth, this is a magnet tied to a rope.",
+    "description": "This is a heavy-duty magnet crudely tied to the end of a long rope.",
     "weight": "1700 g",
     "volume": "1250 ml",
     "price": "0 cent",
@@ -90,13 +91,18 @@
     "to_hit": -3,
     "bashing": 12,
     "material": "steel",
-    "symbol": "/",
-    "color": "cyan",
-    "use_action": {
-      "type": "foraging_item",
-      "item_category_name": "fishing_items_trash",
-      "required_tile": [ "t_water_dp", "t_water_sh" ],
-      "one_in_amount": 10
+    "symbol": "&",
+    "color": "brown",
+    "use_action": {  
+      "type": "foraging_item", 
+      "item_category_name": "fishing_items_magnetic", 
+      "required_tile": ["t_water_dp", "t_water_moving_dp"], 
+      "one_in_amount": 5, 
+      "failure_message": "You found nothing.", 
+      "completion_message": "You found something!", 
+      "invalid_message": "This is not a valid magnet fishing location.", 
+      "need_charges": 1, 
+      "moves": 500 
     }
   },
   {

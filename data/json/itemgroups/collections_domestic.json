@@ -122,6 +122,7 @@
       { "item": "jar_3l_glass", "prob": 40 },
       { "item": "flotation_vest", "prob": 1 },
       { "item": "fishing_rod_professional", "prob": 2 },
+      { "item": "fishing_rod_magnet", "prob": 2 },
       { "item": "bearing", "prob": 1 },
       { "item": "atomic_light", "prob": 1 },
       { "item": "atomic_lamp", "prob": 1 },

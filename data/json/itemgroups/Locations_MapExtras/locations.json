@@ -566,6 +566,7 @@
       [ "grapnel", 40 ],
       [ "fishing_rod_professional", 60 ],
       [ "fishing_rod_basic", 60 ],
+      [ "fishing_rod_magnet", 10 ],
       [ "rope_6", 60 ],
       [ "rope_30", 60 ],
       [ "fish_bait", 100 ],
@@ -594,6 +595,7 @@
       [ "fishing_hook_bone", 30 ],
       [ "fishing_rod_professional", 5 ],
       [ "fishing_rod_basic", 5 ],
+      [ "fishing_rod_magnet", 5 ],
       [ "fish_bait", 5 ],
       [ "fish_trap", 20 ],
       [ "rope_6", 10 ],
@@ -609,6 +611,27 @@
       [ "scrap_copper", 20 ],
       [ "pipe", 20 ],
       [ "battery_car", 5 ],
+      [ "wheel", 20 ]
+    ]
+  },
+  {
+    "id": "fishing_items_magnetic",
+    "type": "item_group",
+    "//": "For magnet fishing. This is stuff that is magnetic or has gotten stuck to the magnet on the way back up.",
+    "items": [
+      [ "plastic_shopping_bag", 50 ],
+      [ "plastic_sheet", 20 ],
+      [ "rag", 30 ],
+      [ "bag_plastic", 30 ],
+      [ "bucket", 10 ],
+      [ "battery_car", 5 ],
+      [ "fishing_rod_professional", 1 ],
+      [ "fishing_rod_basic", 5 ],
+      [ "knife_hunting", 5 ],
+      { "group": "carried_guns_pistol_common", "prob": 1 },
+      { "group": "oa_ig_rd_metal_trash", "prob": 50 },
+      { "group": "recycle_iron", "prob": 50 },
+      { "group": "recycle_steel", "prob": 50 },
       [ "wheel", 20 ]
     ]
   },

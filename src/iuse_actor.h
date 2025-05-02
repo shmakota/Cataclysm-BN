@@ -441,8 +441,14 @@ class foraging_item_iuse : public iuse_actor
 {
     public:
         std::string item_category_name;
+        std::string failure_message;
+        std::string completion_message;
+        std::string invalid_message;
+        std::string need_charges_msg;
         std::vector<std::string> required_tile;
         int one_in_amount = 10;
+        int need_charges = 1;
+        int moves = 100;
 
 
         foraging_item_iuse() : iuse_actor( "foraging_item" ) { }
