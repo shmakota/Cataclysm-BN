@@ -92,7 +92,12 @@
     "material": "steel",
     "symbol": "/",
     "color": "cyan",
-    "use_action": { "type": "foraging_item", "item_category_name": "fishing_items_trash", "required_tile": ["t_water_dp", "t_water_sh"], "one_in_amount": 10 }
+    "use_action": {
+      "type": "foraging_item",
+      "item_category_name": "fishing_items_trash",
+      "required_tile": [ "t_water_dp", "t_water_sh" ],
+      "one_in_amount": 10
+    }
   },
   {
     "id": "fishing_rod_professional",

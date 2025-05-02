@@ -89,7 +89,11 @@
     "name": "sea scooter",
     "blueprint": [ [ "O" ] ],
     "parts": [
-      { "x": 0, "y": 0, "parts": [ "sea_scooter_hull", "sea_scooter_battery", "controls_electronic", "motorcycle_headlight" ] }
+      {
+        "x": 0,
+        "y": 0,
+        "parts": [ "sea_scooter_hull", "sea_scooter_battery", "controls_electronic", "motorcycle_headlight" ]
+      }
     ]
   },
   {
@@ -156,7 +160,16 @@
     "id": "boat_jetski",
     "type": "vehicle",
     "name": "jetski",
-    "parts": [ { "x": 0, "y": 0, "parts": [ "frame_cross", "metal_boat_hull" ] }, { "x": 1, "y": 0, "parts": [ "frame_cross", "metal_boat_hull" ] }, { "x": 2, "y": 0, "parts": [ "frame_cross", "metal_boat_hull" ] }, { "x": 0, "y": 0, "parts": [ "engine_1cyl_large", "alternator_motorbike" ] }, { "x": 2, "y": 0, "part": "windshield_vertical_right" }, { "x": 1, "y": 0, "part": "seat" }, { "x": 0, "y": 0, "part": "tank", "fuel": "gasoline" }, { "x": 1, "y": 0, "parts": [ "battery_motorbike", "controls", "dashboard" ] } ]
+    "parts": [
+      { "x": 0, "y": 0, "parts": [ "frame_cross", "metal_boat_hull" ] },
+      { "x": 1, "y": 0, "parts": [ "frame_cross", "metal_boat_hull" ] },
+      { "x": 2, "y": 0, "parts": [ "frame_cross", "metal_boat_hull" ] },
+      { "x": 0, "y": 0, "parts": [ "engine_1cyl_large", "alternator_motorbike" ] },
+      { "x": 2, "y": 0, "part": "windshield_vertical_right" },
+      { "x": 1, "y": 0, "part": "seat" },
+      { "x": 0, "y": 0, "part": "tank", "fuel": "gasoline" },
+      { "x": 1, "y": 0, "parts": [ "battery_motorbike", "controls", "dashboard" ] }
+    ]
   },
   {
     "type": "vehicle",
