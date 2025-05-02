@@ -225,5 +225,33 @@
       "flags": [ "SHEATH_SPEAR", "SHEATH_AXE" ]
     },
     "flags": [ "BELTED", "COMPACT", "OVERSIZE", "ALLOWS_NATURAL_ATTACKS", "WATER_FRIENDLY" ]
+  },
+  {
+    "id": "spearsling",
+    "type": "ARMOR",
+    "name": { "str": "spear strap" },
+    "description": "A leather strap tied around the torso for toting spears while keeping your hands free.  You have to duck to get through doors while one's in it, though.  Activate to holster/draw a weapon.",
+    "weight": "160 g",
+    "volume": "500 ml",
+    "price": "52 USD",
+    "price_postapoc": "250 cent",
+    "to_hit": -1,
+    "material": [ "leather" ],
+    "symbol": "[",
+    "looks_like": "bscabbard",
+    "color": "brown",
+    "covers": [ "torso" ],
+    "coverage": 5,
+    "max_encumbrance": 3,
+    "material_thickness": 1,
+    "use_action": {
+      "type": "holster",
+      "holster_prompt": "Bundle item",
+      "holster_msg": "You bundle your %s.",
+      "max_volume": "3500 ml",
+      "draw_cost": 150,
+      "flags": [ ]
+    },
+    "flags": [ "BELTED", "COMPACT", "OVERSIZE", "ALLOWS_NATURAL_ATTACKS", "WATER_FRIENDLY" ]
   }
 ]
