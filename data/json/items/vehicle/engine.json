@@ -124,6 +124,18 @@
     "displacement": 100
   },
   {
+    "id": "rivtech_compact_jet",
+    "copy-from": "engine_gasoline",
+    "type": "ENGINE",
+    "name": { "str": "twin rivtech jet engines" },
+    "description": "A compact combination fuel tank and twin rivtech brand jet engines for use in a jetpack.",
+    "weight": "120000 g",
+    "volume": "2 L",
+    "price": "2250 USD",
+    "price_postapoc": "50 USD",
+    "displacement": 100
+  },
+  {
     "id": "v6_combustion",
     "copy-from": "engine_gasoline",
     "type": "ENGINE",

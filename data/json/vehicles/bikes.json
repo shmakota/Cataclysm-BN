@@ -311,5 +311,12 @@
     "name": "Skateboard",
     "blueprint": [ "$" ],
     "parts": [ { "x": 0, "y": 0, "parts": [ "frame_wood_deck", "wheel_mount_skateboard", "wheel_skateboard" ] } ]
+  },
+  {
+    "id": "rivtech_jetpack",
+    "type": "vehicle",
+    "name": "Rivtech Jetpack",
+    "parts": [ { "x": 0, "y": 0, "parts": [ "xlframe_cross", "seat", "controls", "battery_motorbike",
+          { "part": "tank_small", "fuel": "gasoline" },  "solar_panel_light", "engine_rivtech_jetpack" ] } ]
   }
 ]

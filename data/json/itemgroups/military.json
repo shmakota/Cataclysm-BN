@@ -422,6 +422,7 @@
       { "item": "shoulder_strap", "prob": 10 },
       { "item": "bot_manhack", "prob": 1 },
       { "item": "bot_grenade_hack", "prob": 1 },
+      { "item": "folding_jetpack", "prob": 1 },
       { "item": "l-stick", "prob": 1 },
       { "item": "mil_gps_device", "prob": 5, "charges-min": 10, "charges-max": 95 },
       { "item": "chem_hexamine", "prob": 5 },

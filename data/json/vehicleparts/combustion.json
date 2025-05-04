@@ -322,6 +322,25 @@
     "damage_reduction": { "all": 60 }
   },
   {
+    "id": "engine_rivtech_jetpack",
+    "copy-from": "gasoline_engine",
+    "type": "vehicle_part",
+    "item": "rivtech_compact_jet",
+    "durability": 200,
+    "epower": -50,
+    "power": 37300,
+    "energy_consumption": 124500,
+    "rotor_diameter": 8,
+    "breaks_into": [
+      { "item": "engine_block_tiny" },
+      { "item": "steel_lump", "count": [ 0, 3 ] },
+      { "item": "steel_chunk", "count": [ 0, 3 ] },
+      { "item": "scrap", "count": [ 0, 3 ] }
+    ],
+    "extend": { "flags": [ "FOLDABLE", "ROTOR" ] },
+    "damage_reduction": { "all": 60 }
+  },
+  {
     "abstract": "steam_engine",
     "copy-from": "engine_combustion",
     "type": "vehicle_part",

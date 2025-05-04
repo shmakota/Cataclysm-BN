@@ -164,6 +164,30 @@
     "flags": [ "ALLOWS_REMOTE_USE", "DESTROY_ON_DECHARGE" ]
   },
   {
+    "id": "folding_jetpack",
+    "type": "TOOL",
+    "looks_like": "engine_block_tiny",
+    "category": "deployables",
+    "name": { "str": "Rivtech jetpack" },
+    "description": "This is a Rivtech brand compact jetpack. It features twin engines mounted on a lightweight frame, with ergonomic controls built into the harness for responsive maneuvering. When folding back up, you will dump out any fuel left in the vehicle on the ground and destroy it. Don't forget to reclaim any fuel.",
+    "weight": "150000 g",
+    "volume": "10000 ml",
+    "price": "8000 USD",
+    "price_postapoc": "200 USD",
+    "to_hit": -5,
+    "bashing": 10,
+    "material": "aluminum",
+    "symbol": "J",
+    "color": "light_gray",
+    "use_action": {
+      "type": "unfold_vehicle",
+      "vehicle_name": "rivtech_jetpack",
+      "unfold_msg": "You unfold the jetpack's jets, extend the controls and prepare the jetpack for use.",
+      "moves": 0
+    },
+    "flags": [ "ALLOWS_REMOTE_USE", "DESTROY_ON_DECHARGE" ]
+  },
+  {
     "id": "generic_folded_vehicle",
     "type": "TOOL",
     "category": "deployables",
