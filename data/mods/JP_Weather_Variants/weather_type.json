@@ -15,14 +15,14 @@
     "effects": [
       {
         "name": "morale",
-        "intensity": 60,
+        "intensity": 180,
         "bonus": 2,
         "bonus_max": 60,
-        "duration": 180,
+        "duration": 120,
         "decay_start": 60,
         "morale_id_str": "morale_weather_rainbow",
         "morale_msg": "You stare in awe at the rainbow.",
-        "morale_msg_frequency": 3,
+        "morale_msg_frequency": 5,
         "message_type": 0
       }
     ],
@@ -46,7 +46,7 @@
     "name": "Sundog",
     "color": "c_yellow",
     "map_color": "c_yellow",
-    "glyph": ".",
+    "glyph": "*",
     "ranged_penalty": 0,
     "sight_penalty": 1.01,
     "light_modifier": 5,
@@ -58,19 +58,19 @@
     "effects": [
       {
         "name": "morale",
-        "intensity": 60,
+        "intensity": 180,
         "bonus": 2,
         "bonus_max": 60,
-        "duration": 180,
+        "duration": 120,
         "decay_start": 60,
         "morale_id_str": "morale_weather_sundog",
         "morale_msg": "You stare in awe at the sundog and the ice crystals suspended in the air.",
-        "morale_msg_frequency": 3,
+        "morale_msg_frequency": 5,
         "message_type": 0
       }
     ],
     "//": "representative of 'diamond dust' or tiny ice crystals in the air",
-    "animation": { "factor": 0.001, "color": "c_white", "glyph": ".", "tile": "weather_snowflake" },
+    "animation": { "factor": 0.001, "color": "c_white", "glyph": "*", "tile": "weather_snowflake" },
     "sun_intensity": "high",
     "requirements": {
       "temperature_max": 21,
@@ -102,30 +102,28 @@
     "effects": [
       {
         "name": "morale",
-        "intensity": 40,
+        "intensity": 60,
         "bonus": 2,
         "bonus_max": 60,
         "duration": 30,
         "decay_start": 60,
         "morale_id_str": "morale_weather_geomagnetic_lights",
-        "morale_msg": "You stare in awe at the violent pink, green, and blue waves rippling across the sky.",
-        "morale_msg_frequency": 6,
-        "message_type": 0
+        "morale_msg": "You stare in awe at the violent pink, green, and blue waves rippling across the sky as you feel an odd wave-like sensation.",
+        "morale_msg_frequency": 5,
+        "message_type": 2
       },
       {
         "name": "effect",
-        "intensity": 2,
+        "intensity": 60,
         "duration": 30,
         "effect_id_str": "emp",
         "effect_intensity": 0,
-        "bodypart_string": "",
+        "bodypart_string": "head",
         "precipitation_name": "electromagnetic waves",
         "ignore_armor": true,
-        "effect_msg": "You feel an odd wave-like sensation pass through your body.",
-        "effect_msg_frequency": 60,
-        "message_type": 2,
-        "clothing_protection": 0,
-        "umbrella_protection": 0
+        "effect_msg": "",
+        "effect_msg_frequency": 0,
+        "message_type": 2
       }
     ],
     "sun_intensity": "light",
@@ -135,7 +133,7 @@
       "humidity_max": 52,
       "pressure_min": 1020,
       "pressure_max": 1021,
-      "humidity_and_pressure": false, 
+      "humidity_and_pressure": false,
       "time": "night",
       "required_weathers": [ "clear" ]
     }
@@ -165,7 +163,7 @@
         "duration": 30,
         "decay_start": 60,
         "morale_id_str": "morale_weather_geomagnetic_lights",
-        "morale_msg": "You stare in awe at the pink, green, and blue waves rippling across the sky.",
+        "morale_msg": "You stare in awe at the violent pink, green, and blue waves rippling across the sky.",
         "morale_msg_frequency": 5,
         "message_type": 0
       }
@@ -177,7 +175,7 @@
       "humidity_max": 55,
       "pressure_min": 1020,
       "pressure_max": 1023,
-      "humidity_and_pressure": false, 
+      "humidity_and_pressure": false,
       "time": "night",
       "required_weathers": [ "clear" ]
     }
@@ -201,7 +199,7 @@
       {
         "name": "effect",
         "intensity": 2,
-        "duration": 2,
+        "duration": 60,
         "effect_id_str": "acid_burn_pain_light",
         "effect_intensity": 0,
         "bodypart_string": "",
@@ -209,9 +207,7 @@
         "ignore_armor": false,
         "effect_msg": "The acidic snowflakes burn, but are mostly harmless for now...",
         "effect_msg_frequency": 3,
-        "message_type": 3,
-        "clothing_protection": 2,
-        "umbrella_protection": 1
+        "message_type": 3
       }
     ],
     "animation": { "factor": 0.01, "color": "c_light_green", "glyph": ".", "tile": "weather_acid_snow" },
@@ -238,7 +234,7 @@
       {
         "name": "effect",
         "intensity": 2,
-        "duration": 2,
+        "duration": 60,
         "effect_id_str": "acid_burn_pain",
         "effect_intensity": 0,
         "bodypart_string": "",
@@ -246,9 +242,7 @@
         "ignore_armor": false,
         "effect_msg": "The acidic snowflakes burn your skin as they melt!",
         "effect_msg_frequency": 1,
-        "message_type": 1,
-        "clothing_protection": 2,
-        "umbrella_protection": 1
+        "message_type": 1
       }
     ],
     "animation": { "factor": 0.02, "color": "c_light_green", "glyph": ".", "tile": "weather_acid_snow" },
@@ -275,7 +269,7 @@
       {
         "name": "effect",
         "intensity": 2,
-        "duration": 2,
+        "duration": 60,
         "effect_id_str": "acid_burn_pain",
         "effect_intensity": 0,
         "bodypart_string": "",
@@ -283,9 +277,7 @@
         "ignore_armor": false,
         "effect_msg": "The acidic snowflakes burn your skin as they melt!",
         "effect_msg_frequency": 1,
-        "message_type": 1,
-        "clothing_protection": 2,
-        "umbrella_protection": 1
+        "message_type": 1
       }
     ],
     "animation": { "factor": 0.02, "color": "c_light_green", "glyph": ".", "tile": "weather_acid_snow" },
