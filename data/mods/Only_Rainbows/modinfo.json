@@ -1,0 +1,13 @@
+[
+  {
+    "type": "MOD_INFO",
+    "id": "rainbow",
+    "name": "Only Rainbows",
+    "authors": [ "Kota", "roloa" ],
+    "description": "An example weather blacklist mod that changes the weather to constantly be a rainbow, even at night. Based on the Japanese CDDA variant.",
+    "category": "misc_additions",
+    "dependencies": [ "bn", "weather_variants" ],
+    "version": "1",
+    "obsolete": false
+  }
+]
