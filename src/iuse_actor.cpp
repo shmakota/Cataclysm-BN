@@ -1268,16 +1268,14 @@ int foraging_item_iuse::use( player &p, item &it, bool, const tripoint & ) const
     std::optional<tripoint> target_pos;
     bool failed = false;
 
-    if (required_tile.size() == 0){
-        
+    if( required_tile.size() == 0 ) {
+
         const std::string query = _( "Where?" );
         target_pos = choose_adjacent( _( "Where?" ) );
         if( !target_pos ) {
             failed = true;
         }
-    }
-    else
-    {
+    } else {
         target_pos = p.pos();
     }
 
@@ -1285,10 +1283,9 @@ int foraging_item_iuse::use( player &p, item &it, bool, const tripoint & ) const
     bool valid_tile = false;
 
     // if no required_tiles are defined default to true
-    if(required_tile.size() == 0){
+    if( required_tile.size() == 0 ) {
         valid_tile = true;
-    }
-    else{
+    } else {
         for( const std::string &req_tile_name : required_tile ) {
             if( here.ter( target_pos.value() ).id().c_str() == req_tile_name ) {
                 valid_tile = true;
@@ -1310,12 +1307,12 @@ int foraging_item_iuse::use( player &p, item &it, bool, const tripoint & ) const
         p.add_msg_if_player( m_info, _( failure_message ) );
         failed = true;
     }
-    
+
     if( need_charges > 0 ) {
         p.consume_charges( it, need_charges );
     }
-    
-    if (failed){
+
+    if( failed ) {
         return 0;
     }
     return 1;

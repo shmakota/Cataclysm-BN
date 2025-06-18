@@ -250,7 +250,7 @@
       "holster_msg": "You bundle your %s.",
       "max_volume": "3500 ml",
       "draw_cost": 150,
-      "flags": [ ]
+      "flags": [  ]
     },
     "flags": [ "BELTED", "COMPACT", "OVERSIZE", "ALLOWS_NATURAL_ATTACKS", "WATER_FRIENDLY" ]
   }

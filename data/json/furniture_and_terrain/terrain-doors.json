@@ -2948,7 +2948,6 @@
       "ter_set": "t_water_cube",
       "items": [ { "item": "scrap", "count": [ 12, 24 ] }, { "item": "steel_plate", "prob": 75 } ]
     }
-<<<<<<< HEAD
   },
   {
     "type": "terrain",
@@ -3111,7 +3110,5 @@
         { "item": "hinge", "count": [ 1, 2 ] }
       ]
     }
-=======
->>>>>>> 8a0b411cdf (fix terrain-doors)
   }
 ]
