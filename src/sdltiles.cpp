@@ -65,6 +65,7 @@
 #include "rng.h"
 #include "sdl_wrappers.h"
 #include "sdl_geometry.h"
+#include "sdl_utils.h"
 #include "sdl_font.h"
 #include "sdlsound.h"
 #include "string_formatter.h"
@@ -689,13 +690,18 @@ void clear_window_area( const catacurses::window &win_ )
 static std::optional<std::pair<tripoint_abs_omt, std::string>> get_mission_arrow(
             const inclusive_cuboid<tripoint> &overmap_area, const tripoint_abs_omt &center )
 {
-    if( get_avatar().get_active_mission() == nullptr ) {
+    const auto *mission = get_avatar().get_active_mission();
+    const bool custom_waypoint_valid = get_avatar().get_custom_mission_target() !=
+                                       overmap::invalid_tripoint;
+    if( mission == nullptr && !custom_waypoint_valid ) {
         return std::nullopt;
     }
-    if( !get_avatar().get_active_mission()->has_target() ) {
+    if( ( mission == nullptr || !mission->has_target() ) && !custom_waypoint_valid ) {
         return std::nullopt;
     }
-    const tripoint_abs_omt mission_target = get_avatar().get_active_mission_target();
+    tripoint_abs_omt mission_target = custom_waypoint_valid
+                                      ? get_avatar().get_custom_mission_target()
+                                      : get_avatar().get_active_mission_target();  // Safe here because mission is non-null
 
     std::string mission_arrow_variant;
     if( overmap_area.contains( mission_target.raw() ) ) {
@@ -919,10 +925,38 @@ void cata_tiles::draw_om( point dest, const tripoint_abs_omt &center_abs_omt, bo
                 }
             }
 
-            const lit_level ll = overmap_buffer.is_explored( omp ) ? lit_level::LOW : lit_level::LIT;
-            // light level is now used for choosing between grayscale filter and normal lit tiles.
-            draw_from_id_string( id, TILE_CATEGORY::C_OVERMAP_TERRAIN, "overmap_terrain", omp.raw(),
-                                 subtile, rotation, ll, false, height_3d, 0 );
+            if( overmap_transparency ) {
+                int z_offset = 0;
+                while( id == "open_air" ) {
+                    z_offset++;
+                    const tripoint_abs_omt lower_omp = omp + tripoint( 0, 0, -z_offset );
+                    const bool lower_see = has_debug_vision || overmap_buffer.seen( lower_omp );
+                    if( !lower_see ) {
+                        //actually really strange situation when above overmap is explored, but below one isn't
+                        //so let's account for this just in case, drawing highest seen tile
+                        z_offset--;
+                        break;
+                    }
+                    id = get_omt_id_rotation_and_subtile( lower_omp, rotation, subtile );
+                }
+                draw_om_tile_recursively( omp + tripoint( 0, 0, -z_offset ), id, rotation, subtile, z_offset );
+            } else {
+                const lit_level ll = overmap_buffer.is_explored( omp ) ? lit_level::LOW : lit_level::LIT;
+                // light level is now used for choosing between grayscale filter and normal lit tiles.
+                draw_from_id_string( id, TILE_CATEGORY::C_OVERMAP_TERRAIN, "overmap_terrain", omp.raw(),
+                                     subtile, rotation, ll, false, height_3d, 0 );
+            }
+
+            if( blink && uistate.overmap_highlighted_omts.contains( omp ) ) {
+                if( tile_iso ) {
+                    draw_from_id_string( "highlight", omp.raw(), 0, 0, lit_level::LIT, false, 0 );
+                } else {
+                    SDL_Color c = curses_color_to_SDL( c_pink );
+                    c.a = c.a >> 1;
+                    auto p = player_to_screen( omp.raw().xy() );
+                    draw_color_at( c, p, SDL_BLENDMODE_BLEND );
+                }
+            }
 
             if( see ) {
                 if( blink && uistate.overmap_debug_mongroup ) {
@@ -3175,26 +3209,55 @@ static void CheckMessages()
                     }
 
                     // Only monitor motion when cursor is visible
-                    last_input = input_event( MOUSE_MOVE, input_event_t::mouse );
+                    last_input = input_event( MouseInput::Move );
                 }
                 break;
 
             case SDL_MOUSEBUTTONUP:
                 switch( ev.button.button ) {
                     case SDL_BUTTON_LEFT:
-                        last_input = input_event( MOUSE_BUTTON_LEFT, input_event_t::mouse );
+                        last_input = input_event( MouseInput::LeftButtonUp );
                         break;
                     case SDL_BUTTON_RIGHT:
-                        last_input = input_event( MOUSE_BUTTON_RIGHT, input_event_t::mouse );
+                        last_input = input_event( MouseInput::RightButtonUp );
+                        break;
+                    case SDL_BUTTON_MIDDLE:
+                        last_input = input_event( MouseInput::MiddleButtonUp );
+                        break;
+                    case SDL_BUTTON_X1:
+                        last_input = input_event( MouseInput::X1ButtonUp );
+                        break;
+                    case SDL_BUTTON_X2:
+                        last_input = input_event( MouseInput::X2ButtonUp );
+                        break;
+                }
+                break;
+
+            case SDL_MOUSEBUTTONDOWN:
+                switch( ev.button.button ) {
+                    case SDL_BUTTON_LEFT:
+                        last_input = input_event( MouseInput::LeftButtonDown );
+                        break;
+                    case SDL_BUTTON_RIGHT:
+                        last_input = input_event( MouseInput::RightButtonDown );
+                        break;
+                    case SDL_BUTTON_MIDDLE:
+                        last_input = input_event( MouseInput::MiddleButtonDown );
+                        break;
+                    case SDL_BUTTON_X1:
+                        last_input = input_event( MouseInput::X1ButtonDown );
+                        break;
+                    case SDL_BUTTON_X2:
+                        last_input = input_event( MouseInput::X2ButtonDown );
                         break;
                 }
                 break;
 
             case SDL_MOUSEWHEEL:
                 if( ev.wheel.y > 0 ) {
-                    last_input = input_event( SCROLLWHEEL_UP, input_event_t::mouse );
+                    last_input = input_event( MouseInput::ScrollUp );
                 } else if( ev.wheel.y < 0 ) {
-                    last_input = input_event( SCROLLWHEEL_DOWN, input_event_t::mouse );
+                    last_input = input_event( MouseInput::ScrollDown );
                 }
                 break;
 
@@ -3706,7 +3769,7 @@ bool gamepad_available()
     return joystick != nullptr;
 }
 
-void rescale_tileset( int size )
+void rescale_tileset( float size )
 {
     tilecontext->set_draw_scale( size );
 }
@@ -3812,6 +3875,31 @@ std::optional<tripoint> input_context::get_coordinates( const catacurses::window
     }
 
     return tripoint( p, g->get_levz() );
+}
+
+std::optional<point> input_context::get_coordinates_text( const catacurses::window
+        & capture_win ) const
+{
+#if !defined( TILES )
+    std::optional<tripoint_bub_ms> coord3d = get_coordinates( capture_win );
+    if( coord3d.has_value() ) {
+        return coord3d->xy().raw();
+    } else {
+        return std::nullopt;
+    }
+#else
+    if( !coordinate_input_received ) {
+        return std::nullopt;
+    }
+    const window_dimensions dim = get_window_dimensions( capture_win );
+    const int &fw = dim.scaled_font_size.x;
+    const int &fh = dim.scaled_font_size.y;
+    const point &win_min = dim.window_pos_pixel;
+    const point screen_pos = coordinate - win_min;
+    const point selected( divide_round_down( screen_pos.x, fw ),
+                          divide_round_down( screen_pos.y, fh ) );
+    return selected;
+#endif
 }
 
 int get_terminal_width()

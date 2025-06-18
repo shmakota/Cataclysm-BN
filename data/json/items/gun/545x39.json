@@ -18,6 +18,7 @@
     "modes": [ [ "DEFAULT", "semi", 1 ], [ "AUTO", "auto", 4 ] ],
     "barrel_length": "250 ml",
     "magazines": [ [ "545x39", [ "ak74mag", "rpk74mag" ] ] ],
+    "blackpowder_tolerance": 24,
     "flags": [ "NEVER_JAMS" ]
   },
   {
@@ -29,6 +30,7 @@
     "weight": "3850 g",
     "volume": "1750 ml",
     "price": "4200 USD",
+    "handling": 30,
     "price_postapoc": "45 USD",
     "bashing": 11,
     "material": [ "steel", "plastic" ],

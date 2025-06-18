@@ -542,6 +542,7 @@ void show_armor_layers_ui( Character &who )
     ctxt.register_action( "NEXT_TAB" );
     ctxt.register_action( "MOVE_ARMOR" );
     ctxt.register_action( "CHANGE_SIDE" );
+    ctxt.register_action( "TOGGLE_CLOTH" );
     ctxt.register_action( "ASSIGN_INVLETS" );
     ctxt.register_action( "SORT_ARMOR" );
     ctxt.register_action( "EQUIP_ARMOR" );
@@ -609,7 +610,7 @@ void show_armor_layers_ui( Character &who )
                 mvwprintz( w_sort_left, point( 0, drawindex + 1 ), c_yellow, ">>" );
             }
 
-            std::string worn_armor_name = ( *access_tmp_worn( itemindex ) )->tname();
+            std::string worn_armor_name = ( *access_tmp_worn( itemindex ) )->display_name();
             item_penalties const penalties =
                 get_item_penalties( access_tmp_worn( itemindex ), who, bp );
 
@@ -622,6 +623,21 @@ void show_armor_layers_ui( Character &who )
                 //~ Hint: Letter to show which piece of armor is Hidden in the layering menu
                 mvwprintz( w_sort_left, point( offset_x - 1, drawindex + 1 ), c_cyan, _( "H" ) );
             }
+        }
+
+        // Total armor for the given part (Ignoring the "All" condition)
+        if( bp.id() ) {
+            mvwprintz( w_sort_left, point( 0, cont_h - 6 ), c_white, _( "Total Protection:" ) );
+            mvwprintz( w_sort_left, point( 2, cont_h - 5 ), c_light_gray,
+                       _( "Bash: " + std::to_string( who.get_armor_bash( bp ) ) ) );
+            mvwprintz( w_sort_left, point( 2, cont_h - 4 ), c_light_gray,
+                       _( "Cut: " + std::to_string( who.get_armor_cut( bp ) ) ) );
+            // Assuming that float armor values are rounded and not floored or truncated
+            mvwprintz( w_sort_left, point( 2, cont_h - 3 ), c_light_gray,
+                       _( "Stab: " + std::to_string( static_cast<int>( std::round( who.get_armor_cut(
+                                   bp ) * 0.8f ) ) ) ) );
+            mvwprintz( w_sort_left, point( 2, cont_h - 2 ), c_light_gray,
+                       _( "Ballistic: " + std::to_string( who.get_armor_bullet( bp ) ) ) );
         }
 
         // Left footer
