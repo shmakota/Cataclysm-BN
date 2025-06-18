@@ -2925,26 +2925,5 @@
       "ter_set": "t_water_cube",
       "items": [ { "item": "scrap", "count": [ 12, 24 ] }, { "item": "steel_plate", "prob": 75 } ]
     }
-  },
-  {
-    "type": "terrain",
-    "id": "t_door_metal_bulkhead_o_underwater",
-    "name": "open bulkhead door",
-    "description": "An extremely resilient door of cast metal, it is watertight and opened using the fly wheel.",
-    "symbol": "+",
-    "looks_like": "t_door_metal_bulkhead_o",
-    "color": "light_gray",
-    "move_cost": 2,
-    "coverage": 95,
-    "roof": "t_metal_flat_roof",
-    "flags": [ "TRANSPARENT", "INDOORS", "FLAT", "ROAD", "LIQUID", "NO_SCENT", "SWIMMABLE", "DEEP_WATER", "GOES_UP" ],
-    "close": "t_door_metal_bulkhead_c_underwater",
-    "bash": {
-      "str_min": 90,
-      "str_max": 250,
-      "sound": "metal screeching!",
-      "sound_fail": "clang!",
-      "ter_set": "t_water_cube",
-      "items": [ { "item": "scrap", "count": [ 12, 24 ] }, { "item": "steel_plate", "prob": 75 } ]
-    }
+  }
 ]
