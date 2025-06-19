@@ -61,7 +61,7 @@
     "id": "bio_wings",
     "copy-from": "bionic_general_npc_usable",
     "type": "BIONIC_ITEM",
-    "name": { "str": "Bionic Wings CBM" },
+    "name": { "str": "Carbon Fiber Wings CBM" },
     "looks_like": "bio_int_enhancer",
     "description": "A compact implant housing retractable mechanical wings constructed from ultra-light alloys and powered by high-torque servos. Once installed, the wings deploy with precision to enable controlled gliding, rapid descents, or limited powered flight.",
     "price": "9500 USD",
