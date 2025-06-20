@@ -20,6 +20,12 @@
   },
   {
     "type": "overmap_connection",
+    "id": "lake_to_lab",
+    "default_terrain": "lake_bed_lab_entrance_airlock",
+    "subtypes": [ { "terrain": "lake_bed_lab_entrance_airlock", "locations": [ "subterranean" ], "flags": [ "ORTHOGONAL" ] } ]
+  },
+  {
+    "type": "overmap_connection",
     "id": "subway_tunnel",
     "layout": "p2p",
     "default_terrain": "subway",
