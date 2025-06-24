@@ -10228,6 +10228,7 @@ void game::vertical_move( int movez, bool force, bool peeking )
 
         if( !character_funcs::can_fly( u ) ) {
             add_msg( m_info, _( "You can't go down here!" ) );
+            suggest_auto_walk_to_stairs( u, m, "down" );
             return;
         }
 
