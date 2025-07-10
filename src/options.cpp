@@ -2421,6 +2421,11 @@ void options_manager::add_options_world_default()
          0.0, 100, 2.0, 0.01
        );
 
+    add( "RESTOCK_DELAY_MULT", world_default, translate_marker( "Merchant restock scaling factor" ),
+         translate_marker( "A scaling factor that determines restock rate of merchants." ),
+         0.01, 10.0, 1.0, 0.01
+       );
+
     add_empty_line();
 
     add( "ITEM_SPAWNRATE", world_default,
@@ -2704,11 +2709,6 @@ void options_manager::add_options_world_default()
     add( "RANDOM_NPC", world_default, translate_marker( "Random NPCs" ),
          translate_marker( "If true, the game will randomly spawn NPCs during gameplay." ),
          false
-       );
-
-    add( "RESTOCK_DELAY_MULT", world_default, translate_marker( "Merchant restock rate" ),
-         translate_marker( "A scaling factor that determines restock rate of merchants." ),
-         0.01, 10.0, 1.0, 0.01
        );
 
     add_empty_line();
