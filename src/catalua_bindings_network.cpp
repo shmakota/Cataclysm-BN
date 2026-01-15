@@ -7,6 +7,7 @@
 #include <map>
 #include <ranges>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace
@@ -88,6 +89,63 @@ void cata::detail::reg_network_api( sol::state &lua )
         result["ok"] = true;
         result["status"] = response->status;
         result["body"] = response->body;
+        return result;
+    } );
+
+    luna::set_fx( lib, "request_async",
+    []( sol::this_state lua_state, sol::table opts ) {
+        sol::state_view lua( lua_state );
+        sol::table result = lua.create_table();
+
+        if( !opts.valid() ) {
+            result["ok"] = false;
+            result["error"] = "network.request_async requires an options table";
+            return result;
+        }
+
+        auto request_options = make_request_options( opts );
+        if( !request_options ) {
+            result["ok"] = false;
+            result["error"] = request_options.error();
+            return result;
+        }
+
+        try {
+            auto request_id = start_http_request_async( *request_options );
+            result["ok"] = true;
+            result["request_id"] = request_id;
+        } catch( const std::system_error &err ) {
+            result["ok"] = false;
+            result["error"] = err.what();
+        }
+
+        return result;
+    } );
+
+    luna::set_fx( lib, "poll_async",
+    []( sol::this_state lua_state ) {
+        sol::state_view lua( lua_state );
+        sol::table result = lua.create_table();
+        auto responses = collect_http_async_responses();
+        auto entries = lua.create_table();
+        auto index = 1;
+
+        std::ranges::for_each( responses, [&]( const auto &entry ) {
+            sol::table response_entry = lua.create_table();
+            response_entry["request_id"] = entry.request_id;
+            if( entry.response ) {
+                response_entry["ok"] = true;
+                response_entry["status"] = entry.response->status;
+                response_entry["body"] = entry.response->body;
+            } else {
+                response_entry["ok"] = false;
+                response_entry["error"] = entry.response.error();
+            }
+            entries[index++] = response_entry;
+        } );
+
+        result["ok"] = true;
+        result["responses"] = entries;
         return result;
     } );
 

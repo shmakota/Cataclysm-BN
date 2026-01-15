@@ -1,8 +1,12 @@
 #include "catalua_network.h"
 
 #include <algorithm>
+#include <atomic>
 #include <curl/curl.h>
+#include <deque>
+#include <mutex>
 #include <ranges>
+#include <thread>
 
 namespace
 {
@@ -97,4 +101,39 @@ auto cata::detail::perform_http_request( const http_request_options &opts ) -> s
     response.status = static_cast<int>( code );
 
     return response;
+}
+
+namespace
+{
+auto next_request_id = std::atomic<int>{ 1 };
+auto async_mutex = std::mutex{};
+auto pending_async_responses = std::deque<cata::detail::http_async_response>{};
+
+} // namespace
+
+auto cata::detail::start_http_request_async( http_request_options opts ) -> int
+{
+    auto request_id = next_request_id.fetch_add( 1, std::memory_order_relaxed );
+    std::thread(
+    [opts = std::move( opts ), request_id]() mutable {
+        auto result = http_async_response{ request_id, perform_http_request( opts ) };
+        auto lock = std::lock_guard{ async_mutex };
+        pending_async_responses.push_back( std::move( result ) );
+    } ).detach();
+    return request_id;
+}
+
+auto cata::detail::collect_http_async_responses() -> std::vector<http_async_response>
+{
+    auto lock = std::lock_guard{ async_mutex };
+    if( pending_async_responses.empty() ) {
+        return {};
+    }
+    auto responses = std::vector<http_async_response>{};
+    responses.reserve( pending_async_responses.size() );
+    std::ranges::for_each( pending_async_responses, [&]( auto &entry ) {
+        responses.push_back( std::move( entry ) );
+    } );
+    pending_async_responses.clear();
+    return responses;
 }
