@@ -53,11 +53,11 @@ void reg_time_types( sol::state &lua );
 void reg_types( sol::state &lua );
 void reg_ui_elements( sol::state &lua );
 void reg_units( sol::state &lua );
+void reg_network_api( sol::state &lua );
 
 } // namespace detail
 
 void reg_all_bindings( sol::state &lua );
 
 } // namespace cata
-
 

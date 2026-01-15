@@ -46,6 +46,12 @@ function(setup_common_target_properties target_name)
     # Add common libraries
     target_link_libraries(${target_name} PUBLIC ZLIB::ZLIB)
     target_link_libraries(${target_name} PUBLIC SQLite::SQLite3)
+    if( TARGET CURL::libcurl )
+        target_link_libraries(${target_name} PUBLIC CURL::libcurl)
+    else()
+        target_include_directories(${target_name} PUBLIC ${CURL_INCLUDE_DIRS})
+        target_link_libraries(${target_name} PUBLIC ${CURL_LIBRARIES})
+    endif()
 
     # Setup threading
     if (CMAKE_USE_PTHREADS_INIT)

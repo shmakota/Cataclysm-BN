@@ -745,6 +745,7 @@ void cata::reg_all_bindings( sol::state &lua )
     forbid_unsafe_functions( lua );
     reg_debug_api( lua );
     reg_game_api( lua );
+    reg_network_api( lua );
     reg_locale_api( lua );
     reg_units( lua );
     reg_skill_level_map( lua );
