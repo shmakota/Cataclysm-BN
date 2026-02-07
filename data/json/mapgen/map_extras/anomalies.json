@@ -117,5 +117,22 @@
     "sym": "X",
     "color": "yellow",
     "autonote": true
+  },
+  {
+    "type": "mapgen",
+    "method": "json",
+    "update_mapgen_id": "mx_animal_well_anomaly",
+    "object": { "place_nested": [ { "chunks": [ [ "9x9_animal_well_anomaly", 100 ] ], "x": [ 12, 12 ], "y": [ 12, 12 ] } ] }
+  },
+  {
+    "id": "mx_animal_well_anomaly",
+    "type": "map_extra",
+    "name": "Animal Well Anomaly",
+    "looks_like": "mon_deer",
+    "description": "An animal well anomaly.",
+    "generator": { "generator_method": "update_mapgen", "generator_id": "mx_animal_well_anomaly" },
+    "sym": "X",
+    "color": "yellow",
+    "autonote": true
   }
 ]

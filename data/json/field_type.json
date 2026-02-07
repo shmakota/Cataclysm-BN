@@ -635,6 +635,35 @@
     "looks_like": "fd_smoke"
   },
   {
+    "id": "fd_animal_well",
+    "type": "field_type",
+    "intensity_levels": [
+      {
+        "name": "odd ripple",
+        "color": "light_gray",
+        "sym": "*",
+        "dangerous": true,
+        "intensity_upgrade_chance": 10,
+        "intensity_upgrade_duration": "6 hours"
+      },
+      { "name": "swirling air", "color": "dark_gray" },
+      {
+        "name": "animal well",
+        "color": "magenta",
+        "transparent": false,
+        "monster_spawn_chance": 1200,
+        "monster_spawn_count": 1,
+        "monster_spawn_radius": 1,
+        "monster_spawn_group": "GROUP_FOREST"
+      }
+    ],
+    "description_affix": "under",
+    "priority": 8,
+    "display_items": false,
+    "display_field": true,
+    "looks_like": "fd_fatigue"
+  },
+  {
     "id": "fd_push_items",
     "type": "field_type",
     "legacy_enum_id": 21,

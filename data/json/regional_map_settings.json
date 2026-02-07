@@ -421,6 +421,7 @@
           "mx_portal": 3,
           "mx_crater": 10,
           "mx_portal_in": 3,
+          "mx_animal_well_anomaly": 3,
           "mx_grass": 10,
           "mx_fallen_shed": 20,
           "mx_spider": 200,
