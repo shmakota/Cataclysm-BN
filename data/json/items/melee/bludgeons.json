@@ -47,6 +47,7 @@
     "color": "brown",
     "symbol": "/",
     "material": [ "wood" ],
+    "melee_mod_locations": [ [ "blunt", 1 ], [ "handle", 1 ], [ "wrap", 1 ] ],
     "techniques": [ "WBLOCK_1" ],
     "flags": [ "DURABLE_MELEE" ],
     "volume": "1750 ml",

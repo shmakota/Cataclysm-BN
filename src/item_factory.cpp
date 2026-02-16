@@ -234,7 +234,7 @@ void Item_factory::finalize_pre( itype &obj )
     if( obj.mod ) {
         std::string func = obj.gunmod ? "GUNMOD_ATTACH" : "TOOLMOD_ATTACH";
         emplace_usage( obj.use_methods, func );
-    } else if( obj.gun ) {
+    } else if( obj.gun || !obj.melee_mod_locations.empty() ) {
         const std::string func = "detach_gunmods";
         emplace_usage( obj.use_methods, func );
     }
@@ -2450,6 +2450,7 @@ void Item_factory::load( islot_gunmod &slot, const JsonObject &jo, const std::st
         }
     }
     assign( jo, "blacklist_mod", slot.blacklist_mod );
+    assign( jo, "weapon_flags", slot.weapon_flags );
 }
 
 void Item_factory::load_gunmod( const JsonObject &jo, const std::string &src )
@@ -2680,6 +2681,12 @@ void Item_factory::load_basic_info( const JsonObject &jo, itype &def, const std:
     }
 
     assign( jo, "weapon_category", def.weapon_category );
+    if( jo.has_array( "melee_mod_locations" ) ) {
+        def.melee_mod_locations.clear();
+        for( JsonArray curr : jo.get_array( "melee_mod_locations" ) ) {
+            def.melee_mod_locations.emplace( curr.get_string( 0 ), curr.get_int( 1 ) );
+        }
+    }
 
     if( jo.has_member( "damage_states" ) ) {
         auto arr = jo.get_array( "damage_states" );

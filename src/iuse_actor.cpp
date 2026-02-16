@@ -4620,9 +4620,7 @@ std::unique_ptr<iuse_actor> detach_gunmods_actor::detach_gunmods_actor::clone() 
 
 void detach_gunmods_actor::finalize( const itype_id &my_item_type )
 {
-    if( !my_item_type->gun ) {
-        debugmsg( "Item %s has detach_gunmods_actor actor, but it's a gun.", my_item_type.c_str() );
-    }
+    // Allow use on any item carrying gunmods (melee weapons included)
 }
 
 std::unique_ptr<iuse_actor> mutagen_actor::clone() const

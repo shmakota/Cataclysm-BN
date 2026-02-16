@@ -1,0 +1,259 @@
+[
+  {
+    "id": "melee_mod_test_weapon",
+    "type": "GENERIC",
+    "category": "weapons",
+    "name": { "str": "test melee mod weapon" },
+    "description": "A simple melee weapon with a dedicated slot for testing weapon mods.",
+    "weight": "1 kg",
+    "volume": "750 ml",
+    "price": 0,
+    "to_hit": 1,
+    "bashing": 10,
+    "material": [ "steel" ],
+    "symbol": "/",
+    "color": "light_gray",
+    "melee_mod_locations": [ [ "tip", 1 ] ],
+    "flags": [ "DURABLE_MELEE" ]
+  },
+  {
+    "id": "melee_mod_barbed_wire",
+    "type": "GUNMOD",
+    "name": { "str": "barbed wire wrap" },
+    "description": "A length of barbed wire meant to be wrapped around a blade’s tip, adding nasty tearing wounds at the cost of handling.",
+    "weight": "350 g",
+    "volume": "400 ml",
+    "price": "25 USD",
+    "to_hit": -2,
+    "bashing": 2,
+    "cutting": 4,
+    "material": [ "steel" ],
+    "symbol": ":",
+    "color": "dark_gray",
+    "location": "wrap",
+    "install_time": "10 m",
+    "flags": [ "MELEE_GUNMOD" ],
+    "weapon_flags": [ "STAB" ],
+    "techniques": [ "WBLOCK_1" ]
+  },
+  {
+    "id": "melee_mod_nailed",
+    "type": "GUNMOD",
+    "name": { "str": "melee nail spikes" },
+    "description": "A set of nails intended to be driven into the weapon's blunt section, adding to the cut value.",
+    "weight": "350 g",
+    "volume": "400 ml",
+    "price": "25 USD",
+    "to_hit": -2,
+    "bashing": 2,
+    "cutting": 4,
+    "material": [ "steel" ],
+    "symbol": ":",
+    "color": "dark_gray",
+    "location": "blunt",
+    "install_time": "10 m",
+    "flags": [ "MELEE_GUNMOD" ]
+  },
+  {
+    "id": "melee_mod_bolted",
+    "type": "GUNMOD",
+    "name": { "str": "melee bolts" },
+    "description": "A set of bolts intended to be driven into the weapon's blunt section, adding to the cut value.",
+    "weight": "350 g",
+    "volume": "400 ml",
+    "price": "25 USD",
+    "to_hit": -1,
+    "bashing": 8,
+    "material": [ "steel" ],
+    "symbol": ":",
+    "color": "dark_gray",
+    "location": "blunt",
+    "install_time": "10 m",
+    "flags": [ "MELEE_GUNMOD" ],
+    "techniques": [ "BRUTAL" ]
+  },
+  {
+    "id": "melee_mod_electric_coil",
+    "type": "GUNMOD",
+    "name": { "str": "melee tesla coil" },
+    "description": "A wrap of copper coils and a compact power pack that electrifies the blade tip, adding a jolt on impact.",
+    "weight": "300 g",
+    "volume": "250 ml",
+    "price": "120 USD",
+    "to_hit": -1,
+    "bashing": 2,
+    "material": [ "steel", "copper" ],
+    "symbol": ":",
+    "color": "yellow",
+    "location": "wrap",
+    "install_time": "15 m",
+    "attacks": [
+      {
+        "id": "COIL",
+        "damage": {
+          "values": [
+            { "damage_type": "electric", "amount": 8 }
+          ]
+        }
+      }
+    ],
+    "flags": [ "MELEE_GUNMOD" ]
+  },
+  {
+    "id": "melee_mod_overkill",
+    "type": "GUNMOD",
+    "name": { "str": "overkill melee mod" },
+    "description": "A wildly unstable high-energy coil rig that overclocks any blade it is mounted to, vaporizing targets on contact.  Handle with absurd caution.",
+    "weight": "500 g",
+    "volume": "500 ml",
+    "price": "9999 USD",
+    "to_hit": -2,
+    "bashing": 5,
+    "material": [ "steel", "copper" ],
+    "symbol": ":",
+    "color": "red",
+    "location": "tip",
+    "install_time": "30 m",
+    "attacks": [
+      {
+        "id": "OVERKILL",
+        "damage": {
+          "values": [
+            { "damage_type": "cut", "amount": 9000000 },
+            { "damage_type": "electric", "amount": 9000000 }
+          ]
+        }
+      }
+    ],
+    "flags": [ "MELEE_GUNMOD" ]
+  },
+  {
+    "id": "melee_mod_duct_tape_wrap",
+    "type": "GUNMOD",
+    "name": { "str": "duct tape grip" },
+    "description": "A tight duct tape wrap for a weapon handle that improves grip and balance.",
+    "weight": "180 g",
+    "volume": "150 ml",
+    "price": "35 USD",
+    "to_hit": 1,
+    "material": [ "plastic" ],
+    "symbol": ":",
+    "color": "brown",
+    "location": "handle",
+    "install_time": "10 m",
+    "flags": [ "MELEE_GUNMOD" ]
+  },
+  {
+    "id": "melee_mod_leather_wrap",
+    "type": "GUNMOD",
+    "name": { "str": "leather grip" },
+    "description": "A tight leather wrap for a weapon handle that improves grip and balance.",
+    "weight": "180 g",
+    "volume": "150 ml",
+    "price": "35 USD",
+    "to_hit": 2,
+    "material": [ "leather" ],
+    "symbol": ":",
+    "color": "brown",
+    "location": "handle",
+    "install_time": "10 m",
+    "flags": [ "MELEE_GUNMOD" ]
+  },
+  {
+    "id": "melee_mod_pommel_weight",
+    "type": "GUNMOD",
+    "name": { "str": "weighted pommel" },
+    "description": "A metal pommel cap that shifts balance rearward and adds striking mass.",
+    "weight": "450 g",
+    "volume": "300 ml",
+    "price": "45 USD",
+    "to_hit": -1,
+    "bashing": 6,
+    "material": [ "steel" ],
+    "symbol": ":",
+    "color": "light_gray",
+    "location": "handle",
+    "install_time": "12 m",
+    "flags": [ "MELEE_GUNMOD" ]
+  },
+  {
+    "id": "melee_mod_shishkebab_handle",
+    "type": "GUNMOD",
+    "name": { "str": "shishkebab handle" },
+    "description": "A retrofit handle with a miniature fuel reservoir and pilot jet that bathes the blade in flame while swinging.",
+    "weight": "750 g",
+    "volume": "500 ml",
+    "price": "350 USD",
+    "to_hit": -1,
+    "bashing": 2,
+    "material": [ "steel", "plastic" ],
+    "symbol": ":",
+    "color": "light_red",
+    "location": "handle",
+    "install_time": "15 m",
+    "attacks": [
+      {
+        "id": "SHISHKEBAB_FLAME",
+        "damage": {
+          "values": [
+            { "damage_type": "heat", "amount": 12 }
+          ]
+        }
+      }
+    ],
+    "weapon_flags": [ "FIRE", "LIGHT_310" ],
+    "flags": [ "MELEE_GUNMOD", "IRREMOVABLE" ]
+  },
+  {
+    "id": "melee_mod_nanomolecular_edge",
+    "type": "GUNMOD",
+    "name": { "str": "nanomolecular sleeve" },
+    "description": "A nanomolecular sleeve that clamps over a blade, adding a brutal cutting edge at the cost of balance.",
+    "weight": "600 g",
+    "volume": "350 ml",
+    "price": "120 USD",
+    "to_hit": -1,
+    "cutting": 14,
+    "material": [ "steel" ],
+    "symbol": ":",
+    "color": "dark_gray",
+    "location": "blade",
+    "install_time": "18 m",
+    "attacks": [
+      {
+        "id": "NANOMOLECULAR_EDGE",
+        "damage": {
+          "values": [
+            { "damage_type": "cut", "amount": 14 }
+          ]
+        }
+      }
+    ],
+    "flags": [ "MELEE_GUNMOD" ]
+  },
+  {
+    "id": "melee_mod_poison_coating",
+    "type": "GUNMOD",
+    "name": { "str": "poison coating" },
+    "description": "A small vial and brush to coat a blade in toxin, trading handling for a nasty venomous bite.",
+    "weight": "150 g",
+    "volume": "125 ml",
+    "price": "150 USD",
+    "material": [ "plastic", "glass" ],
+    "symbol": ":",
+    "color": "green",
+    "location": "blade",
+    "install_time": "12 m",
+    "attacks": [
+      {
+        "id": "POISON_COAT",
+        "damage": {
+          "values": [
+            { "damage_type": "acid", "amount": 8 }
+          ]
+        }
+      }
+    ],
+    "flags": [ "MELEE_GUNMOD", "IRREMOVABLE" ]
+  }
+]

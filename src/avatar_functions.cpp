@@ -474,10 +474,12 @@ bool gunmod_remove( avatar &you, item &gun, item &mod )
         return false;
     }
 
-    gun.gun_set_mode( gun_mode_id( "DEFAULT" ) );
+    if( gun.is_gun() ) {
+        gun.gun_set_mode( gun_mode_id( "DEFAULT" ) );
+    }
     //TODO: add activity for removing gunmods
 
-    if( mod.has_flag( flag_BRASS_CATCHER ) ) {
+    if( gun.is_gun() && mod.has_flag( flag_BRASS_CATCHER ) ) {
         gun.casings_handle( [&]( detached_ptr<item> &&e ) {
             you.i_add_or_drop( std::move( e ) );
             return detached_ptr<item>();
@@ -520,6 +522,10 @@ bool gunmod_remove( avatar &you, item &gun, item &mod )
 std::pair<int, int> gunmod_installation_odds( const avatar &you, const item &gun,
         const item &mod )
 {
+    const bool weapon_is_gun = gun.is_gun();
+    const skill_id weapon_skill = weapon_is_gun ? gun.gun_skill() : gun.melee_skill();
+    const int weapon_durability = weapon_is_gun && gun.type->gun ? gun.type->gun->durability : 10;
+
     // Mods with INSTALL_DIFFICULT have a chance to fail, potentially damaging the gun
     if( !mod.has_flag( flag_INSTALL_DIFFICULT ) || you.has_trait( trait_DEBUG_HS ) ) {
         return std::make_pair( 100, 0 );
@@ -531,7 +537,10 @@ std::pair<int, int> gunmod_installation_odds( const avatar &you, const item &gun
 
     for( const auto &e : mod.type->min_skills ) {
         // gain an additional chance for every level above the minimum requirement
-        skill_id sk = e.first == skill_weapon ? gun.gun_skill() : e.first;
+        skill_id sk = e.first == skill_weapon ? weapon_skill : e.first;
+        if( !sk ) {
+            continue;
+        }
         chances += std::max( you.get_skill_level( sk ) - e.second, 0 );
     }
     // cap success from skill alone to 1 in 5 (~83% chance)
@@ -546,7 +555,7 @@ std::pair<int, int> gunmod_installation_odds( const avatar &you, const item &gun
     roll = std::min( std::max( roll, 0 ), 100 );
 
     // risk of causing damage on failure increases with less durable guns
-    risk = ( 100 - roll ) * ( ( 10.0 - std::min( gun.type->gun->durability, 9 ) ) / 10.0 );
+    risk = ( 100 - roll ) * ( ( 10.0 - std::min( weapon_durability, 9 ) ) / 10.0 );
 
     return std::make_pair( roll, risk );
 }

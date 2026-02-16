@@ -628,7 +628,8 @@
   {
     "id": "STAB",
     "type": "json_flag",
-    "context": [ "GENERIC", "TOOL" ]
+    "context": [ "GENERIC", "TOOL" ],
+    "info": "This item <good>enables stabbing attacks</good>."
   },
   {
     "id": "SPEAR",

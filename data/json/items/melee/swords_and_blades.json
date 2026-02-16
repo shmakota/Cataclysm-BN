@@ -1370,6 +1370,7 @@
     "color": "light_gray",
     "techniques": [ "WBLOCK_2" ],
     "qualities": [ [ "CUT", 1 ], [ "BUTCHER", 9 ] ],
+    "melee_mod_locations": [ [ "blade", 1 ], [ "handle", 1 ] ],
     "flags": [ "DURABLE_MELEE", "SHEATH_SWORD", "NONCONDUCTIVE" ]
   },
   {
@@ -1514,6 +1515,7 @@
     "symbol": "/",
     "color": "light_gray",
     "techniques": [ "RAPID", "WBLOCK_2" ],
+    "melee_mod_locations": [ [ "blade", 1 ], [ "handle", 1 ] ],
     "qualities": [ [ "CUT", 1 ], [ "BUTCHER", 9 ] ],
     "flags": [ "DURABLE_MELEE", "SHEATH_SWORD", "NONCONDUCTIVE" ]
   },

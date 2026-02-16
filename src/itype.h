@@ -659,6 +659,9 @@ struct islot_gunmod : common_ranged_data {
 
     /** Not compatable on weapons that have this mod slot */
     std::set<gunmod_location> blacklist_mod;
+
+    /** Flags explicitly inherited by the parent weapon when this mod is attached. */
+    std::set<flag_id> weapon_flags;
 };
 
 struct islot_magazine {
@@ -1085,6 +1088,9 @@ struct itype {
 
         /** Volume above which the magazine starts to protrude from the item and add extra volume */
         units::volume magazine_well = 0_ml;
+
+        /** Location map for melee-focused mods; empty means no melee mods can be installed. */
+        std::map<gunmod_location, int> melee_mod_locations;
 
         layer_level layer = layer_level::MAX_CLOTHING_LAYER;
 

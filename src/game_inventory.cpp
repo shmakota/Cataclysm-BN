@@ -917,7 +917,9 @@ class gunmod_inventory_preset : public inventory_selector_preset
         }
 
         bool is_shown( const item *loc ) const override {
-            return loc->is_gun() && !loc->is_gunmod();
+            const bool melee_mod_target = loc->is_melee() && !loc->is_gun() &&
+                                          !loc->is_gunmod() && !loc->type->melee_mod_locations.empty();
+            return ( loc->is_gun() && !loc->is_gunmod() ) || melee_mod_target;
         }
 
         std::string get_denial( const item *loc ) const override {
@@ -964,8 +966,8 @@ class gunmod_inventory_preset : public inventory_selector_preset
 item *game_menus::inv::gun_to_modify( player &p, const item &gunmod )
 {
     return inv_internal( p, gunmod_inventory_preset( p, gunmod ),
-                         _( "Select gun to modify" ), -1,
-                         _( "You don't have any guns to modify." ) );
+                         _( "Select weapon to modify" ), -1,
+                         _( "You don't have any weapons to modify." ) );
 }
 
 class read_inventory_preset final: public inventory_selector_preset
