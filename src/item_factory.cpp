@@ -184,7 +184,7 @@ namespace
 auto defmode_name( itype &obj )
 {
     if( obj.mod ) {
-        return translate_marker( "gunmod" ); // grenade launchers
+        return translate_marker( "weapon mod" ); // grenade launchers
     } else if( obj.gun->clip == 1 ) {
         return translate_marker( "manual" ); // break-type actions
     } else if( obj.gun->skill_used == skill_id( "pistol" ) && obj.has_flag( flag_RELOAD_ONE ) ) {
@@ -207,9 +207,9 @@ void Item_factory::finalize_pre( itype &obj )
         std::swap( obj.melee[DT_CUT], obj.melee[DT_STAB] );
     }
 
-    // We want to recalculate DEFAULT attack, because it defaults to 0
-    // But if it doesn't exist, we want to keep it that way
-    if( obj.attacks.empty() || obj.attacks.contains( "DEFAULT" ) ) {
+    // We want to recalculate DEFAULT attack, because it defaults to 0.
+    // Only populate when no attacks exist or DEFAULT is empty.
+    if( obj.attacks.empty() ) {
         attack_statblock att;
         att.to_hit = obj.m_to_hit;
         for( size_t i = 0; i < NUM_DT; i++ ) {
@@ -219,6 +219,20 @@ void Item_factory::finalize_pre( itype &obj )
         }
 
         obj.attacks["DEFAULT"] = att;
+    } else if( auto default_it = obj.attacks.find( "DEFAULT" ); default_it != obj.attacks.end() ) {
+        const bool has_damage = !default_it->second.damage.empty();
+        const bool has_to_hit = default_it->second.to_hit != 0;
+        if( !has_damage && !has_to_hit ) {
+            attack_statblock att;
+            att.to_hit = obj.m_to_hit;
+            for( size_t i = 0; i < NUM_DT; i++ ) {
+                if( obj.melee[i] > 0 ) {
+                    att.damage.add_damage( static_cast<damage_type>( i ), obj.melee[i] );
+                }
+            }
+
+            obj.attacks["DEFAULT"] = att;
+        }
     }
 
     // add usage methods (with default values) based upon qualities
@@ -2670,6 +2684,7 @@ void Item_factory::load_basic_info( const JsonObject &jo, itype &def, const std:
             std::string id = jo.get_string( "id" );
             attack_statblock att = def.attacks[id];
             att.to_hit = jo.get_int( "to_hit", att.to_hit );
+            att.folded = jo.get_bool( "folded", id == "DEFAULT" ? true : att.folded );
             JsonObject damage = jo.get_object( "damage" );
             att.damage = load_damage_instance_inherit( damage, att.damage );
             def.attacks[id] = att;

@@ -1,11 +1,12 @@
 #pragma once
 
+#include "itype.h"
+
 class Character;
 class Creature;
 class monster;
 class item;
 struct damage_instance;
-struct attack_statblock;
 
 enum damage_type : int;
 
@@ -58,15 +59,13 @@ void roll_non_physical_damage( const Character &c, bool crit, damage_instance &d
 
 // Temporary function that returns any attack from the weapon
 // TODO: Remove
-const attack_statblock &default_attack( const item &it );
+attack_statblock default_attack( const item &it );
 
-const attack_statblock &pick_attack( const Character &c, const item &weapon,
-                                     const Creature &target );
-const attack_statblock &pick_attack( const Character &c, const item &weapon,
-                                     const monster &target );
-const attack_statblock &pick_attack( const Character &c, const item &weapon,
-                                     const Character &target );
+attack_statblock pick_attack( const Character &c, const item &weapon,
+                              const Creature &target );
+attack_statblock pick_attack( const Character &c, const item &weapon,
+                              const monster &target );
+attack_statblock pick_attack( const Character &c, const item &weapon,
+                              const Character &target );
 
 } // namespace melee
-
-

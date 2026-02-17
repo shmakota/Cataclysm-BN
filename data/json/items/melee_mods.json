@@ -1,32 +1,26 @@
 [
   {
-    "id": "melee_mod_test_weapon",
-    "type": "GENERIC",
-    "category": "weapons",
-    "name": { "str": "test melee mod weapon" },
-    "description": "A simple melee weapon with a dedicated slot for testing weapon mods.",
-    "weight": "1 kg",
-    "volume": "750 ml",
-    "price": 0,
-    "to_hit": 1,
-    "bashing": 10,
-    "material": [ "steel" ],
-    "symbol": "/",
-    "color": "light_gray",
-    "melee_mod_locations": [ [ "tip", 1 ] ],
-    "flags": [ "DURABLE_MELEE" ]
-  },
-  {
     "id": "melee_mod_barbed_wire",
     "type": "GUNMOD",
     "name": { "str": "barbed wire wrap" },
+    "looks_like": "wire_barbed",
     "description": "A length of barbed wire meant to be wrapped around a blade’s tip, adding nasty tearing wounds at the cost of handling.",
     "weight": "350 g",
     "volume": "400 ml",
     "price": "25 USD",
-    "to_hit": -2,
-    "bashing": 2,
-    "cutting": 4,
+    "attacks": [
+      {
+        "id": "DEFAULT",
+        "folded": true,
+        "to_hit": -2,
+        "damage": {
+          "values": [
+            { "damage_type": "bash", "amount": 2 },
+            { "damage_type": "cut", "amount": 4 }
+          ]
+        }
+      }
+    ],
     "material": [ "steel" ],
     "symbol": ":",
     "color": "dark_gray",
@@ -40,30 +34,53 @@
     "id": "melee_mod_nailed",
     "type": "GUNMOD",
     "name": { "str": "melee nail spikes" },
+    "looks_like": "nails",
     "description": "A set of nails intended to be driven into the weapon's blunt section, adding to the cut value.",
     "weight": "350 g",
     "volume": "400 ml",
     "price": "25 USD",
-    "to_hit": -2,
-    "bashing": 2,
-    "cutting": 4,
+    "attacks": [
+      {
+        "id": "DEFAULT",
+        "folded": true,
+        "to_hit": -2,
+        "damage": {
+          "values": [
+            { "damage_type": "bash", "amount": 2 },
+            { "damage_type": "stab", "amount": 4 }
+          ]
+        }
+      }
+    ],
     "material": [ "steel" ],
     "symbol": ":",
     "color": "dark_gray",
     "location": "blunt",
     "install_time": "10 m",
+    "weapon_flags": [ "STAB" ],
     "flags": [ "MELEE_GUNMOD" ]
   },
   {
     "id": "melee_mod_bolted",
     "type": "GUNMOD",
     "name": { "str": "melee bolts" },
+    "looks_like": "scrap",
     "description": "A set of bolts intended to be driven into the weapon's blunt section, adding to the cut value.",
     "weight": "350 g",
     "volume": "400 ml",
     "price": "25 USD",
-    "to_hit": -1,
-    "bashing": 8,
+    "attacks": [
+      {
+        "id": "DEFAULT",
+        "folded": true,
+        "to_hit": -1,
+        "damage": {
+          "values": [
+            { "damage_type": "bash", "amount": 8 }
+          ]
+        }
+      }
+    ],
     "material": [ "steel" ],
     "symbol": ":",
     "color": "dark_gray",
@@ -80,8 +97,6 @@
     "weight": "300 g",
     "volume": "250 ml",
     "price": "120 USD",
-    "to_hit": -1,
-    "bashing": 2,
     "material": [ "steel", "copper" ],
     "symbol": ":",
     "color": "yellow",
@@ -89,9 +104,12 @@
     "install_time": "15 m",
     "attacks": [
       {
-        "id": "COIL",
+        "id": "DEFAULT",
+        "folded": true,
+        "to_hit": -1,
         "damage": {
           "values": [
+            { "damage_type": "bash", "amount": 2 },
             { "damage_type": "electric", "amount": 8 }
           ]
         }
@@ -107,16 +125,16 @@
     "weight": "500 g",
     "volume": "500 ml",
     "price": "9999 USD",
-    "to_hit": -2,
-    "bashing": 5,
     "material": [ "steel", "copper" ],
     "symbol": ":",
     "color": "red",
-    "location": "tip",
+    "location": "blade",
     "install_time": "30 m",
     "attacks": [
       {
-        "id": "OVERKILL",
+        "id": "DEFAULT",
+        "folded": true,
+        "to_hit": -2,
         "damage": {
           "values": [
             { "damage_type": "cut", "amount": 9000000 },
@@ -131,6 +149,7 @@
     "id": "melee_mod_duct_tape_wrap",
     "type": "GUNMOD",
     "name": { "str": "duct tape grip" },
+    "looks_like": "duct_tape",
     "description": "A tight duct tape wrap for a weapon handle that improves grip and balance.",
     "weight": "180 g",
     "volume": "150 ml",
@@ -184,8 +203,6 @@
     "weight": "750 g",
     "volume": "500 ml",
     "price": "350 USD",
-    "to_hit": -1,
-    "bashing": 2,
     "material": [ "steel", "plastic" ],
     "symbol": ":",
     "color": "light_red",
@@ -193,15 +210,18 @@
     "install_time": "15 m",
     "attacks": [
       {
-        "id": "SHISHKEBAB_FLAME",
+        "id": "DEFAULT",
+        "folded": true,
+        "to_hit": -1,
         "damage": {
           "values": [
+            { "damage_type": "bash", "amount": 2 },
             { "damage_type": "heat", "amount": 12 }
           ]
         }
       }
     ],
-    "weapon_flags": [ "FIRE", "LIGHT_310" ],
+    "weapon_flags": [ "FIRE", "FLAMING", "LIGHT_16" ],
     "flags": [ "MELEE_GUNMOD", "IRREMOVABLE" ]
   },
   {
@@ -212,16 +232,11 @@
     "weight": "600 g",
     "volume": "350 ml",
     "price": "120 USD",
-    "to_hit": -1,
-    "cutting": 14,
-    "material": [ "steel" ],
-    "symbol": ":",
-    "color": "dark_gray",
-    "location": "blade",
-    "install_time": "18 m",
     "attacks": [
       {
-        "id": "NANOMOLECULAR_EDGE",
+        "id": "DEFAULT",
+        "folded": true,
+        "to_hit": -1,
         "damage": {
           "values": [
             { "damage_type": "cut", "amount": 14 }
@@ -229,6 +244,11 @@
         }
       }
     ],
+    "material": [ "steel" ],
+    "symbol": ":",
+    "color": "dark_gray",
+    "location": "blade",
+    "install_time": "18 m",
     "flags": [ "MELEE_GUNMOD" ]
   },
   {
@@ -239,21 +259,24 @@
     "weight": "150 g",
     "volume": "125 ml",
     "price": "150 USD",
+    "attacks": [
+      {
+        "id": "DEFAULT",
+        "folded": true,
+        "to_hit": -1,
+        "damage": {
+          "values": [
+            { "damage_type": "stab", "amount": 3 },
+            { "damage_type": "acid", "amount": 6 }
+          ]
+        }
+      }
+    ],
     "material": [ "plastic", "glass" ],
     "symbol": ":",
     "color": "green",
     "location": "blade",
     "install_time": "12 m",
-    "attacks": [
-      {
-        "id": "POISON_COAT",
-        "damage": {
-          "values": [
-            { "damage_type": "acid", "amount": 8 }
-          ]
-        }
-      }
-    ],
     "flags": [ "MELEE_GUNMOD", "IRREMOVABLE" ]
   }
 ]

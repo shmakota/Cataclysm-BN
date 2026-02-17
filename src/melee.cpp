@@ -484,7 +484,7 @@ void Character::melee_attack( Creature &t, bool allow_special, const matec_id *f
         }
     }
     item &cur_weapon = allow_unarmed ? used_weapon() : primary_weapon();
-    const attack_statblock &attack = melee::pick_attack( *this, cur_weapon, t );
+    const attack_statblock attack = melee::pick_attack( *this, cur_weapon, t );
 
     // Lua imelee on_melee_attack callback: fires before hit resolution.
     // Returning false from Lua forces a miss.
@@ -1992,7 +1992,7 @@ void Character::perform_special_attacks( Creature &t, dealt_damage_instance &dea
         }
 
         const item &cur_weapon = used_weapon();
-        const attack_statblock &attack = melee::default_attack( cur_weapon );
+        const attack_statblock attack = melee::default_attack( cur_weapon );
         // TODO: Make this hit roll use unarmed skill, not weapon skill + weapon to_hit
         int hit_spread = t.deal_melee_attack( this, hit_roll( cur_weapon, attack ) * 0.8 );
         if( hit_spread >= 0 ) {
@@ -2586,7 +2586,7 @@ void avatar_funcs::try_disarm_npc( avatar &you, npc &target )
     item &it = target.primary_weapon();
 
     // roll your melee and target's dodge skills to check if grab/smash attack succeeds
-    int hitspread = target.deal_melee_attack( &you, you.hit_roll( it, melee::default_attack( it ) ) );
+    const int hitspread = target.deal_melee_attack( &you, you.hit_roll( it, melee::default_attack( it ) ) );
     if( hitspread < 0 ) {
         add_msg( _( "You lunge for the %s, but miss!" ), it.tname() );
         you.mod_moves( -100 - stumble( you,
@@ -2731,16 +2731,21 @@ double melee::expected_damage( const Character &c, const item &weapon,
     return chance * capped_near_hp;
 }
 
-const attack_statblock &melee::default_attack( const item &it )
+attack_statblock melee::default_attack( const item &it )
 {
     assert( !it.type->attacks.empty() );
     return it.type->attacks.begin()->second;
 }
 
-const attack_statblock &melee::pick_attack( const Character &c, const item &weapon,
-        const Creature &target )
+attack_statblock melee::pick_attack( const Character &c, const item &weapon,
+                                     const Creature &target )
 {
-    if( weapon.type->attacks.size() < 2 ) {
+    const std::map<std::string, attack_statblock> attacks = weapon.get_attacks();
+    if( attacks.size() < 2 ) {
+        const auto default_it = attacks.find( "DEFAULT" );
+        if( default_it != attacks.end() ) {
+            return default_it->second;
+        }
         return melee::default_attack( weapon );
     }
 
@@ -2751,20 +2756,26 @@ const attack_statblock &melee::pick_attack( const Character &c, const item &weap
     return melee::pick_attack( c, weapon, *target.as_character() );
 }
 
-const attack_statblock &melee::pick_attack( const Character &c, const item &weapon,
-        const monster &target )
+attack_statblock melee::pick_attack( const Character &c, const item &weapon,
+                                     const monster &target )
 {
-    if( weapon.type->attacks.size() < 2 ) {
+    const std::map<std::string, attack_statblock> attacks = weapon.get_attacks();
+    if( attacks.size() < 2 ) {
+        const auto default_it = attacks.find( "DEFAULT" );
+        if( default_it != attacks.end() ) {
+            return default_it->second;
+        }
         return default_attack( weapon );
     }
 
     double best_dmg = 0.0;
     const attack_statblock *best_attack = nullptr;
-    for( const auto &pr : weapon.type->attacks ) {
-        double attack_dmg = melee::expected_damage( c, weapon, pr.second, target );
+    for( const auto &pr : attacks ) {
+        const attack_statblock &candidate = pr.second;
+        double attack_dmg = melee::expected_damage( c, weapon, candidate, target );
         if( attack_dmg > best_dmg ) {
             best_dmg = attack_dmg;
-            best_attack = &pr.second;
+            best_attack = &candidate;
         }
     }
 
@@ -2772,8 +2783,8 @@ const attack_statblock &melee::pick_attack( const Character &c, const item &weap
     return *best_attack;
 }
 
-const attack_statblock &melee::pick_attack( const Character &c, const item &weapon,
-        const Character &target )
+attack_statblock melee::pick_attack( const Character &c, const item &weapon,
+                                     const Character &target )
 {
     ( void )c;
     ( void )target;

@@ -102,7 +102,7 @@
   {
     "type": "item_action",
     "id": "GUNMOD_ATTACH",
-    "name": { "str": "Attach as gunmod" }
+    "name": { "str": "Attach as weapon mod" }
   },
   {
     "type": "item_action",
@@ -472,7 +472,7 @@
   {
     "type": "item_action",
     "id": "detach_gunmods",
-    "name": { "str": "Detach gunmods" }
+    "name": { "str": "Detach weapon mods" }
   },
   {
     "type": "item_action",

@@ -5,6 +5,7 @@
 #include <ranges>
 #include <array>
 #include <cassert>
+#include <charconv>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -118,6 +119,58 @@
 #include "vpart_position.h"
 #include "weather.h"
 #include "weather_gen.h"
+
+namespace {
+
+constexpr std::string_view light_flag_prefix = "LIGHT_";
+
+auto light_value_from_flag( const flag_id &flag ) -> int
+{
+    const auto name = std::string_view( flag.str() );
+    if( !name.starts_with( light_flag_prefix ) ) {
+        return 0;
+    }
+
+    auto value = 0;
+    const auto digits = name.substr( light_flag_prefix.size() );
+    const auto result = std::from_chars( digits.data(), digits.data() + digits.size(), value );
+    if( result.ec != std::errc() || value <= 0 ) {
+        return 0;
+    }
+
+    return value;
+}
+
+auto max_light_from_flags( const std::set<flag_id> &flags ) -> int
+{
+    if( flags.empty() ) {
+        return 0;
+    }
+
+    const auto light_values = flags | std::views::transform( []( const flag_id &flag ) {
+        return light_value_from_flag( flag );
+    } );
+
+    return std::ranges::max( light_values );
+}
+
+auto max_light_from_weapon_mods( const std::vector<const item *> &mods ) -> int
+{
+    if( mods.empty() ) {
+        return 0;
+    }
+
+    const auto mod_lights = mods | std::views::transform( []( const item *mod ) -> int {
+        if( !mod->type->gunmod ) {
+            return 0;
+        }
+        return max_light_from_flags( mod->type->gunmod->weapon_flags );
+    } );
+
+    return std::ranges::max( mod_lights );
+}
+
+} // namespace
 
 static const std::string GUN_MODE_VAR_NAME( "item::mode" );
 static const std::string CLOTHING_MOD_VAR_PREFIX( "clothing_mod_" );
@@ -1550,7 +1603,11 @@ static const double hits_by_accuracy[41] = {
 
 double item::effective_dps( const player &guy, const monster &mon ) const
 {
-    return effective_dps( guy, mon, melee::default_attack( *this ) );
+    const std::map<std::string, attack_statblock> attacks = get_attacks();
+    const attack_statblock attack = attacks.contains( "DEFAULT" ) ?
+                                    attacks.find( "DEFAULT" )->second :
+                                    melee::default_attack( *this );
+    return effective_dps( guy, mon, attack );
 }
 
 double item::effective_dps( const player &guy, const monster &mon,
@@ -1590,7 +1647,10 @@ double item::effective_dps( const player &guy, const monster &mon,
     // sum average damage past armor and return the number of moves required to achieve
     // that damage
     // @todo Update for attack_statblock
-    const attack_statblock default_attack = melee::default_attack( *this );
+    const std::map<std::string, attack_statblock> attacks = get_attacks();
+    const attack_statblock default_attack = attacks.contains( "DEFAULT" ) ?
+                                            attacks.find( "DEFAULT" )->second :
+                                            melee::default_attack( *this );
     const auto calc_effective_damage = [ &, moves_per_attack]( const double num_strikes,
     const bool crit, const player & guy, const monster & mon ) {
         monster temp_mon( mon );
@@ -2807,6 +2867,36 @@ void item::gunmod_info( std::vector<iteminfo> &info, const iteminfo_query *parts
         info.emplace_back( "GUNMOD", _( "Minimum strength required modifier: " ),
                            mod.min_str_required_mod );
     }
+    if( has_flag( flag_MELEE_GUNMOD ) ) {
+        const std::map<std::string, attack_statblock> attacks = get_attacks();
+        const auto attack_it = attacks.find( "DEFAULT" );
+        if( attack_it != attacks.end() ) {
+            const attack_statblock &attack = attack_it->second;
+            std::set<damage_type> damage_types;
+            std::ranges::for_each( attack.damage, [&damage_types]( const damage_unit &du ) {
+                if( du.amount != 0.0f ) {
+                    damage_types.insert( du.type );
+                }
+            } );
+
+            if( !damage_types.empty() && parts->test( iteminfo_parts::BASE_DAMAGE ) ) {
+                insert_separation_line( info );
+                info.emplace_back( "GUNMOD", _( "<bold>Melee damage</bold>: " ), "", iteminfo::no_newline );
+                bool first = true;
+                std::ranges::for_each( damage_types, [&]( const damage_type dt ) {
+                    const damage_unit du( dt, 0.0f );
+                    const std::string prefix = first ? std::string() : std::string( "  " );
+                    info.emplace_back( "GUNMOD", prefix + string_format( _( "%s: " ), du.get_name() ), "",
+                                       iteminfo::no_newline, attack.damage.type_damage( dt ) );
+                    first = false;
+                } );
+                if( attack.to_hit != 0 ) {
+                    info.emplace_back( "GUNMOD", std::string( "  " ) + _( "To-hit bonus: " ), "",
+                                       iteminfo::show_plus, attack.to_hit );
+                }
+            }
+        }
+    }
     if( !mod.add_mod.empty() && parts->test( iteminfo_parts::GUNMOD_ADD_MOD ) ) {
         insert_separation_line( info );
 
@@ -3686,57 +3776,59 @@ void item::combat_info( std::vector<iteminfo> &info, const iteminfo_query *parts
 
     if( attacks.contains( "DEFAULT" ) ) {
         const attack_statblock &attack = attacks.find( "DEFAULT" )->second;
-        const int dmg_bash = attack.damage.type_damage( DT_BASH );
-        const int dmg_cut = attack.damage.type_damage( DT_CUT );
-        const int dmg_stab = attack.damage.type_damage( DT_STAB );
-        const int dmg_electric = attack.damage.type_damage( DT_ELECTRIC );
-        if( dmg_bash || dmg_cut || dmg_stab || dmg_electric || type->m_to_hit > 0 ) {
+        std::set<damage_type> damage_types;
+        std::ranges::for_each( attack.damage, [&damage_types]( const damage_unit &du ) {
+            if( du.amount != 0.0f ) {
+                damage_types.insert( du.type );
+            }
+        } );
+        const bool has_damage = !damage_types.empty();
+        const int to_hit_total = type->m_to_hit + get_melee_hit_bonus();
+        if( has_damage || to_hit_total > 0 ) {
             print_attacks = true;
         }
 
         if( parts->test( iteminfo_parts::BASE_DAMAGE ) ) {
+            bool printed_line = false;
             insert_separation_line( info );
-            std::string sep;
-            if( dmg_bash || dmg_cut || dmg_stab ) {
+            if( has_damage ) {
                 info.emplace_back( "BASE", _( "<bold>Melee damage</bold>: " ), "", iteminfo::no_newline );
-            }
-            if( dmg_bash ) {
-                info.emplace_back( "BASE", _( "Bash: " ), "", iteminfo::no_newline, dmg_bash );
-                sep = space;
-            }
-            if( dmg_cut ) {
-                info.emplace_back( "BASE", sep + _( "Cut: " ), "", iteminfo::no_newline, dmg_cut );
-                sep = space;
-            }
-            if( dmg_stab ) {
-                info.emplace_back( "BASE", sep + _( "Pierce: " ), "", iteminfo::no_newline, dmg_stab );
-                sep = space;
-            }
-            if( dmg_electric ) {
-                info.emplace_back( "BASE", sep + _( "Electric: " ), "", iteminfo::no_newline, dmg_electric );
-            }
-        }
-
-        if( dmg_bash || dmg_cut || dmg_stab ) {
-            if( parts->test( iteminfo_parts::BASE_TOHIT ) ) {
-                info.emplace_back( "BASE", space + _( "To-hit bonus: " ), "",
-                                   iteminfo::show_plus, type->m_to_hit + get_melee_hit_bonus() );
+                bool first = true;
+                std::ranges::for_each( damage_types, [&]( const damage_type dt ) {
+                    const damage_unit du( dt, 0.0f );
+                    const std::string prefix = first ? std::string() : space;
+                    info.emplace_back( "BASE", prefix + string_format( _( "%s: " ), du.get_name() ), "",
+                                       iteminfo::no_newline, attack.damage.type_damage( dt ) );
+                    first = false;
+                } );
+                printed_line = true;
             }
 
-            if( parts->test( iteminfo_parts::BASE_MOVES ) ) {
+            if( parts->test( iteminfo_parts::BASE_TOHIT ) && to_hit_total != 0 ) {
+                const std::string prefix = printed_line ? space : std::string();
+                info.emplace_back( "BASE", prefix + _( "To-hit bonus: " ), "",
+                                   iteminfo::no_newline | iteminfo::show_plus, to_hit_total );
+                printed_line = true;
+            }
+
+            if( printed_line && parts->test( iteminfo_parts::BASE_MOVES ) && has_damage ) {
+                info.emplace_back( "BASE", newline );
+            }
+
+            if( parts->test( iteminfo_parts::BASE_MOVES ) && has_damage ) {
                 info.emplace_back( "BASE", _( "Moves per attack: " ), "",
                                    iteminfo::lower_is_better, attack_cost() );
                 // This would be a bar if iteminfo was not very insistent on numbers
                 info.emplace_back( "BASE", _( "Stamina Cost: " ), "", iteminfo::lower_is_better, stamina_cost() );
                 info.emplace_back( "BASE", _( "Typical damage per second:" ), "" );
                 const std::map<std::string, double> &dps_data = dps( true, false, attack );
-                std::string sep;
-                for( const std::pair<const std::string, double> &dps_entry : dps_data ) {
-                    info.emplace_back( "BASE", sep + dps_entry.first + ": ", "",
+                std::string dps_sep;
+                std::ranges::for_each( dps_data, [&]( const auto &dps_entry ) {
+                    info.emplace_back( "BASE", dps_sep + dps_entry.first + ": ", "",
                                        iteminfo::no_newline | iteminfo::is_decimal,
                                        dps_entry.second );
-                    sep = space;
-                }
+                    dps_sep = space;
+                } );
                 info.emplace_back( "BASE", "" );
             }
         }
@@ -3830,8 +3922,9 @@ void item::combat_info( std::vector<iteminfo> &info, const iteminfo_query *parts
 
     if( print_attacks || debug_mode ) {
         // @todo Handle multiple attacks
-        const attack_statblock &default_attack = attacks.empty() ? melee::default_attack( *this ) :
-                                               attacks.begin()->second;
+        const attack_statblock default_attack = attacks.contains( "DEFAULT" ) ?
+                                                attacks.find( "DEFAULT" )->second :
+                                                melee::default_attack( *this );
         damage_instance non_crit;
         melee::roll_all_damage( you, false, non_crit, true, *this, default_attack );
         damage_instance crit;
@@ -3843,7 +3936,9 @@ void item::combat_info( std::vector<iteminfo> &info, const iteminfo_query *parts
         }
         // Chance of critical hit
         if( parts->test( iteminfo_parts::DESCRIPTION_MELEEDMG_CRIT ) ) {
-            const auto &attack = melee::default_attack( *this );
+            const attack_statblock attack = attacks.contains( "DEFAULT" ) ?
+                                            attacks.find( "DEFAULT" )->second :
+                                            melee::default_attack( *this );
             info.emplace_back( "DESCRIPTION",
                                string_format( _( "Critical hit chance <neutral>%d%% - %d%%</neutral>" ),
                                               static_cast<int>( you.crit_chance( 0, 100, *this, attack ) *
@@ -4416,7 +4511,7 @@ std::vector<iteminfo> item::info( const iteminfo_query &parts_ref, int batch,
             parts->test( iteminfo_parts::DESCRIPTION_AUX_GUNMOD_HEADER ) ) {
             gun = &*aux;
             info.emplace_back( "DESCRIPTION",
-                               string_format( _( "Stats of the active <info>gunmod (%s)</info> "
+                               string_format( _( "Stats of the active <info>weapon mod (%s)</info> "
                                                  "are shown." ), gun->tname() ) );
         }
     }
@@ -5708,7 +5803,7 @@ int item::damage_melee( damage_type dt ) const
 {
     const std::map<std::string, attack_statblock> attacks = get_attacks();
     const auto it = attacks.find( "DEFAULT" );
-    const attack_statblock &attack = it != attacks.end() ? it->second : melee::default_attack( *this );
+    const attack_statblock attack = it != attacks.end() ? it->second : melee::default_attack( *this );
     return damage_melee( attack, dt );
 }
 
@@ -5744,16 +5839,8 @@ int item::damage_melee( const attack_statblock &attack, damage_type dt ) const
 
     // @todo: This probably breaks attack_statblock logic completely...
     // consider any melee gunmods
-    const std::vector<const item *> mods = gunmods();
-    const bool has_melee_mods = std::ranges::any_of( mods, []( const item *mod ) {
-        return mod->has_flag( flag_MELEE_GUNMOD );
-    } );
-    if( is_gun() || has_melee_mods ) {
-        return std::accumulate( mods.begin(), mods.end(), res, [dt]( int last_max, const item *it ) {
-            return it->has_flag( flag_MELEE_GUNMOD ) ? std::max( last_max, it->damage_melee( dt ) ) : last_max;
-        } );
-
-    }
+    // Damage from attached mods is already folded into attack_statblock via get_attacks(),
+    // so we don't re-max/sum it here to avoid dropping or duplicating non-physical types.
 
     switch( dt ) {
         case DT_BASH:
@@ -5902,58 +5989,75 @@ std::map<std::string, attack_statblock> item::get_attacks() const
 
     }
 
-    // consider any melee gunmods
-    const std::vector<const item *> mods = gunmods();
-    const bool has_melee_mods = std::ranges::any_of( mods, []( const item *mod ) {
-        return mod->has_flag( flag_MELEE_GUNMOD );
+    // Merge folded attacks from this item and attached melee mods into the default attack.
+    attack_statblock merged_default = result.contains( "DEFAULT" ) ? result["DEFAULT"] : attack_statblock{};
+
+    // Fold this item's own folded non-default attacks
+    std::ranges::for_each( type->attacks, [&]( const auto &attack_entry ) {
+        if( attack_entry.first == "DEFAULT" || !attack_entry.second.folded ) {
+            return;
+        }
+        const attack_statblock &fold_attack = attack_entry.second;
+        const int fold_hit = fold_attack.to_hit != 0 ? fold_attack.to_hit : type->m_to_hit;
+        std::ranges::for_each( fold_attack.damage, [&]( const damage_unit &dmg ) {
+            merged_default.damage.add( dmg );
+        } );
+        merged_default.to_hit += fold_hit;
     } );
-    if( is_gun() || has_melee_mods ) {
-        if( get_option<bool>( "LIMITED_BAYONETS" ) ) {
-            // TODO: Multiple bayonets with multiple attacks each - add all attacks, resolve id conflicts
-            float best_damage = 0.0f;
-            const attack_statblock *best = nullptr;
-            for( const item *gunmod_ptr : mods ) {
-                const item &gunmod = *gunmod_ptr;
-                if( gunmod.has_flag( flag_MELEE_GUNMOD ) ) {
-                    // TODO: Handle multiple attacks here - add all of them as separate attacks
-                    assert( !gunmod.type->attacks.empty() );
-                    const attack_statblock &first_attack = gunmod.type->attacks.begin()->second;
-                    float damage_sum = std::accumulate( first_attack.damage.begin(), first_attack.damage.end(),
-                                                        0.0f, []( float amount_sum,
-                    const damage_unit & du ) {
-                        // Ignore multipliers for now because it's a temporary hack
-                        return amount_sum + du.amount;
-                    } );
-                    if( damage_sum > best_damage ) {
-                        best = &first_attack;
-                        best_damage = damage_sum;
-                    }
-                }
+
+    // Fold attached mod attacks
+    const std::vector<const item *> mods = gunmods();
+    std::vector<std::pair<std::string, attack_statblock>> extra_attacks;
+    std::ranges::for_each( mods, [&]( const item *it ) {
+        if( !it->has_flag( flag_MELEE_GUNMOD ) ) {
+            return;
+        }
+        std::ranges::for_each( it->type->attacks, [&]( const auto &attack_entry ) {
+            const bool fold = attack_entry.first == "DEFAULT" || attack_entry.second.folded;
+            const attack_statblock &attack = attack_entry.second;
+            const int mod_hit = attack.to_hit != 0 ? attack.to_hit : it->type->m_to_hit;
+            if( fold ) {
+                std::ranges::for_each( attack.damage, [&]( const damage_unit &dmg ) {
+                    merged_default.damage.add( dmg );
+                } );
+                merged_default.to_hit += mod_hit;
+            } else {
+                const std::string key = std::string( it->typeId() ) + ":" + attack_entry.first;
+                extra_attacks.emplace_back( key, attack );
             }
-            if( best != nullptr ) {
-                attack_statblock gunmod_attack = *best;
-                gunmod_attack.to_hit = type->m_to_hit;
-                // Expose bayonet as its own attack
-                result["BAYONET"] = gunmod_attack;
-                // Also fold into default so stats/rolls show modded damage
-                attack_statblock &default_attack = result.contains( "DEFAULT" ) ? result["DEFAULT"] :
-                                                   result["DEFAULT"] = melee::default_attack( *this );
-                for( const auto &dmg : gunmod_attack.damage.damage_units ) {
-                    default_attack.damage.add( dmg );
-                }
-                default_attack.to_hit += gunmod_attack.to_hit;
+        } );
+    } );
+
+    // Add non-folded attacks for melee weapons; for guns keep them only under LIMITED_BAYONETS
+    if( !is_gun() ) {
+        std::ranges::for_each( extra_attacks, [&]( const auto &entry ) {
+            if( !result.contains( entry.first ) ) {
+                result.emplace( entry.first, entry.second );
             }
-        } else {
-            // Old logic here - max dmg for each type
-            for( const item *it : mods ) {
-                const attack_statblock &attack = melee::default_attack( *it );
-                for( auto &dmg : attack.damage ) {
-                    result["DEFAULT"].damage.add( dmg );
-                }
-                result["DEFAULT"].to_hit += attack.to_hit;
+        } );
+    } else if( get_option<bool>( "LIMITED_BAYONETS" ) ) {
+        float best_damage = 0.0f;
+        const attack_statblock *best = nullptr;
+        for( const auto &entry : extra_attacks ) {
+            const attack_statblock &mod_attack = entry.second;
+            float damage_sum = std::accumulate( mod_attack.damage.begin(), mod_attack.damage.end(),
+                                                0.0f, []( float amount_sum,
+            const damage_unit & du ) {
+                return amount_sum + du.amount;
+            } );
+            if( damage_sum > best_damage ) {
+                best = &mod_attack;
+                best_damage = damage_sum;
             }
         }
+        if( best != nullptr ) {
+            attack_statblock gunmod_attack = *best;
+            gunmod_attack.to_hit += type->m_to_hit;
+            result["BAYONET"] = gunmod_attack;
+        }
     }
+
+    result["DEFAULT"] = merged_default;
 
     return result;
 }
@@ -6102,6 +6206,16 @@ bool item::has_flag( const flag_id &f ) const
             return false;
         } );
     };
+
+    const auto weapon_flag_from_mods = [&f]( const auto & mods ) -> bool {
+        return std::ranges::any_of( mods, [&f]( const item *e ) {
+            return e->type->gunmod && e->type->gunmod->weapon_flags.contains( f );
+        } );
+    };
+
+    if( weapon_flag_from_mods( mods ) ) {
+        return true;
+    }
 
     if( f->inherit() && flag_in_mods( mods ) ) {
         return true;
@@ -7874,7 +7988,7 @@ bool item::is_funnel_container( units::volume &bigger_than ) const
 
 bool item::is_emissive() const
 {
-    return light.luminance > 0 || type->light_emission > 0;
+    return light.luminance > 0 || getlight_emit() > 0;
 }
 
 bool item::is_deployable() const
@@ -8764,7 +8878,7 @@ ret_val<bool> item::is_gunmod_compatible( const item &mod ) const
         return ret_val<bool>::make_failure( _( "isn't a weapon" ) );
 
     } else if( is_gunmod() ) {
-        return ret_val<bool>::make_failure( _( "is a gunmod and cannot be modded" ) );
+        return ret_val<bool>::make_failure( _( "is a weapon mod and cannot be modded" ) );
 
     } else if( gunmod_find( mod.typeId() ) ) {
         return ret_val<bool>::make_failure( _( "already has a %s" ), mod.tname( 1 ) );
@@ -9440,7 +9554,9 @@ bool item::getlight( float &luminance, units::angle &width, units::angle &direct
 
 int item::getlight_emit() const
 {
-    float lumint = type->light_emission;
+    auto lumint = static_cast<float>( type->light_emission );
+    const auto mod_light = max_light_from_weapon_mods( gunmods() );
+    lumint = std::max( lumint, static_cast<float>( mod_light ) );
 
     if( lumint == 0 ) {
         return 0;

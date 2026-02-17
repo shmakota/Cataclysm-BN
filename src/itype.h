@@ -875,6 +875,8 @@ class islot_milling
 struct attack_statblock {
     int to_hit = 0;
     damage_instance damage;
+    /** Whether this attack should be folded into the parent's default attack when attached as a mod. */
+    bool folded = false;
 };
 
 struct itype {
