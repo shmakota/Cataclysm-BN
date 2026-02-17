@@ -2867,7 +2867,7 @@ void item::gunmod_info( std::vector<iteminfo> &info, const iteminfo_query *parts
         info.emplace_back( "GUNMOD", _( "Minimum strength required modifier: " ),
                            mod.min_str_required_mod );
     }
-    if( has_flag( flag_MELEE_GUNMOD ) ) {
+    if( has_flag( flag_MELEE_GUNMOD ) || has_flag( flag_WEAPON_MOD_MELEE ) ) {
         const std::map<std::string, attack_statblock> attacks = get_attacks();
         const auto attack_it = attacks.find( "DEFAULT" );
         if( attack_it != attacks.end() ) {
@@ -6008,8 +6008,11 @@ std::map<std::string, attack_statblock> item::get_attacks() const
     // Fold attached mod attacks
     const std::vector<const item *> mods = gunmods();
     std::vector<std::pair<std::string, attack_statblock>> extra_attacks;
+    const bool base_is_gun = is_gun();
     std::ranges::for_each( mods, [&]( const item *it ) {
-        if( !it->has_flag( flag_MELEE_GUNMOD ) ) {
+        const bool is_bayonet_mod = it->has_flag( flag_MELEE_GUNMOD );
+        const bool is_melee_weapon_mod = it->has_flag( flag_WEAPON_MOD_MELEE );
+        if( ( base_is_gun && !is_bayonet_mod ) || ( !base_is_gun && !is_melee_weapon_mod ) ) {
             return;
         }
         std::ranges::for_each( it->type->attacks, [&]( const auto &attack_entry ) {
@@ -8890,7 +8893,7 @@ ret_val<bool> item::is_gunmod_compatible( const item &mod ) const
         return ret_val<bool>::make_failure( _( "doesn't have enough room for another %s mod" ),
                                             mod.type->gunmod->location.name() );
 
-    } else if( target_is_melee_weapon && !mod.has_flag( flag_MELEE_GUNMOD ) ) {
+    } else if( target_is_melee_weapon && !mod.has_flag( flag_WEAPON_MOD_MELEE ) ) {
         return ret_val<bool>::make_failure( _( "cannot have a %s" ), mod.tname() );
 
     }

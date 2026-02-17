@@ -26,7 +26,7 @@
     "color": "dark_gray",
     "location": "wrap",
     "install_time": "10 m",
-    "flags": [ "MELEE_GUNMOD" ],
+    "flags": [ "WEAPON_MOD_MELEE" ],
     "weapon_flags": [ "STAB" ],
     "techniques": [ "WBLOCK_1" ]
   },
@@ -58,7 +58,7 @@
     "location": "blunt",
     "install_time": "10 m",
     "weapon_flags": [ "STAB" ],
-    "flags": [ "MELEE_GUNMOD" ]
+    "flags": [ "WEAPON_MOD_MELEE" ]
   },
   {
     "id": "melee_mod_bolted",
@@ -86,7 +86,7 @@
     "color": "dark_gray",
     "location": "blunt",
     "install_time": "10 m",
-    "flags": [ "MELEE_GUNMOD" ],
+    "flags": [ "WEAPON_MOD_MELEE" ],
     "techniques": [ "BRUTAL" ]
   },
   {
@@ -115,7 +115,7 @@
         }
       }
     ],
-    "flags": [ "MELEE_GUNMOD" ]
+    "flags": [ "WEAPON_MOD_MELEE" ]
   },
   {
     "id": "melee_mod_overkill",
@@ -143,7 +143,7 @@
         }
       }
     ],
-    "flags": [ "MELEE_GUNMOD" ]
+    "flags": [ "WEAPON_MOD_MELEE" ]
   },
   {
     "id": "melee_mod_duct_tape_wrap",
@@ -160,7 +160,7 @@
     "color": "brown",
     "location": "handle",
     "install_time": "10 m",
-    "flags": [ "MELEE_GUNMOD" ]
+    "flags": [ "WEAPON_MOD_MELEE" ]
   },
   {
     "id": "melee_mod_leather_wrap",
@@ -176,7 +176,7 @@
     "color": "brown",
     "location": "handle",
     "install_time": "10 m",
-    "flags": [ "MELEE_GUNMOD" ]
+    "flags": [ "WEAPON_MOD_MELEE" ]
   },
   {
     "id": "melee_mod_pommel_weight",
@@ -193,7 +193,7 @@
     "color": "light_gray",
     "location": "handle",
     "install_time": "12 m",
-    "flags": [ "MELEE_GUNMOD" ]
+    "flags": [ "WEAPON_MOD_MELEE" ]
   },
   {
     "id": "melee_mod_shishkebab_handle",
@@ -222,7 +222,7 @@
       }
     ],
     "weapon_flags": [ "FIRE", "FLAMING", "LIGHT_16" ],
-    "flags": [ "MELEE_GUNMOD", "IRREMOVABLE" ]
+    "flags": [ "WEAPON_MOD_MELEE", "IRREMOVABLE" ]
   },
   {
     "id": "melee_mod_nanomolecular_edge",
@@ -249,7 +249,7 @@
     "color": "dark_gray",
     "location": "blade",
     "install_time": "18 m",
-    "flags": [ "MELEE_GUNMOD" ]
+    "flags": [ "WEAPON_MOD_MELEE" ]
   },
   {
     "id": "melee_mod_poison_coating",
@@ -277,6 +277,6 @@
     "color": "green",
     "location": "blade",
     "install_time": "12 m",
-    "flags": [ "MELEE_GUNMOD", "IRREMOVABLE" ]
+    "flags": [ "WEAPON_MOD_MELEE", "IRREMOVABLE" ]
   }
 ]

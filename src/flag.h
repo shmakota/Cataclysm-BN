@@ -197,6 +197,7 @@ extern const flag_id flag_MC_TURN_USED;
 extern const flag_id flag_MC_USED;
 extern const flag_id flag_MECH_BAT;
 extern const flag_id flag_MELEE_GUNMOD;
+extern const flag_id flag_WEAPON_MOD_MELEE;
 extern const flag_id flag_MELTS;
 extern const flag_id flag_MESSY;
 extern const flag_id flag_MISSION_ITEM;

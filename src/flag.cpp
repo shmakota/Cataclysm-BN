@@ -196,6 +196,7 @@ const flag_id flag_MC_TURN_USED( "MC_TURN_USED" );
 const flag_id flag_MC_USED( "MC_USED" );
 const flag_id flag_MECH_BAT( "MECH_BAT" );
 const flag_id flag_MELEE_GUNMOD( "MELEE_GUNMOD" );
+const flag_id flag_WEAPON_MOD_MELEE( "WEAPON_MOD_MELEE" );
 const flag_id flag_MELTS( "MELTS" );
 const flag_id flag_MESSY( "MESSY" );
 const flag_id flag_MISSION_ITEM( "MISSION_ITEM" );

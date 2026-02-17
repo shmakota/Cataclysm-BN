@@ -2411,6 +2411,12 @@
     "info": "When attached to a gun, this item <good>contributes to its melee damage</good>."
   },
   {
+    "id": "WEAPON_MOD_MELEE",
+    "type": "json_flag",
+    "context": [ "GUNMOD" ],
+    "info": "When attached to a melee weapon, this item <good>contributes to its melee damage</good>."
+  },
+  {
     "id": "ROOF",
     "type": "json_flag",
     "context": [  ]
