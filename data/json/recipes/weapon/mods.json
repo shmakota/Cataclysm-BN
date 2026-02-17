@@ -1165,5 +1165,51 @@
     "tools": [ [ [ "steyr_aug", -1 ], [ "large_repairkit", 25 ], [ "small_repairkit", 45 ] ], [ [ "mold_plastic", -1 ] ] ],
     "using": [ [ "3d_printing_standard", 3 ] ],
     "components": [ [ [ "plastic_chunk", 8 ] ], [ [ "sheet_metal_small", 1 ] ] ]
+  },
+  {
+    "type": "recipe",
+    "result": "melee_mod_duct_tape_wrap",
+    "category": "CC_WEAPON",
+    "subcategory": "CSC_WEAPON_MODS",
+    "skill_used": "fabrication",
+    "difficulty": 1,
+    "time": "5 m",
+    "autolearn": true,
+    "components": [ [ [ "duct_tape", 20 ] ] ]
+  },
+  {
+    "type": "recipe",
+    "result": "melee_mod_leather_wrap",
+    "category": "CC_WEAPON",
+    "subcategory": "CSC_WEAPON_MODS",
+    "skill_used": "tailor",
+    "difficulty": 1,
+    "time": "10 m",
+    "autolearn": true,
+    "using": [ [ "sewing_standard", 1 ] ],
+    "components": [ [ [ "leather", 1 ] ] ]
+  },
+  {
+    "type": "recipe",
+    "result": "melee_mod_barbed_wire",
+    "category": "CC_WEAPON",
+    "subcategory": "CSC_WEAPON_MODS",
+    "skill_used": "fabrication",
+    "difficulty": 2,
+    "time": "10 m",
+    "autolearn": true,
+    "components": [ [ [ "wire_barbed", 1 ] ], [ [ "duct_tape", 10 ] ] ]
+  },
+  {
+    "type": "recipe",
+    "result": "melee_mod_bolted",
+    "category": "CC_WEAPON",
+    "subcategory": "CSC_WEAPON_MODS",
+    "skill_used": "fabrication",
+    "difficulty": 2,
+    "time": "10 m",
+    "autolearn": true,
+    "qualities": [ { "id": "HAMMER", "level": 1 } ],
+    "components": [ [ [ "bolt_metal", 4 ] ] ]
   }
 ]
