@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -11,12 +12,92 @@
 
 #include "coordinates.h"
 #include "enums.h"
+#include "horde_utils.h"
 #include "overmap_types.h"
 #include "overmapbuffer.h"
 #include "type_id.h"
 
+LUNA_DOC( cata::horde::horde_info, "HordeInfo" );
+LUNA_DOC( cata::horde::horde_spawn_options, "HordeSpawnOptions" );
+
 void cata::detail::reg_overmap( sol::state &lua )
 {
+    // Register horde info struct
+#define UT_CLASS cata::horde::horde_info
+    {
+        sol::usertype<UT_CLASS> ut =
+            luna::new_usertype<UT_CLASS>(
+                lua,
+                luna::no_bases,
+                luna::constructors <
+                UT_CLASS()
+                > ()
+            );
+
+        DOC( "Horde monster group id." );
+        SET_MEMB( type );
+        DOC( "Absolute submap position of the horde." );
+        SET_MEMB( pos_sm );
+        DOC( "Absolute overmap terrain position of the horde." );
+        SET_MEMB( pos_omt );
+        DOC( "Absolute submap target position of the horde." );
+        SET_MEMB( target_sm );
+        DOC( "Absolute overmap terrain target of the horde." );
+        SET_MEMB( target_omt );
+        DOC( "Population estimate or actual population, depending on horde data." );
+        SET_MEMB( population );
+        DOC( "Group radius used when spawning." );
+        SET_MEMB( radius );
+        DOC( "Current interest (0-100)." );
+        SET_MEMB( interest );
+        DOC( "Whether the horde is dying." );
+        SET_MEMB( dying );
+        DOC( "Whether the horde is diffuse." );
+        SET_MEMB( diffuse );
+        DOC( "Horde behaviour string (e.g. \"city\" or \"roam\")." );
+        SET_MEMB( horde_behaviour );
+        DOC( "Explicit monster count (0 if using population only)." );
+        SET_MEMB( monster_count );
+        DOC( "Average speed of the horde." );
+        SET_MEMB( avg_speed );
+        DOC( "Whether the horde type is marked safe." );
+        SET_MEMB( is_safe );
+    }
+#undef UT_CLASS
+
+    // Register horde spawn options struct
+#define UT_CLASS cata::horde::horde_spawn_options
+    {
+        sol::usertype<UT_CLASS> ut =
+            luna::new_usertype<UT_CLASS>(
+                lua,
+                luna::no_bases,
+                luna::constructors <
+                UT_CLASS()
+                > ()
+            );
+
+        DOC( "Horde monster group id." );
+        SET_MEMB( type );
+        DOC( "Absolute overmap terrain position of the horde." );
+        SET_MEMB( pos );
+        DOC( "Absolute overmap terrain target of the horde." );
+        SET_MEMB( target );
+        DOC( "Population for the horde." );
+        SET_MEMB( population );
+        DOC( "Horde radius for spawning (may split into multiple groups)." );
+        SET_MEMB( radius );
+        DOC( "Initial interest (0-100)." );
+        SET_MEMB( interest );
+        DOC( "Whether the horde is dying." );
+        SET_MEMB( dying );
+        DOC( "Whether the horde is diffuse." );
+        SET_MEMB( diffuse );
+        DOC( "Horde behaviour string (e.g. \"city\" or \"roam\")." );
+        SET_MEMB( horde_behaviour );
+    }
+#undef UT_CLASS
+
     // Register overmapbuffer class
     {
         DOC( "Global overmap buffer that manages all overmap data" );
@@ -53,6 +134,78 @@ void cata::detail::reg_overmap( sol::state &lua )
         luna::set_fx( ut, "remove_grid_connection",
         []( overmapbuffer & buf, const tripoint & lhs, const tripoint & rhs ) -> bool {
             return buf.remove_grid_connection( tripoint_abs_omt( lhs ), tripoint_abs_omt( rhs ) );
+        } );
+
+        DOC( "Check if a horde exists at the given overmap terrain position." );
+        luna::set_fx( ut, "has_horde",
+        []( overmapbuffer & buf, const tripoint & p ) -> bool {
+            return buf.has_horde( tripoint_abs_omt( p ) );
+        } );
+
+        DOC( "Get the estimated horde size at the given overmap terrain position." );
+        luna::set_fx( ut, "get_horde_size",
+        []( overmapbuffer & buf, const tripoint & p ) -> int {
+            return buf.get_horde_size( tripoint_abs_omt( p ) );
+        } );
+
+        DOC( "Get all hordes in the rectangular bounds (absolute omt coords)." );
+        luna::set_fx( ut, "get_hordes_in_bounds",
+        []( overmapbuffer &, const tripoint & min, const tripoint & max )
+        -> std::vector<cata::horde::horde_info> {
+            return cata::horde::get_hordes_in_bounds( cata::horde::horde_query_options{
+                .min = min,
+                .max = max
+            } );
+        } );
+
+        DOC( "Get all hordes within radius tiles of the center (absolute omt coords)." );
+        luna::set_fx( ut, "get_hordes_near",
+        []( overmapbuffer &, const tripoint & center, int radius )
+        -> std::vector<cata::horde::horde_info> {
+            return cata::horde::get_hordes_in_bounds( cata::horde::horde_query_options{
+                .min = tripoint( center.x - radius, center.y - radius, center.z ),
+                .max = tripoint( center.x + radius, center.y + radius, center.z )
+            } );
+        } );
+
+        DOC( "Get all hordes at a single overmap terrain tile (absolute omt coords)." );
+        luna::set_fx( ut, "get_hordes_at",
+        []( overmapbuffer &, const tripoint & pos ) -> std::vector<cata::horde::horde_info> {
+            return cata::horde::get_hordes_in_bounds( cata::horde::horde_query_options{
+                .min = pos,
+                .max = pos
+            } );
+        } );
+
+        DOC( "Spawn a horde using the provided options. Throws on error." );
+        luna::set_fx( ut, "add_horde",
+        []( overmapbuffer &, const cata::horde::horde_spawn_options &opts )
+        -> cata::horde::horde_info {
+            auto result = cata::horde::add_horde( opts );
+            if( !result ) {
+                throw std::runtime_error( result.error() );
+            }
+            return *result;
+        } );
+
+        DOC( "Remove all hordes at the given overmap terrain position. Returns count removed." );
+        luna::set_fx( ut, "remove_hordes_at",
+        []( overmapbuffer &, const tripoint & pos ) -> int {
+            return cata::horde::remove_hordes_at( pos );
+        } );
+
+        DOC( "Move all hordes at the source position to the destination. Returns count moved." );
+        luna::set_fx( ut, "move_hordes_at",
+        []( overmapbuffer &, const tripoint & from, const tripoint & to ) -> int {
+            return cata::horde::move_hordes_at( cata::horde::horde_move_options{
+                .from = from,
+                .to = to
+            } );
+        } );
+
+        DOC( "Advance the global horde movement simulation by one step." );
+        luna::set_fx( ut, "move_hordes", []( overmapbuffer & buf ) -> void {
+            buf.move_hordes();
         } );
     }
 
@@ -205,6 +358,75 @@ void cata::detail::reg_overmap( sol::state &lua )
     luna::set_fx( lib, "remove_grid_connection",
     []( const tripoint & lhs, const tripoint & rhs ) -> bool {
         return overmap_buffer.remove_grid_connection( tripoint_abs_omt( lhs ), tripoint_abs_omt( rhs ) );
+    } );
+
+    DOC( "Check if a horde exists at the given overmap terrain position." );
+    luna::set_fx( lib, "has_horde",
+    []( const tripoint & p ) -> bool {
+        return overmap_buffer.has_horde( tripoint_abs_omt( p ) );
+    } );
+
+    DOC( "Get the estimated horde size at the given overmap terrain position." );
+    luna::set_fx( lib, "get_horde_size",
+    []( const tripoint & p ) -> int {
+        return overmap_buffer.get_horde_size( tripoint_abs_omt( p ) );
+    } );
+
+    DOC( "Get all hordes in the rectangular bounds (absolute omt coords)." );
+    luna::set_fx( lib, "get_hordes_in_bounds",
+    []( const tripoint & min, const tripoint & max ) -> std::vector<cata::horde::horde_info> {
+        return cata::horde::get_hordes_in_bounds( cata::horde::horde_query_options{
+            .min = min,
+            .max = max
+        } );
+    } );
+
+    DOC( "Get all hordes within radius tiles of the center (absolute omt coords)." );
+    luna::set_fx( lib, "get_hordes_near",
+    []( const tripoint & center, int radius ) -> std::vector<cata::horde::horde_info> {
+        return cata::horde::get_hordes_in_bounds( cata::horde::horde_query_options{
+            .min = tripoint( center.x - radius, center.y - radius, center.z ),
+            .max = tripoint( center.x + radius, center.y + radius, center.z )
+        } );
+    } );
+
+    DOC( "Get all hordes at a single overmap terrain tile (absolute omt coords)." );
+    luna::set_fx( lib, "get_hordes_at",
+    []( const tripoint & pos ) -> std::vector<cata::horde::horde_info> {
+        return cata::horde::get_hordes_in_bounds( cata::horde::horde_query_options{
+            .min = pos,
+            .max = pos
+        } );
+    } );
+
+    DOC( "Spawn a horde using the provided options. Throws on error." );
+    luna::set_fx( lib, "add_horde",
+    []( const cata::horde::horde_spawn_options &opts ) -> cata::horde::horde_info {
+        auto result = cata::horde::add_horde( opts );
+        if( !result ) {
+            throw std::runtime_error( result.error() );
+        }
+        return *result;
+    } );
+
+    DOC( "Remove all hordes at the given overmap terrain position. Returns count removed." );
+    luna::set_fx( lib, "remove_hordes_at",
+    []( const tripoint & pos ) -> int {
+        return cata::horde::remove_hordes_at( pos );
+    } );
+
+    DOC( "Move all hordes at the source position to the destination. Returns count moved." );
+    luna::set_fx( lib, "move_hordes_at",
+    []( const tripoint & from, const tripoint & to ) -> int {
+        return cata::horde::move_hordes_at( cata::horde::horde_move_options{
+            .from = from,
+            .to = to
+        } );
+    } );
+
+    DOC( "Advance the global horde movement simulation by one step." );
+    luna::set_fx( lib, "move_hordes", []() -> void {
+        overmap_buffer.move_hordes();
     } );
 
     luna::finalize_lib( lib );

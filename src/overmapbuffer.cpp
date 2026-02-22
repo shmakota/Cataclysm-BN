@@ -531,6 +531,12 @@ std::vector<om_vehicle> overmapbuffer::get_vehicle( const tripoint_abs_omt &p )
     return result;
 }
 
+void overmapbuffer::add_mon_group( const point_abs_om &om_pos, const mongroup &group )
+{
+    overmap &om = get( om_pos );
+    om.add_mon_group( group );
+}
+
 void overmapbuffer::signal_hordes( const tripoint_abs_sm &center, const int sig_power )
 {
     const auto radius = sig_power;
