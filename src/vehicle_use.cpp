@@ -1887,12 +1887,11 @@ void vehicle::interact_with( const tripoint &pos, int interact_part )
     const bool has_planter = avail_part_with_feature( interact_part, "PLANTER", true ) >= 0;
     const int door_lock_part = avail_part_with_feature( interact_part, "DOOR_LOCKING", true );
     const bool has_door_lock = door_lock_part >= 0;
-    const bool has_sonar = avail_part_with_feature( interact_part, "SONAR", true ) >= 0;
 
     enum {
         EXAMINE, TRACK, HANDBRAKE, CONTROL, CONTROL_ELECTRONICS, GET_ITEMS, GET_ITEMS_ON_GROUND, FOLD_VEHICLE, UNLOAD_TURRET,
         RELOAD_TURRET, USE_HOTPLATE, FILL_CONTAINER, DRINK, USE_CRAFTER, USE_PURIFIER, PURIFY_TANK, USE_AUTOCLAVE, USE_AUTODOC,
-        USE_MONSTER_CAPTURE, USE_BIKE_RACK, USE_HARNESS, RELOAD_PLANTER, USE_TOWEL, USE_SONAR, PEEK_CURTAIN, PICK_LOCK
+        USE_MONSTER_CAPTURE, USE_BIKE_RACK, USE_HARNESS, RELOAD_PLANTER, USE_TOWEL, PEEK_CURTAIN, PICK_LOCK
     };
     uilist selectmenu;
 
@@ -1966,9 +1965,6 @@ void vehicle::interact_with( const tripoint &pos, int interact_part )
     if( has_planter ) {
         selectmenu.addentry( RELOAD_PLANTER, true, 's', _( "Reload seed drill with seeds" ) );
     }
-    if( has_sonar && fuel_left( itype_battery, true ) > 0 ) {
-        selectmenu.addentry( USE_SONAR, true, 'S', _( "Activate sonar" ) );
-    }
 
     int choice;
     if( selectmenu.entries.size() == 1 ) {
@@ -2020,10 +2016,6 @@ void vehicle::interact_with( const tripoint &pos, int interact_part )
         }
         case USE_TOWEL: {
             iuse::towel_common( &you, nullptr, false );
-            return;
-        }
-        case USE_SONAR: {
-            veh_tool( itype_sonar_device );
             return;
         }
         case USE_AUTOCLAVE: {
