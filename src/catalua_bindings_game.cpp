@@ -17,9 +17,11 @@
 #include "messages.h"
 #include "npc.h"
 #include "monster.h"
+#include "monstergenerator.h"
 #include "overmapbuffer.h"
 #include "line.h"
 #include "lua_action_menu.h"
+#include "veh_type.h"
 
 namespace
 {
@@ -155,6 +157,19 @@ void cata::detail::reg_game_api( sol::state &lua )
         auto all_types = item_controller->all();
         return all_types
                | std::views::transform( []( const itype * type ) -> itype_id { return type->get_id(); } )
+               | std::ranges::to<std::vector>();
+    } );
+
+    DOC( "Get all loaded vehicle prototype ids, including modded definitions." );
+    luna::set_fx( lib, "get_all_vehicle_prototype_ids", []() -> std::vector<vproto_id> {
+        return vehicle_prototype::get_all();
+    } );
+
+    DOC( "Get all loaded monster type ids, including modded definitions." );
+    luna::set_fx( lib, "get_all_monster_type_ids", []() -> std::vector<mtype_id> {
+        const auto &all_types = MonsterGenerator::generator().get_all_mtypes();
+        return all_types
+               | std::views::transform( []( const mtype & type ) -> mtype_id { return type.id; } )
                | std::ranges::to<std::vector>();
     } );
 
