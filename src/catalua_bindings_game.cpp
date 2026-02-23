@@ -5,10 +5,12 @@
 #include "catalua_luna_doc.h"
 
 #include <ranges>
+#include <vector>
 
 #include "avatar.h"
 #include "distribution_grid.h"
 #include "game.h"
+#include "item_factory.h"
 #include "lightmap.h"
 #include "map.h"
 #include "catalua_log.h"
@@ -146,6 +148,14 @@ void cata::detail::reg_game_api( sol::state &lua )
     DOC( "Spawns a new item. Same as Item::spawn " );
     luna::set_fx( lib, "create_item", []( const itype_id & itype, int count ) -> detached_ptr<item> {
         return item::spawn( itype, calendar::turn, count );
+    } );
+
+    DOC( "Get all loaded item type ids, including modded and runtime definitions." );
+    luna::set_fx( lib, "get_all_item_type_ids", []() -> std::vector<itype_id> {
+        auto all_types = item_controller->all();
+        return all_types
+               | std::views::transform( []( const itype * type ) -> itype_id { return type->get_id(); } )
+               | std::ranges::to<std::vector>();
     } );
 
     luna::set_fx( lib, "get_creature_at",
