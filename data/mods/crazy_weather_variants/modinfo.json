@@ -1,0 +1,14 @@
+[
+  {
+    "type": "MOD_INFO",
+    "id": "crazy_weather_variants_patch",
+    "name": "Crazy Cataclysm Weather Variants Patch",
+    "authors": [ "Community" ],
+    "description": "Only makes sense when Crazy Cataclysm and Weather Variants are enabled: mutagenic rain sweeps the skies.",
+    "category": "content",
+    "dependencies": [ "bn", "crazy_cataclysm", "weather_variants" ],
+    "lua_api_version": 2,
+    "version": "1",
+    "obsolete": false
+  }
+]
