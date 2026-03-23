@@ -22,13 +22,13 @@
         "effect_id_str": "toxin_buildup",
         "effect_intensity": 0,
         "precipitation_name": "mutagenic rain",
-        "ignore_armor": false,
+        "ignore_armor": true,
         "effect_msg": "The mutagenic rain leaves a sickly sheen on your skin.",
         "effect_msg_frequency": 3,
         "effect_msg_blocked_frequency": 32,
         "message_type": 3,
-        "clothing_protection": 1,
-        "umbrella_protection": 1
+        "clothing_protection": 0,
+        "umbrella_protection": 0
       }
     ],
     "animation": {
@@ -40,7 +40,7 @@
     "sound_category": "rainy",
     "sun_intensity": "none",
     "requirements": {
-      "required_weathers": [ "rain" ]
+      "required_overlays": [ "mutagenic_overlay" ]
     }
   }
 ]

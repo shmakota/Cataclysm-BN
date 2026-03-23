@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 
 #include "calendar.h"
 #include "coordinates.h"
@@ -18,6 +19,22 @@ struct w_point {
     std::string wind_desc;
     int winddirection = 0;
     bool acidic = false;
+    std::unordered_map<std::string, double> overlay_values;
+};
+
+struct weather_overlay {
+    std::string id;
+    double noise_scale_xy = 1.0;
+    double noise_scale_z = 1.0;
+    double noise_multiplier = 1.0;
+    double noise_offset = 0.0;
+    double base_value = 0.0;
+    double threshold = 1.0;
+    int seed_offset = 0;
+    bool uses_base_acid = false;
+    auto is_active( double value ) const -> bool {
+        return value >= threshold;
+    }
 };
 
 struct season_modifier {
@@ -69,12 +86,18 @@ class weather_generator
         int convert_winddir( int ) const;
         void test_weather( unsigned ) const;
 
+        std::unordered_map<std::string, double> evaluate_overlay_values(
+            const tripoint_abs_ms &location, const time_point &t, const calendar_config &calendar_config,
+            unsigned seed ) const;
+        void apply_overlay_values( w_point &w, const std::unordered_map<std::string, double> &overlay_values ) const;
+        const weather_overlay *find_overlay( const std::string &overlay_id ) const;
+
         units::temperature get_weather_temperature( const tripoint_abs_ms &, const time_point &,
                 const calendar_config &calendar_config, unsigned ) const;
         units::temperature get_water_temperature( const tripoint_abs_ms &, const time_point &,
                 const calendar_config &calendar_config, unsigned ) const;
 
         static weather_generator load( const JsonObject &jo );
+        std::vector<weather_overlay> overlays;
+        std::unordered_map<std::string, size_t> overlay_index;
 };
-
-

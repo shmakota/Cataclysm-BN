@@ -257,7 +257,11 @@
     "animation": { "factor": 0.01, "color": "c_light_green", "glyph": ".", "tile": "weather_acid_drop" },
     "sound_category": "drizzle",
     "sun_intensity": "normal",
-    "requirements": { "acidic": true, "required_weathers": [ "drizzle" ] }
+    "requirements": {
+      "acidic": true,
+      "required_weathers": [ "drizzle" ],
+      "required_overlays": [ "acid_overlay" ]
+    }
   },
   {
     "id": "acid_rain",
@@ -294,7 +298,11 @@
     "animation": { "factor": 0.02, "color": "c_light_green", "glyph": ",", "tile": "weather_acid_drop" },
     "sound_category": "rainy",
     "sun_intensity": "none",
-    "requirements": { "acidic": true, "required_weathers": [ "rain" ] }
+    "requirements": {
+      "acidic": true,
+      "required_weathers": [ "rain" ],
+      "required_overlays": [ "acid_overlay" ]
+    }
   },
   {
     "id": "light_flurries",

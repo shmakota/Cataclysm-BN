@@ -1051,6 +1051,14 @@
       "base_wind": 10,
       "base_wind_distrib_peaks": 100,
       "base_wind_season_variation": 30,
+      "weather_overlays": [
+        {
+          "id": "acid_overlay",
+          "noise_multiplier": 8.0,
+          "threshold": 1.0,
+          "uses_base_acid": true
+        }
+      ],
       "weather_types": [
         "clear",
         "sunny",

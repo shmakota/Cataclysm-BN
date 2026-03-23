@@ -5,7 +5,9 @@
 #include <numeric>
 #include <ostream>
 #include <random>
+#include <ranges>
 #include <string>
+#include <unordered_map>
 
 #include "assign.h"
 #include "cached_options.h"
@@ -178,6 +180,53 @@ w_point weather_generator::get_weather( const tripoint_abs_ms &location, const t
     return w_point{ T, H, P, W, wind_desc, current_winddir, acid };
 }
 
+auto weather_generator::find_overlay( const std::string &overlay_id ) const -> const weather_overlay *
+{
+    const auto found = overlay_index.find( overlay_id );
+    if( found == overlay_index.end() ) {
+        return nullptr;
+    }
+    return &overlays[found->second];
+}
+
+auto weather_generator::evaluate_overlay_values(
+    const tripoint_abs_ms &location, const time_point &t, const calendar_config &calendar_config,
+    unsigned seed ) const -> std::unordered_map<std::string, double>
+{
+    std::unordered_map<std::string, double> overlay_vals;
+    if( overlays.empty() ) {
+        return overlay_vals;
+    }
+
+    const weather_gen_common common = get_common_data( location.xy(), t, calendar_config, seed );
+    const double scale_x = common.x;
+    const double scale_y = common.y;
+    const double scale_z = common.z;
+    for( const weather_overlay &overlay : overlays ) {
+        const double noise = raw_noise_4d( scale_x * overlay.noise_scale_xy,
+                                            scale_y * overlay.noise_scale_xy,
+                                            scale_z * overlay.noise_scale_z,
+                                            common.modSEED + overlay.seed_offset );
+        auto noise_value = noise * overlay.noise_multiplier;
+        const double value = overlay.base_value + noise_value + overlay.noise_offset +
+                             ( overlay.uses_base_acid ? base_acid : 0.0 );
+        overlay_vals[overlay.id] = value;
+    }
+    return overlay_vals;
+}
+
+void weather_generator::apply_overlay_values( w_point &w,
+        const std::unordered_map<std::string, double> &overlay_values ) const
+{
+    w.overlay_values = overlay_values;
+    if( const weather_overlay *overlay = find_overlay( "acid_overlay" ) ) {
+        const auto found = overlay_values.find( overlay->id );
+        if( found != overlay_values.end() && overlay->is_active( found->second ) ) {
+            w.acidic = true;
+        }
+    }
+}
+
 const weather_type_id &weather_generator::get_default_weather() const
 {
     return weather_types[0];
@@ -207,6 +256,9 @@ const weather_type_id &weather_generator::get_weather_conditions( const tripoint
         const time_point &t, unsigned seed ) const
 {
     w_point w( get_weather( location, t, seed ) );
+    const tripoint_abs_ms abs_ms = tripoint_abs_ms( location );
+    auto overlay_values = evaluate_overlay_values( abs_ms, t, calendar::config, seed );
+    apply_overlay_values( w, overlay_values );
     return get_weather_conditions( w );
 }
 
@@ -236,6 +288,22 @@ const weather_type_id &weather_generator::get_weather_conditions( const w_point 
         bool test_acidic = !wrequires.acidic || w.acidic;
         if( !( test_temperature && test_windspeed && test_acidic ) ) {
             continue;
+        }
+
+        if( !wrequires.required_overlays.empty() ) {
+            const bool overlays_ok = std::ranges::all_of(
+                wrequires.required_overlays,
+                [&]( const std::string &overlay_id ) {
+                    const auto value_it = w.overlay_values.find( overlay_id );
+                    const weather_overlay *overlay = find_overlay( overlay_id );
+                    return overlay &&
+                           value_it != w.overlay_values.end() &&
+                           overlay->is_active( value_it->second );
+                }
+            );
+            if( !overlays_ok ) {
+                continue;
+            }
         }
 
         if( !wrequires.required_weathers.empty() ) {
@@ -339,8 +407,11 @@ void weather_generator::test_weather( unsigned seed = 1000 ) const
 
         const time_point begin = calendar::turn;
         const time_point end = begin + 2 * calendar::year_length();
+        const tripoint_abs_ms abs_zero = tripoint_abs_ms( tripoint_zero );
         for( time_point i = begin; i < end; i += 20_minutes ) {
             w_point w = get_weather( tripoint_zero, i, seed );
+            const auto overlay_vals = evaluate_overlay_values( abs_zero, i, calendar::config, seed );
+            apply_overlay_values( w, overlay_vals );
             const weather_type_id &conditions = get_weather_conditions( w );
 
             int year = to_turns<int>( i - calendar::turn_zero ) / to_turns<int>
@@ -431,6 +502,30 @@ weather_generator weather_generator::load( const JsonObject &jo )
     jo.read( "weather_types", ret.weather_types );
     if( ret.weather_types.empty() ) {
         jo.throw_error( "expected at least 1 weather type", "weather_types" );
+    }
+    if( jo.has_member( "weather_overlays" ) ) {
+        JsonArray overlay_arr = jo.get_array( "weather_overlays" );
+        while( overlay_arr.has_more() ) {
+            JsonObject overlay_jo = overlay_arr.next_object();
+            weather_overlay overlay;
+            overlay_jo.read( "id", overlay.id );
+            if( overlay.id.empty() ) {
+                overlay_jo.throw_error( "expected overlay id", "id" );
+            }
+            assign( overlay_jo, "noise_scale_xy", overlay.noise_scale_xy );
+            assign( overlay_jo, "noise_scale_z", overlay.noise_scale_z );
+            assign( overlay_jo, "noise_multiplier", overlay.noise_multiplier );
+            assign( overlay_jo, "noise_offset", overlay.noise_offset );
+            assign( overlay_jo, "base_value", overlay.base_value );
+            assign( overlay_jo, "threshold", overlay.threshold );
+            assign( overlay_jo, "seed_offset", overlay.seed_offset );
+            assign( overlay_jo, "uses_base_acid", overlay.uses_base_acid );
+            ret.overlays.push_back( overlay );
+        }
+    }
+    ret.overlay_index.clear();
+    for( auto i = 0u; i < ret.overlays.size(); ++i ) {
+        ret.overlay_index[ret.overlays[i].id] = i;
     }
     return ret;
 }

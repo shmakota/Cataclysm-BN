@@ -249,6 +249,7 @@ void weather_type::load( const JsonObject &jo, const std::string & )
         optional( j, was_loaded, "acidic", requirements.acidic, false );
         optional( j, was_loaded, "time", requirements.time, weather_time_requirement_type::both );
         optional( j, was_loaded, "required_weathers", requirements.required_weathers );
+        optional( j, was_loaded, "required_overlays", requirements.required_overlays );
     }
 }
 
@@ -276,4 +277,3 @@ void weather_types::load( const JsonObject &jo, const std::string &src )
 {
     weather_type_factory.load( jo, src );
 }
-

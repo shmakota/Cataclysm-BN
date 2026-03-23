@@ -92,7 +92,8 @@ struct weather_requirements {
     bool humidity_and_pressure = true;
     bool acidic = false;
     weather_time_requirement_type time = weather_time_requirement_type::both;
-    std::vector<weather_type_id> required_weathers;
+        std::vector<weather_type_id> required_weathers;
+        std::vector<std::string> required_overlays;
 };
 
 struct weather_type {
@@ -142,4 +143,3 @@ void load( const JsonObject &jo, const std::string &src );
 /** Checks all loaded from JSON are valid */
 void check_consistency();
 } // namespace weather_types
-

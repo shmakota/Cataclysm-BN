@@ -1,6 +1,7 @@
 [
   {
     "type": "region_settings",
+    "//": "players don't understand they need to change regions, so we are just overwriting the default region",
     "id": "default",
     "default_oter": "field",
     "default_groundcover": [ [ "t_region_groundcover", 1 ] ],
@@ -8,8 +9,8 @@
       "terrain": {
         "t_region_groundcover": { "t_grass": 12, "t_grass_dead": 2, "t_dirt": 1 },
         "t_region_groundcover_urban": { "t_grass": 20, "t_grass_dead": 3 },
-        "t_region_groundcover_forest": { "t_grass_long": 10, "t_grass_tall": 1, "t_moss": 2, "t_grass_dead": 7 },
-        "t_region_groundcover_swamp": { "t_grass_long": 100, "t_grass_tall": 10, "t_moss": 60, "t_dirt": 70, "t_bog_iron": 1 },
+        "t_region_groundcover_forest": { "t_grass_long": 5, "t_grass_tall": 1, "t_moss": 1, "t_grass_dead": 3 },
+        "t_region_groundcover_swamp": { "t_grass_long": 90, "t_grass_tall": 30, "t_moss": 60, "t_dirt": 60, "t_bog_iron": 1 },
         "t_region_groundcover_barren": { "t_dirt": 30, "t_grass_dead": 2, "t_railroad_rubble": 1 },
         "t_region_grass": { "t_grass": 1 },
         "t_region_soil": { "t_dirt": 1 },
@@ -804,8 +805,7 @@
         "cs_public_art_piece": 100,
         "cs_public_space": 100,
         "cs_city_dump_small": 100,
-        "cs_open_sewer": 100,
-        "trailerpark_city": 10
+        "cs_open_sewer": 100
       },
       "shops": {
         "bus_station": 200,
@@ -1047,7 +1047,7 @@
       "summer_humidity_manual_mod": -17,
       "winter_humidity_manual_mod": 17,
       "base_pressure": 1016,
-      "base_acid": 0,
+      "base_acid": 0.5,
       "base_wind": 10,
       "base_wind_distrib_peaks": 100,
       "base_wind_season_variation": 30,
@@ -1057,6 +1057,16 @@
           "noise_multiplier": 8.0,
           "threshold": 1.0,
           "uses_base_acid": true
+        },
+        {
+          "id": "mutagenic_overlay",
+          "noise_scale_xy": 1.0,
+          "noise_scale_z": 1.0,
+          "noise_multiplier": 8.0,
+          "noise_offset": 0.0,
+          "base_value": 0.0,
+          "threshold": 1.0,
+          "seed_offset": 103
         }
       ],
       "weather_types": [
@@ -1069,12 +1079,9 @@
         "heavy_rain",
         "thunder",
         "lightning",
-        "acid_drizzle",
-        "acid_rain",
-        "light_flurries",
-        "flurries",
-        "snowing",
-        "snowstorm"
+        "clear_night",
+        "starry_night",
+        "mutagenic_rain"
       ]
     },
     "overmap_feature_flag_settings": { "clear_blacklist": false, "blacklist": [  ], "clear_whitelist": false, "whitelist": [  ] }

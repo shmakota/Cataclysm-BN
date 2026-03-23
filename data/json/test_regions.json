@@ -136,6 +136,14 @@
       "base_humidity": 40,
       "base_pressure": 1015,
       "base_acid": 0,
+      "weather_overlays": [
+        {
+          "id": "acid_overlay",
+          "noise_multiplier": 8.0,
+          "threshold": 1.0,
+          "uses_base_acid": true
+        }
+      ],
       "weather_types": [
         "clear",
         "sunny",

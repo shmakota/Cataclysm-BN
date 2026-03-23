@@ -6,6 +6,7 @@
 #include <memory>
 #include <ranges>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "assign.h"
@@ -689,7 +690,7 @@ std::string weather_forecast( const point_abs_sm &abs_sm_pos )
     //weather_report += "Across <region>, skies ranged from <cloudiest> to <clearest>.  ";
     // TODO: Add fake reports for nearby cities
     // TODO: fix point types
-    const tripoint abs_ms_pos = tripoint( project_to<coords::ms>( abs_sm_pos ).raw(), 0 );
+    const auto abs_ms_pos = tripoint_abs_ms( project_to<coords::ms>( abs_sm_pos ), 0 );
 
     const time_point now_hour = calendar::turn - time_duration::from_minutes( minute_of_hour<int>
                                 ( calendar::turn ) );
@@ -725,7 +726,9 @@ std::string weather_forecast( const point_abs_sm &abs_sm_pos )
 
         forecast_period &period = periods[last_idx];
 
-        w_point w = wgen.get_weather( abs_ms_pos, last_hour, g->get_seed() );
+        w_point w = wgen.get_weather( abs_ms_pos, last_hour, calendar::config, g->get_seed() );
+        auto overlay_vals = wgen.evaluate_overlay_values( abs_ms_pos, last_hour, calendar::config, g->get_seed() );
+        wgen.apply_overlay_values( w, overlay_vals );
         const weather_type_id &new_type = wgen.get_weather_conditions( w );
         int new_priority = wgen.forecast_priority( new_type );
         if( !period.type || new_priority > period.type_priority ) {
@@ -1102,6 +1105,52 @@ weather_manager::weather_manager()
 
 weather_manager::~weather_manager() = default;
 
+auto weather_manager::add_local_overlay( const weather_local_overlay_config &config ) -> void
+{
+    weather_local_overlay overlay;
+    overlay.overlay_id = config.overlay_id;
+    overlay.center = config.center;
+    overlay.radius = config.radius;
+    overlay.strength = config.strength;
+    overlay.expires = config.duration != 0_turns ? calendar::turn + config.duration : calendar::before_time_starts;
+    local_overlays.push_back( overlay );
+}
+
+auto weather_manager::get_overlay_values() const -> const std::unordered_map<std::string, double> &
+{
+    return overlay_values;
+}
+
+auto weather_manager::apply_local_overlay_influences(
+    std::unordered_map<std::string, double> &values,
+    const tripoint_abs_ms &location ) -> void
+{
+    for( const weather_local_overlay &overlay : local_overlays ) {
+        if( overlay.radius <= 0 ) {
+            continue;
+        }
+        const int distance = rl_dist( overlay.center.xy(), location.xy() );
+        if( distance > overlay.radius ) {
+            continue;
+        }
+        const auto existing = values.find( overlay.overlay_id );
+        const double current = existing != values.end() ? existing->second : 0.0;
+        values[overlay.overlay_id] = std::max( current, overlay.strength );
+    }
+}
+
+auto weather_manager::remove_expired_local_overlays() -> void
+{
+    const time_point now = calendar::turn;
+    local_overlays.erase(
+        std::remove_if( local_overlays.begin(), local_overlays.end(),
+        [now]( const weather_local_overlay &overlay ) {
+            return overlay.expires != calendar::before_time_starts && now >= overlay.expires;
+        } ),
+        local_overlays.end()
+    );
+}
+
 const weather_generator &weather_manager::get_cur_weather_gen() const
 {
     const overmap &om = g->get_cur_om();
@@ -1121,7 +1170,13 @@ void weather_manager::update_weather()
     }
 
     const weather_generator &weather_gen = get_cur_weather_gen();
-    w = weather_gen.get_weather( g->u.global_square_location(), calendar::turn, g->get_seed() );
+    remove_expired_local_overlays();
+    const auto location = tripoint_abs_ms( g->u.global_square_location() );
+    w = weather_gen.get_weather( location, calendar::turn, calendar::config, g->get_seed() );
+    auto overlay_vals = weather_gen.evaluate_overlay_values( location, calendar::turn, calendar::config, g->get_seed() );
+    apply_local_overlay_influences( overlay_vals, location );
+    weather_gen.apply_overlay_values( w, overlay_vals );
+    overlay_values = overlay_vals;
     weather_type_id old_weather = weather_id;
     weather_id = weather_override ? weather_override : weather_gen.get_weather_conditions( w );
     if( !g->u.has_artifact_with( AEP_BAD_WEATHER ) ) {

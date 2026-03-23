@@ -11,9 +11,9 @@
 
 #include <optional>
 #include <string>
-#include <vector>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 /**
  * @name BODYTEMP
@@ -95,6 +95,22 @@ struct weather_sum {
     int acid_amount = 0;
     float sunlight = 0.0f;
     int wind_amount = 0;
+};
+
+struct weather_local_overlay_config {
+    std::string overlay_id;
+    tripoint_abs_ms center;
+    int radius = 0;
+    double strength = 0.0;
+    time_duration duration = 0_turns;
+};
+
+struct weather_local_overlay {
+    std::string overlay_id;
+    tripoint_abs_ms center;
+    int radius = 0;
+    double strength = 0.0;
+    time_point expires = calendar::before_time_starts;
 };
 
 namespace weather
@@ -225,6 +241,9 @@ class weather_manager
             return weather_precise;
         }
 
+        void add_local_overlay( const weather_local_overlay_config &config );
+        const std::unordered_map<std::string, double> &get_overlay_values() const;
+
         // For use in tests
         void override_humidity( int h ) {
             weather_precise.humidity = h;
@@ -233,8 +252,11 @@ class weather_manager
     private:
         // Cached weather data
         w_point weather_precise;
+        std::unordered_map<std::string, double> overlay_values;
+        std::vector<weather_local_overlay> local_overlays;
+        void apply_local_overlay_influences( std::unordered_map<std::string, double> &values,
+                                             const tripoint_abs_ms &location );
+        void remove_expired_local_overlays();
 };
 
 weather_manager &get_weather();
-
-

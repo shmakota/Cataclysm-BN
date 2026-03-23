@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "assign.h"
 #include "consistency_report.h"
 #include "debug.h"
 #include "enum_conversions.h"
@@ -728,6 +729,31 @@ void apply_region_overlay( const JsonObject &jo, regional_settings &region )
     load_overmap_lake_settings( jo, region.overmap_lake, false, true );
 
     load_region_terrain_and_furniture_settings( jo, region.region_terrain_and_furniture, false, true );
+
+    if( jo.has_object( "weather" ) ) {
+        JsonObject wjo = jo.get_object( "weather" );
+        if( wjo.has_array( "weather_overlays" ) ) {
+            JsonArray overlay_arr = wjo.get_array( "weather_overlays" );
+            while( overlay_arr.has_more() ) {
+                JsonObject overlay_jo = overlay_arr.next_object();
+                weather_overlay overlay;
+                overlay_jo.read( "id", overlay.id );
+                if( overlay.id.empty() ) {
+                    overlay_jo.throw_error( "expected overlay id", "id" );
+                }
+                assign( overlay_jo, "noise_scale_xy", overlay.noise_scale_xy );
+                assign( overlay_jo, "noise_scale_z", overlay.noise_scale_z );
+                assign( overlay_jo, "noise_multiplier", overlay.noise_multiplier );
+                assign( overlay_jo, "noise_offset", overlay.noise_offset );
+                assign( overlay_jo, "base_value", overlay.base_value );
+                assign( overlay_jo, "threshold", overlay.threshold );
+                assign( overlay_jo, "seed_offset", overlay.seed_offset );
+                assign( overlay_jo, "uses_base_acid", overlay.uses_base_acid );
+                region.weather.overlays.push_back( overlay );
+                region.weather.overlay_index[overlay.id] = region.weather.overlays.size() - 1;
+            }
+        }
+    }
 }
 
 void groundcover_extra::finalize()   // FIXME: return bool for failure
