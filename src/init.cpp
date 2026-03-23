@@ -108,6 +108,7 @@
 #include "vehicle_group.h"
 #include "vitamin.h"
 #include "weather.h"
+#include "weather_settings.h"
 #include "weather_type.h"
 #include "world_type.h"
 #include "worldfactory.h"
@@ -415,6 +416,7 @@ void DynamicDataLoader::initialize()
     add( "city_building", &city_buildings::load );
     add( "map_extra", &MapExtras::load );
 
+    add( "weather_settings", &load_weather_settings );
     add( "region_settings", &load_region_settings );
     add( "region_overlay", &load_region_overlay );
     add( "ITEM_BLACKLIST", []( const JsonObject & jo ) {
@@ -614,6 +616,7 @@ void DynamicDataLoader::unload_data()
     reset_mutation_types();
     reset_overlay_ordering();
     reset_recipe_categories();
+    reset_weather_settings();
     reset_region_settings();
     reset_scenarios_blacklist();
     reset_speech();

@@ -20,6 +20,7 @@
 #include "string_formatter.h"
 #include "string_id.h"
 #include "translations.h"
+#include "weather_settings.h"
 
 ter_furn_id::ter_furn_id() : ter( t_null ), furn( f_null ) { }
 
@@ -413,6 +414,32 @@ static void load_region_terrain_and_furniture_settings( const JsonObject &jo,
     }
 }
 
+static auto load_weather_overlays_from_json( const JsonObject &wjo, weather_generator &weather ) -> void
+{
+    if( !wjo.has_array( "weather_overlays" ) ) {
+        return;
+    }
+    auto overlay_arr = wjo.get_array( "weather_overlays" );
+    while( overlay_arr.has_more() ) {
+        auto overlay_jo = overlay_arr.next_object();
+        weather_overlay overlay;
+        overlay_jo.read( "id", overlay.id );
+        if( overlay.id.empty() ) {
+            overlay_jo.throw_error( "expected overlay id", "id" );
+        }
+        assign( overlay_jo, "noise_scale_xy", overlay.noise_scale_xy );
+        assign( overlay_jo, "noise_scale_z", overlay.noise_scale_z );
+        assign( overlay_jo, "noise_multiplier", overlay.noise_multiplier );
+        assign( overlay_jo, "noise_offset", overlay.noise_offset );
+        assign( overlay_jo, "base_value", overlay.base_value );
+        assign( overlay_jo, "threshold", overlay.threshold );
+        assign( overlay_jo, "seed_offset", overlay.seed_offset );
+        assign( overlay_jo, "uses_base_acid", overlay.uses_base_acid );
+        weather.overlays.push_back( overlay );
+        weather.overlay_index[overlay.id] = weather.overlays.size() - 1;
+    }
+}
+
 void load_region_settings( const JsonObject &jo )
 {
     regional_settings new_region;
@@ -560,13 +587,36 @@ void load_region_settings( const JsonObject &jo )
         }
     }
 
-    if( !jo.has_object( "weather" ) ) {
-        if( strict ) {
-            jo.throw_error( "\"weather\": { … } required for default" );
+    if( jo.has_member( "weather" ) ) {
+        std::string weather_id;
+        if( jo.read( "weather", weather_id, false ) ) {
+            if( weather_id.empty() ) {
+                jo.throw_error( "\"weather\" must specify a non-empty id", "weather" );
+            }
+            if( !has_weather_setting( weather_id ) ) {
+                jo.throw_error( string_format( "weather style '%s' not found", weather_id ), "weather" );
+            }
+            new_region.weather = get_weather_setting( weather_id );
+        } else if( jo.has_object( "weather" ) ) {
+            auto wjo = jo.get_object( "weather" );
+            std::string referenced_id;
+            if( wjo.read( "id", referenced_id, false ) && !wjo.has_array( "weather_types" ) ) {
+                if( referenced_id.empty() ) {
+                    wjo.throw_error( "weather style id cannot be empty", "id" );
+                }
+                if( !has_weather_setting( referenced_id ) ) {
+                    wjo.throw_error( string_format( "weather style '%s' not found", referenced_id ), "id" );
+                }
+                new_region.weather = get_weather_setting( referenced_id );
+                load_weather_overlays_from_json( wjo, new_region.weather );
+            } else {
+                new_region.weather = weather_generator::load( wjo );
+            }
+        } else {
+            jo.throw_error( "\"weather\" must be a string or object", "weather" );
         }
-    } else {
-        JsonObject wjo = jo.get_object( "weather" );
-        new_region.weather = weather_generator::load( wjo );
+    } else if( strict ) {
+        jo.throw_error( "\"weather\": { … } required for default" );
     }
 
     load_overmap_feature_flag_settings( jo, new_region.overmap_feature_flag, strict, false );
@@ -731,28 +781,8 @@ void apply_region_overlay( const JsonObject &jo, regional_settings &region )
     load_region_terrain_and_furniture_settings( jo, region.region_terrain_and_furniture, false, true );
 
     if( jo.has_object( "weather" ) ) {
-        JsonObject wjo = jo.get_object( "weather" );
-        if( wjo.has_array( "weather_overlays" ) ) {
-            JsonArray overlay_arr = wjo.get_array( "weather_overlays" );
-            while( overlay_arr.has_more() ) {
-                JsonObject overlay_jo = overlay_arr.next_object();
-                weather_overlay overlay;
-                overlay_jo.read( "id", overlay.id );
-                if( overlay.id.empty() ) {
-                    overlay_jo.throw_error( "expected overlay id", "id" );
-                }
-                assign( overlay_jo, "noise_scale_xy", overlay.noise_scale_xy );
-                assign( overlay_jo, "noise_scale_z", overlay.noise_scale_z );
-                assign( overlay_jo, "noise_multiplier", overlay.noise_multiplier );
-                assign( overlay_jo, "noise_offset", overlay.noise_offset );
-                assign( overlay_jo, "base_value", overlay.base_value );
-                assign( overlay_jo, "threshold", overlay.threshold );
-                assign( overlay_jo, "seed_offset", overlay.seed_offset );
-                assign( overlay_jo, "uses_base_acid", overlay.uses_base_acid );
-                region.weather.overlays.push_back( overlay );
-                region.weather.overlay_index[overlay.id] = region.weather.overlays.size() - 1;
-            }
-        }
+        auto wjo = jo.get_object( "weather" );
+        load_weather_overlays_from_json( wjo, region.weather );
     }
 }
 

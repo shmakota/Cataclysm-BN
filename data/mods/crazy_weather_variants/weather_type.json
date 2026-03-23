@@ -27,8 +27,8 @@
         "effect_msg_frequency": 3,
         "effect_msg_blocked_frequency": 32,
         "message_type": 3,
-        "clothing_protection": 0,
-        "umbrella_protection": 0
+        "clothing_protection": 2,
+        "umbrella_protection": 1
       }
     ],
     "animation": {
@@ -40,7 +40,8 @@
     "sound_category": "rainy",
     "sun_intensity": "none",
     "requirements": {
-      "required_overlays": [ "mutagenic_overlay" ]
+      "required_overlays": [ "mutagenic_overlay" ],
+      "required_weathers": [ "rain" ]
     }
   }
 ]

@@ -1,0 +1,63 @@
+[
+  {
+    "type": "weather_settings",
+    "id": "crazy_weather_variants_default",
+    "spring_temp": 8,
+    "summer_temp": 16,
+    "autumn_temp": 7,
+    "winter_temp": -14,
+    "base_humidity": 70,
+    "summer_humidity_manual_mod": -17,
+    "winter_humidity_manual_mod": 17,
+    "base_pressure": 1016,
+    "base_acid": 0.5,
+    "base_wind": 10,
+    "base_wind_distrib_peaks": 100,
+    "base_wind_season_variation": 30,
+    "weather_overlays": [
+      {
+        "id": "acid_overlay",
+        "noise_multiplier": 8.0,
+        "threshold": 1.0,
+        "uses_base_acid": true
+      },
+      {
+        "id": "mutagenic_overlay",
+        "noise_scale_xy": 1.0,
+        "noise_scale_z": 1.0,
+        "noise_multiplier": 8.0,
+        "noise_offset": 0.0,
+        "base_value": 0.0,
+        "threshold": 1.0,
+        "seed_offset": 103
+      }
+    ],
+    "weather_types": [
+      "clear",
+      "sunny",
+      "cloudy",
+      "light_drizzle",
+      "drizzle",
+      "rain",
+      "heavy_rain",
+      "thunder",
+      "lightning",
+      "acid_drizzle",
+      "acid_rain",
+      "light_flurries",
+      "flurries",
+      "snowing",
+      "snowstorm",
+      "rainbow",
+      "sundog",
+      "geomagnetic_storm",
+      "northern_lights",
+      "acid_flurries",
+      "acid_snow",
+      "acid_snowstorm",
+      "clear_night",
+      "starry_night",
+      "mutagenic_rain"
+    ]
+  }
+]

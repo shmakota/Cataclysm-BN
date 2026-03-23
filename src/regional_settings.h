@@ -235,6 +235,7 @@ struct regional_settings {
     region_terrain_and_furniture_settings region_terrain_and_furniture;
 
     std::unordered_map<std::string, map_extras> region_extras;
+    std::string requested_weather_style_id;
 
     regional_settings() : id( "null" ), default_oter( "field" ) {
         default_groundcover.add( t_null, 0 );
@@ -252,5 +253,4 @@ void load_region_settings( const JsonObject &jo );
 void reset_region_settings();
 void load_region_overlay( const JsonObject &jo );
 void apply_region_overlay( const JsonObject &jo, regional_settings &region );
-
 
