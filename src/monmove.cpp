@@ -958,13 +958,16 @@ monster_plan_t monster::compute_plan( const monster::compute_plan_context &ctx )
             const auto current_pos = pos();
             const auto away = current_pos - dest;
             auto flee_goal = current_pos + tripoint( away.x, away.y, 0 );
-            if( flies() ) {
+            if( flies() || climbs_walls() ) {
                 if( const auto preferred_z = type->preferred_z ) {
                     flee_goal.z = *preferred_z;
-                } else if( away.z != 0 ) {
+                } else if( flies() && away.z != 0 ) {
                     flee_goal.z = current_pos.z + away.z;
-                } else {
-                    flee_goal.z = current_pos.z + 1;
+                } else if( get_map().has_zlevels() ) {
+                    const int upper_z = std::min( current_pos.z + 1, OVERMAP_HEIGHT );
+                    if( get_map().inbounds_z( upper_z ) ) {
+                        flee_goal.z = upper_z;
+                    }
                 }
             } else {
                 flee_goal.z = current_pos.z;
