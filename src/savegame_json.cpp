@@ -490,6 +490,7 @@ void Character::load( const JsonObject &data )
 
     data.read( "base_age", init_age );
     data.read( "base_height", init_height );
+    data.read( "custom_description", custom_description );
 
     if( !data.read( "profession", prof ) || !prof.is_valid() ) {
         // We are likely an older profession which has since been removed so just set to default.
@@ -845,6 +846,7 @@ void Character::store( JsonOut &json ) const
 
     json.member( "base_age", init_age );
     json.member( "base_height", init_height );
+    json.member( "custom_description", custom_description );
 
     if( prof.is_valid() ) {
         json.member( "profession", prof );
