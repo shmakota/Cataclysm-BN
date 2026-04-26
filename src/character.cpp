@@ -511,6 +511,7 @@ void Character::move_operator_common( Character &&source ) noexcept
 
     name = std::move( source.name );
     male = source.male ;
+    custom_description = std::move( source.custom_description );
 
     worn = std::move( source.worn );
     in_vehicle = source.in_vehicle ;
@@ -7385,6 +7386,10 @@ std::string Character::extended_description() const
     }
 
     ss += "\n--\n";
+    if( !custom_description.empty() ) {
+        ss += custom_description;
+        ss += "\n--\n";
+    }
 
     const std::vector<bodypart_id> &bps = get_all_body_parts( true );
     // Find length of bp names, to align
@@ -7652,6 +7657,17 @@ void Character::reset_chargen_attributes()
 {
     init_age = 25;
     init_height = 175;
+    custom_description.clear();
+}
+
+auto Character::get_custom_description() const -> const std::string &
+{
+    return custom_description;
+}
+
+auto Character::set_custom_description( const std::string &description ) -> void
+{
+    custom_description = description;
 }
 
 int Character::base_age() const

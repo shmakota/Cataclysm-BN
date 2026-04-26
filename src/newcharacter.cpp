@@ -3165,9 +3165,18 @@ namespace char_creation
 {
 enum description_selector {
     NAME,
+    DESCRIPTION,
     HEIGHT,
     AGE
 };
+
+static auto get_description_preview( const avatar &you ) -> std::string
+{
+    if( you.get_custom_description().empty() ) {
+        return _( "--- No description ---" );
+    }
+    return you.get_custom_description();
+}
 
 static void draw_height( const catacurses::window &w_height, const avatar &you,
                          const bool highlight )
@@ -3214,6 +3223,7 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
     catacurses::window w_guide;
     catacurses::window w_height;
     catacurses::window w_age;
+    catacurses::window w_character_description;
 
 #if defined(TILES)
     character_preview_window character_preview;
@@ -3234,6 +3244,7 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
 
         // Row 2
         w_age = catacurses::newwin( 1, 12, point( 80, 6 ) );
+        w_character_description = catacurses::newwin( 1, std::max( 1, TERMX - 46 ), point( 46, 7 ) );
 
         // Big Row
         w_stats = catacurses::newwin( 6, 20, point( 2, 9 ) );
@@ -3475,7 +3486,7 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
 
         fold_and_print( w_guide, point( 0, getmaxy( w_guide ) - 4 ), ( TERMX / 2 ), c_light_gray,
                         _( "Press <color_light_green>%s</color> or <color_light_green>%s</color> "
-                           "to cycle through name, height, and age." ),
+                           "to cycle through name, description, height, and age." ),
                         ctxt.get_desc( "LEFT" ),
                         ctxt.get_desc( "RIGHT" ) );
 
@@ -3521,7 +3532,7 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
         if( !MAP_SHARING::isSharing() ) { // no random names when sharing maps
             // NOLINTNEXTLINE(cata-use-named-point-constants)
             fold_and_print( w_name, point( 0, 1 ), ( TERMX / 2 ), c_light_gray,
-                            _( "Press <color_light_green>%s</color> to edit.\nPress <color_light_green>%s</color> to randomize description." ),
+                            _( "Press <color_light_green>%s</color> to edit.\nPress <color_light_green>%s</color> to randomize character details." ),
                             ctxt.get_desc( "CONFIRM" ), ctxt.get_desc( "RANDOMIZE_CHAR_DESCRIPTION" ) );
         }
         wnoutrefresh( w_name );
@@ -3539,6 +3550,18 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
 
         char_creation::draw_age( w_age, you, current_selector == char_creation::AGE );
         char_creation::draw_height( w_height, you, current_selector == char_creation::HEIGHT );
+
+        werase( w_character_description );
+        mvwprintz( w_character_description, point_zero,
+                   current_selector == char_creation::DESCRIPTION ? h_light_gray : c_light_gray,
+                   _( "Description:" ) );
+        trim_and_print( w_character_description,
+                        point( 1 + utf8_width( _( "Description:" ) ), 0 ),
+                        getmaxx( w_character_description ) - 1 -
+                        ( 1 + utf8_width( _( "Description:" ) ) ),
+                        you.get_custom_description().empty() ? c_light_gray : c_white,
+                        char_creation::get_description_preview( you ) );
+        wnoutrefresh( w_character_description );
 
         const std::string location_prompt = string_format(
                                                 _( "Press <color_light_green>%s</color> to select location." ),
@@ -3791,6 +3814,9 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
         } else if( action == "RIGHT" ) {
             switch( current_selector ) {
                 case char_creation::NAME:
+                    current_selector = char_creation::DESCRIPTION;
+                    break;
+                case char_creation::DESCRIPTION:
                     current_selector = char_creation::HEIGHT;
                     break;
                 case char_creation::HEIGHT:
@@ -3805,8 +3831,11 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
                 case char_creation::NAME:
                     current_selector = char_creation::AGE;
                     break;
-                case char_creation::HEIGHT:
+                case char_creation::DESCRIPTION:
                     current_selector = char_creation::NAME;
+                    break;
+                case char_creation::HEIGHT:
+                    current_selector = char_creation::DESCRIPTION;
                     break;
                 case char_creation::AGE:
                     current_selector = char_creation::HEIGHT;
@@ -3862,6 +3891,7 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
                 you.pick_name();
                 no_name_entered = you.name.empty();
             }
+            you.set_custom_description( "" );
             you.set_base_age( rng( 16, 55 ) );
             you.set_base_height( rng( 145, 200 ) );
         } else if( action == "CHANGE_GENDER" ) {
@@ -3891,6 +3921,15 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
                     .only_digits( false );
                     you.name = popup.query_string();
                     no_name_entered = you.name.empty();
+                    break;
+                }
+                case char_creation::DESCRIPTION: {
+                    popup.title( _( "Enter character description." ) )
+                    .description( _( "This description is shown when extended-viewing your character." ) )
+                    .text( you.get_custom_description() )
+                    .max_length( 120 )
+                    .only_digits( false );
+                    you.set_custom_description( popup.query_string() );
                     break;
                 }
                 case char_creation::AGE: {

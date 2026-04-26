@@ -1876,6 +1876,8 @@ class Character : public Creature, public location_visitable<Character>
         int bmr() const;
         // Reset age and height to defaults for consistent test results
         void reset_chargen_attributes();
+        auto get_custom_description() const -> const std::string &;
+        auto set_custom_description( const std::string &description ) -> void;
         // age in years, determined at character creation
         int base_age() const;
         void set_base_age( int age );
@@ -2330,6 +2332,8 @@ class Character : public Creature, public location_visitable<Character>
         int init_age = 25;
         /**height at character creation*/
         int init_height = 175;
+        /** Character description set during character creation. */
+        std::string custom_description;
         /** Size class of character. */
         creature_size size_class = creature_size::medium;
 

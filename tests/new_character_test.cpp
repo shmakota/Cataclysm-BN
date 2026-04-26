@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "avatar.h"
+#include "fstream_utils.h"
 #include "game.h"
 #include "item.h"
 #include "item_contents.h"
@@ -78,6 +79,30 @@ static avatar get_sanitized_player()
     ret.set_stored_kcal( 100 );
     ret.set_thirst( 10000 );
     return ret;
+}
+
+TEST_CASE( "character_description_persists_and_is_shown_in_extended_description",
+           "[character][description][serialization]" )
+{
+    clear_all_state();
+
+    auto original = get_sanitized_player();
+    original.set_custom_description( "Keeps a meticulous field journal." );
+
+    CHECK( original.extended_description().find( original.get_custom_description() ) !=
+           std::string::npos );
+
+    const auto serialized_avatar = serialize_wrapper( [&]( JsonOut & jsout ) {
+        original.serialize( jsout );
+    } );
+
+    auto loaded = avatar();
+    deserialize_wrapper( [&]( JsonIn & jsin ) {
+        loaded.deserialize( jsin );
+    }, serialized_avatar );
+
+    CHECK( loaded.get_custom_description() == original.get_custom_description() );
+    CHECK( loaded.extended_description().find( loaded.get_custom_description() ) != std::string::npos );
 }
 
 struct failure {
