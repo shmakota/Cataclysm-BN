@@ -235,6 +235,7 @@ static distribution load_distribution( const JsonObject &jo, const std::string &
 void npc_class::load( const JsonObject &jo, const std::string & )
 {
     mandatory( jo, was_loaded, "name", name );
+    optional( jo, was_loaded, "description", description );
     mandatory( jo, was_loaded, "job_description", job_description );
 
     optional( jo, was_loaded, "common", common, true );
@@ -345,12 +346,17 @@ const npc_class_id &npc_class::random_common()
     return *random_entry( common_classes );
 }
 
-std::string npc_class::get_name() const
+auto npc_class::get_name() const -> std::string
 {
     return name.translated();
 }
 
-std::string npc_class::get_job_description() const
+auto npc_class::get_description() const -> std::string
+{
+    return description.translated();
+}
+
+auto npc_class::get_job_description() const -> std::string
 {
     return job_description.translated();
 }

@@ -13,6 +13,7 @@
     "type": "npc_class",
     "id": "NC_TEST_CLASS",
     "name": { "str": "Debug Dude" },
+    "description": "Looks like they were built to exercise NPC class behavior.",
     "job_description": "I'm helping you test the game.",
     "common": false,
     "bonus_str": 100,

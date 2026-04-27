@@ -47,6 +47,7 @@ class npc_class
 {
     private:
         translation name;
+        translation description;
         translation job_description;
 
         bool common = true;
@@ -77,8 +78,9 @@ class npc_class
         std::map<bionic_id, int> bionic_list;
         npc_class();
 
-        std::string get_name() const;
-        std::string get_job_description() const;
+        auto get_name() const -> std::string;
+        auto get_description() const -> std::string;
+        auto get_job_description() const -> std::string;
 
         int roll_strength() const;
         int roll_dexterity() const;
@@ -126,5 +128,3 @@ extern npc_class_id NC_SOLDIER;
 extern npc_class_id NC_BARTENDER;
 extern npc_class_id NC_JUNK_SHOPKEEP;
 extern npc_class_id NC_HALLU;
-
-

@@ -2503,6 +2503,17 @@ auto npc::print_info( const catacurses::window &w, int line, int vLines, int col
         }
     }
 
+    const auto display_description = get_display_description();
+    if( !display_description.empty() && line < last_line ) {
+        const auto description_lines = foldstring( display_description, iWidth );
+        for( const std::string &description_line : description_lines ) {
+            if( line >= last_line ) {
+                break;
+            }
+            trim_and_print( w, point( column, ++line ), iWidth, c_dark_gray, description_line );
+        }
+    }
+
     if( display_object_ids && line < last_line ) {
         mvwprintz( w, point( column, ++line ), c_light_blue, string_format( "[%s]", myclass ) );
     }
@@ -3394,6 +3405,14 @@ mfaction_id npc::get_monster_faction() const
     }
 
     return human_fac.id();
+}
+
+auto npc::get_display_description() const -> std::string
+{
+    if( !custom_description.empty() ) {
+        return custom_description;
+    }
+    return myclass.obj().get_description();
 }
 
 std::string npc::extended_description() const

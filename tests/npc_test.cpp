@@ -72,6 +72,24 @@ static void create_model( npc &model_npc )
 
 }
 
+TEST_CASE( "npc_class_description_is_used_as_default_visible_description",
+           "[npc][description]" )
+{
+    clear_all_state();
+
+    auto test_npc = standard_npc{};
+    test_npc.myclass = npc_class_id( "NC_TEST_CLASS" );
+
+    CHECK( test_npc.get_custom_description().empty() );
+    CHECK( test_npc.get_display_description() ==
+           "Looks like they were built to exercise NPC class behavior." );
+    CHECK( test_npc.extended_description().find( test_npc.get_display_description() ) !=
+           std::string::npos );
+
+    test_npc.set_custom_description( "Has a hand-written override." );
+    CHECK( test_npc.get_display_description() == "Has a hand-written override." );
+}
+
 static std::string get_list_of_npcs( const std::string &title )
 {
 
