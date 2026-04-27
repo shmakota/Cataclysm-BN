@@ -131,6 +131,70 @@ extern std::map<std::string, weighted_int_list<std::shared_ptr<mapgen_function_j
 namespace debug_menu
 {
 
+namespace
+{
+
+auto select_npc_class_for_debug_spawn() -> std::optional<npc_class_id>
+{
+    auto classes = uilist();
+    classes.text = _( "Spawn which NPC class?" );
+
+    auto class_ids = std::vector<npc_class_id>();
+    class_ids.emplace_back( npc_class_id::NULL_ID() );
+    classes.addentry_desc( 0, true, 'r', _( "Random common NPC" ),
+                           _( "Spawns the same kind of random debug NPC as before." ) );
+
+    auto sorted_class_ids = std::vector<npc_class_id>();
+    for( const auto &npc_class : npc_class::get_all() ) {
+        if( !npc_class.id.is_null() ) {
+            sorted_class_ids.emplace_back( npc_class.id );
+        }
+    }
+    std::ranges::sort( sorted_class_ids, []( const npc_class_id & lhs, const npc_class_id & rhs ) {
+        return localized_compare( lhs->get_name(), rhs->get_name() );
+    } );
+
+    for( const auto &class_id : sorted_class_ids ) {
+        class_ids.emplace_back( class_id );
+        classes.addentry_desc( static_cast<int>( class_ids.size() ) - 1, true, -1,
+                               class_id->get_name(), class_id->get_job_description() );
+    }
+
+    classes.query();
+    if( classes.ret < 0 || classes.ret >= static_cast<int>( class_ids.size() ) ) {
+        return std::nullopt;
+    }
+
+    return class_ids[classes.ret];
+}
+
+auto spawn_debug_npc( avatar &who, const npc_class_id &class_id ) -> void
+{
+    auto temp = make_shared_fast<npc>();
+    temp->randomize( class_id );
+    temp->spawn_at_precise( { g->get_levx(), g->get_levy() }, who.pos() + point( -4, -4 ) );
+    get_overmapbuffer( get_avatar().get_dimension() ).insert_npc( temp );
+    temp->form_opinion( who );
+    temp->mission = NPC_MISSION_NULL;
+    temp->add_new_mission( mission::reserve_random( ORIGIN_ANY_NPC, temp->global_omt_location(),
+                           temp->getID() ) );
+    auto new_fac_id = std::string( "solo_" );
+    new_fac_id += temp->name;
+    // create a new "lone wolf" faction for this one NPC
+    auto *new_solo_fac = g->faction_manager_ptr->add_new_faction( temp->name,
+                         faction_id( new_fac_id ), faction_id( "no_faction" ) );
+    temp->set_fac( new_solo_fac ? new_solo_fac->id : faction_id( "no_faction" ) );
+    cata::run_hooks( "on_creature_spawn", [&]( sol::table & params ) {
+        params["creature"] = temp.get();
+    } );
+    cata::run_hooks( "on_npc_spawn", [&]( sol::table & params ) {
+        params["npc"] = temp.get();
+    } );
+    g->load_npcs();
+}
+
+} // namespace
+
 enum debug_menu_index {
     DEBUG_WISH,
     DEBUG_SHORT_TELEPORT,
@@ -1548,27 +1612,9 @@ void debug()
         break;
 
         case DEBUG_SPAWN_NPC: {
-            shared_ptr_fast<npc> temp = make_shared_fast<npc>();
-            temp->randomize();
-            temp->spawn_at_precise( { g->get_levx(), g->get_levy() }, u.pos() + point( -4, -4 ) );
-            get_overmapbuffer( get_avatar().get_dimension() ).insert_npc( temp );
-            temp->form_opinion( u );
-            temp->mission = NPC_MISSION_NULL;
-            temp->add_new_mission( mission::reserve_random( ORIGIN_ANY_NPC, temp->global_omt_location(),
-                                   temp->getID() ) );
-            std::string new_fac_id = "solo_";
-            new_fac_id += temp->name;
-            // create a new "lone wolf" faction for this one NPC
-            faction *new_solo_fac = g->faction_manager_ptr->add_new_faction( temp->name,
-                                    faction_id( new_fac_id ), faction_id( "no_faction" ) );
-            temp->set_fac( new_solo_fac ? new_solo_fac->id : faction_id( "no_faction" ) );
-            cata::run_hooks( "on_creature_spawn", [&]( sol::table & params ) {
-                params["creature"] = temp.get();
-            } );
-            cata::run_hooks( "on_npc_spawn", [&]( sol::table & params ) {
-                params["npc"] = temp.get();
-            } );
-            g->load_npcs();
+            if( const auto class_id = select_npc_class_for_debug_spawn() ) {
+                spawn_debug_npc( u, *class_id );
+            }
         }
         break;
 

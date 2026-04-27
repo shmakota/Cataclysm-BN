@@ -7386,8 +7386,9 @@ std::string Character::extended_description() const
     }
 
     ss += "\n--\n";
-    if( !custom_description.empty() ) {
-        ss += custom_description;
+    const auto display_description = get_display_description();
+    if( !display_description.empty() ) {
+        ss += display_description;
         ss += "\n--\n";
     }
 
@@ -7661,6 +7662,11 @@ void Character::reset_chargen_attributes()
 }
 
 auto Character::get_custom_description() const -> const std::string &
+{
+    return custom_description;
+}
+
+auto Character::get_display_description() const -> std::string
 {
     return custom_description;
 }
@@ -11553,6 +11559,16 @@ auto Character::print_info( const catacurses::window &w, int vStart, int vLines,
     const int name_column = column + bar_max_width + 1;
     mvwprintz( w, point( name_column, vStart ), basic_symbol_color(), _( "You (%s)" ), name );
     int line = vStart + 1;
+    const auto display_description = get_display_description();
+    if( !display_description.empty() ) {
+        const auto description_lines = foldstring( display_description, iWidth );
+        for( const std::string &description_line : description_lines ) {
+            if( line >= last_line ) {
+                break;
+            }
+            trim_and_print( w, point( column, line++ ), iWidth, c_dark_gray, description_line );
+        }
+    }
     const auto description_parts = short_description_parts();
     for( size_t idx = 1; idx < description_parts.size(); ++idx ) {
         const auto &part = description_parts[idx];

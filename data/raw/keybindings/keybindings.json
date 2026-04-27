@@ -3386,6 +3386,12 @@
     "bindings": [ { "input_method": "keyboard", "key": "&" } ]
   },
   {
+    "type": "keybinding",
+    "id": "CHANGE_DESCRIPTION",
+    "name": "Change character description",
+    "bindings": [ { "input_method": "keyboard", "key": "(" } ]
+  },
+  {
     "id": "ACTIVATE",
     "type": "keybinding",
     "category": "INVENTORY_ITEM",

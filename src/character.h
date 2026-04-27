@@ -1877,6 +1877,7 @@ class Character : public Creature, public location_visitable<Character>
         // Reset age and height to defaults for consistent test results
         void reset_chargen_attributes();
         auto get_custom_description() const -> const std::string &;
+        virtual auto get_display_description() const -> std::string;
         auto set_custom_description( const std::string &description ) -> void;
         // age in years, determined at character creation
         int base_age() const;
@@ -2184,7 +2185,7 @@ class Character : public Creature, public location_visitable<Character>
          * depending on choice of ingredients */
         std::pair<nutrients, nutrients> compute_nutrient_range(
             const item &, const recipe_id &,
-            const cata::flat_set<flag_id> &extra_flags = {} ) const;
+        const cata::flat_set<flag_id> &extra_flags = {} ) const;
         /** Same, but across arbitrary recipes */
         std::pair<nutrients, nutrients> compute_nutrient_range(
             const itype_id &, const cata::flat_set<flag_id> &extra_flags = {} ) const;

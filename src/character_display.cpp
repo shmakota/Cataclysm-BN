@@ -1235,6 +1235,24 @@ static bool handle_player_display_action( Character &you, unsigned int &line,
         you.name = popup.text();
         add_msg( "From now on, you will refer to yourself as '%s.'", popup.text() );
         ui_tip.invalidate_ui();
+    } else if( action == "CHANGE_DESCRIPTION" ) {
+        string_input_popup popup;
+        popup.title( _( "Description: " ) )
+        .description( _( "This description is shown when extended-viewing your character." ) )
+        .width( 50 )
+        .text( you.get_custom_description() )
+        .max_length( 120 )
+        .only_digits( false )
+        .query();
+
+        you.set_custom_description( popup.text() );
+        if( popup.text().empty() ) {
+            add_msg( _( "Description cleared." ) );
+        } else {
+            add_msg( _( "Description set to \"%s\"." ), popup.text() );
+        }
+        ui_tip.invalidate_ui();
+        ui_info.invalidate_ui();
     }
     return done;
 }
@@ -1428,6 +1446,7 @@ void character_display::disp_info( Character &ch )
     ctxt.register_action( "CONFIRM", to_translation( "Toggle skill training / Upgrade stat" ) );
     ctxt.register_action( "CHANGE_PROFESSION_NAME", to_translation( "Change profession name" ) );
     ctxt.register_action( "CHANGE_NAME", to_translation( "Change name" ) );
+    ctxt.register_action( "CHANGE_DESCRIPTION", to_translation( "Change character description" ) );
     ctxt.register_action( "HELP_KEYBINDINGS" );
 
     std::map<std::string, int> speed_effects;
