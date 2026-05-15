@@ -82,6 +82,18 @@ static const skill_id skill_throw( "throw" );
 
 static const quality_id qual_SLEEP_AID( "SLEEP_AID" );
 
+namespace
+{
+
+auto container_contents_are_solid( const item &container ) -> bool
+{
+    return std::ranges::all_of( container.contents.all_items_top(), []( const item *const entry ) {
+        return entry->made_of( SOLID );
+    } );
+}
+
+} // namespace
+
 namespace character_funcs
 {
 
@@ -881,6 +893,10 @@ bool list_ammo( const Character &who, item &base, std::vector<item_reload_option
                 ammo->contents_made_of( SOLID ) ) {
                 continue;
             }
+            if( ( ammo->is_ammo_container() || ammo->is_container() ) &&
+                ammo->contents.num_item_stacks() != 1 ) {
+                continue;
+            }
             auto id = ( ammo->is_ammo_container() || ammo->is_container() )
                       ? ammo->contents.front().typeId()
                       : ammo->typeId();
@@ -934,6 +950,9 @@ item_reload_option select_ammo( const player &who, item &base,
     std::vector<std::string> names;
     std::ranges::transform( opts,
     std::back_inserter( names ), [&]( const item_reload_option & e ) {
+        const auto ammo_contents = ( e.ammo->is_ammo_container() || e.ammo->is_container() ) &&
+                                   e.ammo->contents.num_item_stacks() == 1 ?
+                                   &e.ammo->contents.front() : nullptr;
         const auto ammo_color = [&]( const std::string & name ) {
             return base.is_gun() && e.ammo->ammo_data() &&
                    !base.ammo_types().contains( e.ammo->ammo_data()->ammo->type ) ?
@@ -954,7 +973,7 @@ item_reload_option select_ammo( const player &who, item &base,
         } else if( e.ammo->is_container() ||
                    ( e.ammo->is_ammo_container() && who.is_worn( *e.ammo ) ) ) {
             // worn ammo containers should be named by their contents with their location also updated below
-            return e.ammo->contents.front().display_name();
+            return ammo_contents != nullptr ? ammo_contents->display_name() : e.ammo->display_name();
         } else {
             return ammo_color( ( who.ammo_location &&
                                  who.ammo_location == e.ammo ? "* " : "" ) + e.ammo->display_name() );
@@ -1009,13 +1028,16 @@ item_reload_option select_ammo( const player &who, item &base,
 
     auto draw_row = [&]( int idx ) {
         const auto &sel = opts[ idx ];
+        const auto ammo_contents = ( sel.ammo->is_ammo_container() || sel.ammo->is_container() ) &&
+                                   sel.ammo->contents.num_item_stacks() == 1 ?
+                                   &sel.ammo->contents.front() : nullptr;
         std::string row = string_format( "%s| %s |", names[ idx ], where[ idx ] );
         row += string_format( ( sel.ammo->is_ammo() ||
                                 sel.ammo->is_ammo_container() ) ? " %-7d |" : "         |", sel.qty() );
         row += string_format( " %-7d ", sel.moves() );
 
         if( base.is_gun() || base.is_magazine() ) {
-            const itype *ammo = sel.ammo->is_ammo_container() ? sel.ammo->contents.front().ammo_data() :
+            const itype *ammo = ammo_contents != nullptr ? ammo_contents->ammo_data() :
                                 sel.ammo->ammo_data();
             if( ammo ) {
                 const damage_instance &dam = ammo->ammo->damage;
@@ -1064,7 +1086,9 @@ item_reload_option select_ammo( const player &who, item &base,
     }
 
     for( auto i = 0; i < static_cast<int>( opts.size() ); ++i ) {
-        const item &ammo = opts[ i ].ammo->is_ammo_container() ? opts[ i ].ammo->contents.front() :
+        const item &ammo = ( opts[ i ].ammo->is_ammo_container() || opts[ i ].ammo->is_container() ) &&
+                           opts[ i ].ammo->contents.num_item_stacks() == 1 ?
+                           opts[ i ].ammo->contents.front() :
                            *opts[ i ].ammo;
 
         char hotkey = -1;
@@ -1232,22 +1256,27 @@ template <typename T, typename Output>
 void find_ammo_helper( T &src, const item &obj, bool empty, Output out, bool nested )
 {
     if( obj.is_container() ) {
-        if( !obj.is_container_empty() ) {
-            auto contents_id = obj.contents.front().typeId();
+        if( obj.contents.num_item_stacks() == 1 ) {
+            const auto contents_id = obj.contents.front().typeId();
+            const bool solid_contents = container_contents_are_solid( obj );
 
             // Look for containers with the same type of liquid as that already in our container
-            src.visit_items( [&nested, &out, &contents_id, &obj]( item * node ) {
+            src.visit_items( [&nested, &out, &contents_id, &obj, solid_contents]( item * node ) {
                 if( node == &obj ) {
                     // This stops containers and magazines counting *themselves* as ammo sources.
                     return VisitResponse::SKIP;
                 }
 
-                if( node->is_container() && !node->is_container_empty() &&
-                    node->contents.front().typeId() == contents_id ) {
-                    out = node;
-                } else if( !node->is_container() && !node->is_in_container() && node->made_of( SOLID ) &&
-                           node->typeId() == contents_id ) {
-                    out = node;
+                if( node->is_container() && node->contents.num_item_stacks() == 1 ) {
+                    if( solid_contents && container_contents_are_solid( *node ) ) {
+                        out = node;
+                    } else if( node->contents.front().typeId() == contents_id ) {
+                        out = node;
+                    }
+                } else if( !node->is_container() && !node->is_in_container() && node->made_of( SOLID ) ) {
+                    if( solid_contents || node->typeId() == contents_id ) {
+                        out = node;
+                    }
                 }
                 return nested ? VisitResponse::NEXT : VisitResponse::SKIP;
             } );
@@ -1255,9 +1284,9 @@ void find_ammo_helper( T &src, const item &obj, bool empty, Output out, bool nes
             // Look for any contents we can hold
             src.visit_items( [&nested, &out]( item * node ) {
                 if( ( node->is_watertight_container() && node->contents_made_of( LIQUID ) ) ||
-                    ( !node->is_in_container() && node->count_by_charges() &&
-                      node->made_of( SOLID ) ) ||
-                    ( node->is_container() && node->contents_made_of( SOLID ) ) ) {
+                    ( !node->is_in_container() && node->made_of( SOLID ) ) ||
+                    ( node->is_container() && node->contents.num_item_stacks() == 1 &&
+                      container_contents_are_solid( *node ) ) ) {
                     out = node;
                 }
                 return nested ? VisitResponse::NEXT : VisitResponse::SKIP;
@@ -1278,7 +1307,7 @@ void find_ammo_helper( T &src, const item &obj, bool empty, Output out, bool nes
                 // some liquids are ammo but we can't reload with them unless within a container or frozen
                 return VisitResponse::SKIP;
             }
-            if( node->is_ammo_container() && !node->contents.empty() &&
+            if( node->is_ammo_container() && node->contents.num_item_stacks() == 1 &&
                 !node->contents_made_of( SOLID ) ) {
                 for( const ammotype &at : ammo ) {
                     if( node->contents.front().ammo_type() == at ) {
@@ -1311,7 +1340,7 @@ void find_ammo_helper( T &src, const item &obj, bool empty, Output out, bool nes
             }
             if( node->is_magazine() ) {
 
-                if( !node->contents.empty() ) {
+                if( node->contents.num_item_stacks() == 1 ) {
                     const bool match = std::ranges::any_of( ammo, [&]( const ammotype & at ) {
                         return node->contents.front().ammo_type() == at;
                     } );
