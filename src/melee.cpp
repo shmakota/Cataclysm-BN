@@ -59,9 +59,11 @@
 #include "point.h"
 #include "projectile.h"
 #include "rng.h"
+#include "ui.h"
 #include "sounds.h"
 #include "string_formatter.h"
 #include "string_id.h"
+#include "string_utils.h"
 #include "translations.h"
 #include "type_id.h"
 #include "units.h"
@@ -79,31 +81,7 @@ static const itype_id itype_rag( "rag" );
 static const matec_id tec_none( "tec_none" );
 static const matec_id WBLOCK_1( "WBLOCK_1" );
 static const matec_id WBLOCK_2( "WBLOCK_2" );
-
-namespace
-{
-
-auto with_cross_z_melee_cost( const int base_cost, const tripoint &source,
-                              const tripoint &target ) -> int
-{
-    if( std::abs( source.z - target.z ) < 1 ) {
-        return base_cost;
-    }
-
-    const auto modifier = get_option<float>( "CROSS_Z_LEVEL_MELEE_DIFFICULTY_MODIFIER" );
-    return static_cast<int>( std::floor( base_cost * modifier ) );
-}
-
-} // namespace
-
-static const matec_id WBLOCK_3( "WBLOCK_3" );
-
-static const skill_id skill_stabbing( "stabbing" );
-static const skill_id skill_cutting( "cutting" );
-static const skill_id skill_unarmed( "unarmed" );
-static const skill_id skill_bashing( "bashing" );
-static const skill_id skill_melee( "melee" );
-
+static const efftype_id effect_amigara( "amigara" );
 static const efftype_id effect_badpoison( "badpoison" );
 static const efftype_id effect_beartrap( "beartrap" );
 static const efftype_id effect_bouldering( "bouldering" );
@@ -119,7 +97,6 @@ static const efftype_id effect_monster_disarmed( "monster_disarmed" );
 static const efftype_id effect_narcosis( "narcosis" );
 static const efftype_id effect_poison( "poison" );
 static const efftype_id effect_stunned( "stunned" );
-
 static const trait_id trait_ARM_TENTACLES( "ARM_TENTACLES" );
 static const trait_id trait_ARM_TENTACLES_4( "ARM_TENTACLES_4" );
 static const trait_id trait_ARM_TENTACLES_8( "ARM_TENTACLES_8" );
@@ -134,13 +111,168 @@ static const trait_id trait_POISONOUS( "POISONOUS" );
 static const trait_id trait_PROF_SKATER( "PROF_SKATER" );
 static const trait_id trait_VINES2( "VINES2" );
 static const trait_id trait_VINES3( "VINES3" );
-
 static const trait_flag_str_id trait_flag_NEED_ACTIVE_TO_MELEE( "NEED_ACTIVE_TO_MELEE" );
 static const trait_flag_str_id trait_flag_UNARMED_BONUS( "UNARMED_BONUS" );
-
-static const efftype_id effect_amigara( "amigara" );
-
 static const species_id HUMAN( "HUMAN" );
+
+namespace
+{
+
+thread_local int technique_prompt_suppression_depth = 0;
+
+auto with_cross_z_melee_cost( const int base_cost, const tripoint &source,
+                              const tripoint &target ) -> int
+{
+    if( std::abs( source.z - target.z ) < 1 ) {
+        return base_cost;
+    }
+
+    const auto modifier = get_option<float>( "CROSS_Z_LEVEL_MELEE_DIFFICULTY_MODIFIER" );
+    return static_cast<int>( std::floor( base_cost * modifier ) );
+}
+
+} // namespace
+
+auto Character::get_valid_techniques( const technique_query_options &options ) -> std::vector<matec_id>
+{
+    const auto all = martial_arts_data->get_all_techniques( options.weapon );
+    auto possible = std::vector<matec_id>();
+
+    const bool downed = options.target.has_effect( effect_downed );
+    const bool stunned = options.target.has_effect( effect_stunned );
+    const bool wall_adjacent = g->m.is_wall_adjacent( pos() );
+    const auto monster_target = dynamic_cast<const monster *>( &options.target );
+
+    for( const matec_id &tec_id : all ) {
+        const ma_technique &tec = tec_id.obj();
+
+        if( tec.dummy || tec.defensive ) {
+            continue;
+        }
+        if( tec.wall_adjacent && !wall_adjacent ) {
+            continue;
+        }
+        if( options.dodge_counter != tec.dodge_counter ) {
+            continue;
+        }
+        if( options.block_counter != tec.block_counter ) {
+            continue;
+        }
+        if( !tec.crit_ok && ( options.critical_hit != tec.crit_tec ) ) {
+            continue;
+        }
+        if( downed && tec.down_dur > 0 ) {
+            continue;
+        }
+        if( !downed && tec.downed_target ) {
+            continue;
+        }
+        if( !stunned && tec.stunned_target ) {
+            continue;
+        }
+        if( tec.disarms && ( ( monster_target == nullptr && !options.target.has_weapon() ) ||
+                             ( monster_target != nullptr && !monster_target->type->monster_weapon ) ||
+                             options.target.has_effect( effect_monster_disarmed ) ) ) {
+            continue;
+        }
+        if( tec.take_weapon && ( has_weapon() ||
+                                 ( ( monster_target == nullptr && !options.target.has_weapon() ) ||
+                                   ( monster_target != nullptr &&
+                                     !monster_target->type->monster_weapon ) ||
+                                   options.target.has_effect( effect_monster_disarmed ) ) ) ) {
+            continue;
+        }
+        if( tec.human_target && !options.target.in_species( HUMAN ) ) {
+            continue;
+        }
+        if( !tec.aoe.empty() && !valid_aoe_technique( options.target, tec ) ) {
+            continue;
+        }
+        if( options.use_weighting && tec.weighting < 0 &&
+            !one_in( std::abs( tec.weighting ) ) ) {
+            continue;
+        }
+        if( tec.is_valid_character( *this ) ) {
+            possible.push_back( tec.id );
+            if( options.use_weighting && tec.weighting > 1 ) {
+                for( int i = 1; i < tec.weighting; ++i ) {
+                    possible.push_back( tec.id );
+                }
+            }
+        }
+    }
+
+    return possible;
+}
+
+namespace
+{
+
+auto choose_melee_technique( Character &self, Creature &target, const item &weapon,
+                             const bool critical_hit ) -> std::optional<matec_id>
+{
+    auto techniques = self.get_valid_techniques( {
+        .target = target,
+        .weapon = weapon,
+        .critical_hit = critical_hit,
+        .use_weighting = false,
+    } );
+
+    if( techniques.empty() ) {
+        return std::nullopt;
+    }
+
+    std::set<matec_id> unique_techniques( techniques.begin(), techniques.end() );
+    techniques.assign( unique_techniques.begin(), unique_techniques.end() );
+    std::ranges::sort( techniques, {}, []( const matec_id &tec_id ) {
+        return tec_id->name;
+    } );
+
+    uilist menu;
+    menu.desc_enabled = true;
+    menu.text = string_format( _( "Choose melee technique for %s" ), target.disp_name() );
+    menu.addentry_desc( -1, true, 'a', _( "Automatic" ),
+                        _( "Let the game pick the best available technique." ) );
+
+    for( size_t i = 0; i < techniques.size(); ++i ) {
+        const ma_technique &technique = techniques[i].obj();
+        menu.addentry_desc( static_cast<int>( i ), true, MENU_AUTOASSIGN,
+                            technique.name, replace_colors( technique.get_description() ) );
+    }
+
+    menu.selected = 0;
+    menu.query();
+    if( menu.ret < 0 ) {
+        return std::nullopt;
+    }
+
+    return techniques[menu.ret];
+}
+
+} // namespace
+
+auto melee::is_technique_prompt_suppressed() -> bool
+{
+    return technique_prompt_suppression_depth > 0;
+}
+
+melee::technique_prompt_suppression_guard::technique_prompt_suppression_guard()
+{
+    ++technique_prompt_suppression_depth;
+}
+
+melee::technique_prompt_suppression_guard::~technique_prompt_suppression_guard()
+{
+    --technique_prompt_suppression_depth;
+}
+
+static const matec_id WBLOCK_3( "WBLOCK_3" );
+
+static const skill_id skill_stabbing( "stabbing" );
+static const skill_id skill_cutting( "cutting" );
+static const skill_id skill_unarmed( "unarmed" );
+static const skill_id skill_bashing( "bashing" );
+static const skill_id skill_melee( "melee" );
 
 void player_hit_message( Character *attacker, const std::string &message,
                          Creature &t, int dam, bool crit = false );
@@ -589,7 +721,17 @@ void Character::melee_attack( Creature &t, bool allow_special, const matec_id *f
         // Pick one or more special attacks
         matec_id technique_id;
         if( allow_special && !has_force_technique ) {
-            technique_id = pick_technique( t, cur_weapon, critical_hit, false, false );
+            if( is_player() && !is_auto_moving() &&
+                !melee::is_technique_prompt_suppressed() ) {
+                if( const std::optional<matec_id> selected_technique =
+                        choose_melee_technique( *this, t, cur_weapon, critical_hit ) ) {
+                    technique_id = *selected_technique;
+                } else {
+                    technique_id = pick_technique( t, cur_weapon, critical_hit, false, false );
+                }
+            } else {
+                technique_id = pick_technique( t, cur_weapon, critical_hit, false, false );
+            }
         } else if( has_force_technique ) {
             technique_id = *force_technique;
         } else {
@@ -1291,109 +1433,14 @@ void melee::roll_non_physical_damage( const Character &c, bool crit, damage_inst
 matec_id Character::pick_technique( Creature &t, const item &weap,
                                     bool crit, bool dodge_counter, bool block_counter )
 {
-
-    const std::vector<matec_id> all = martial_arts_data->get_all_techniques( weap );
-
-    std::vector<matec_id> possible;
-
-    bool downed = t.has_effect( effect_downed );
-    bool stunned = t.has_effect( effect_stunned );
-    bool wall_adjacent = g->m.is_wall_adjacent( pos() );
-
-    // first add non-aoe tecs
-    for( const matec_id &tec_id : all ) {
-        const ma_technique &tec = tec_id.obj();
-
-        // ignore "dummy" techniques like WBLOCK_1
-        if( tec.dummy ) {
-            continue;
-        }
-
-        // skip defensive techniques
-        if( tec.defensive ) {
-            continue;
-        }
-
-        // skip wall adjacent techniques if not next to a wall
-        if( tec.wall_adjacent && !wall_adjacent ) {
-            continue;
-        }
-
-        // skip dodge counter techniques
-        if( dodge_counter != tec.dodge_counter ) {
-            continue;
-        }
-
-        // skip block counter techniques
-        if( block_counter != tec.block_counter ) {
-            continue;
-        }
-
-        // if critical then select only from critical tecs
-        // but allow the technique if its crit ok
-        if( !tec.crit_ok && ( crit != tec.crit_tec ) ) {
-            continue;
-        }
-
-        // don't apply downing techniques to someone who's already downed
-        if( downed && tec.down_dur > 0 ) {
-            continue;
-        }
-
-        // don't apply "downed only" techniques to someone who's not downed
-        if( !downed && tec.downed_target ) {
-            continue;
-        }
-
-        // don't apply "stunned only" techniques to someone who's not stunned
-        if( !stunned && tec.stunned_target ) {
-            continue;
-        }
-
-        const auto m = dynamic_cast<const monster *>( &t );
-        // don't apply disarming techniques to someone without a weapon
-        // TODO: these are the stat requirements for tec_disarm
-        // dice(   dex_cur +    get_skill_level("unarmed"),  8) >
-        // dice(p->dex_cur + p->get_skill_level("melee"),   10))
-        if( tec.disarms && ( ( m == nullptr && !t.has_weapon() ) || ( m != nullptr &&
-                             !m->type->monster_weapon ) ||
-                             t.has_effect( effect_monster_disarmed ) ) ) {
-            continue;
-        }
-
-        if( ( tec.take_weapon && ( ( has_weapon() ) || ( ( m == nullptr && !t.has_weapon() ) ||
-                                   ( m != nullptr &&
-                                     !m->type->monster_weapon ) || t.has_effect( effect_monster_disarmed ) ) ) ) ) {
-            continue;
-        }
-
-        // Don't apply humanoid-only techniques to non-humanoids
-        if( tec.human_target && !t.in_species( HUMAN ) ) {
-            continue;
-        }
-        // if aoe, check if there are valid targets
-        if( !tec.aoe.empty() && !valid_aoe_technique( t, tec ) ) {
-            continue;
-        }
-
-        // If we have negative weighting then roll to see if it's valid this time
-        if( tec.weighting < 0 && !one_in( std::abs( tec.weighting ) ) ) {
-            continue;
-        }
-
-        if( tec.is_valid_character( *this ) ) {
-            possible.push_back( tec.id );
-
-            //add weighted options into the list extra times, to increase their chance of being selected
-            if( tec.weighting > 1 ) {
-                for( int i = 1; i < tec.weighting; i++ ) {
-                    possible.push_back( tec.id );
-                }
-            }
-        }
-    }
-
-    return random_entry( possible, tec_none );
+    return random_entry( get_valid_techniques( {
+                             .target = t,
+                             .weapon = weap,
+                             .critical_hit = crit,
+                             .dodge_counter = dodge_counter,
+                             .block_counter = block_counter,
+                         } ),
+                         tec_none );
 }
 
 bool Character::valid_aoe_technique( Creature &t, const ma_technique &technique )
