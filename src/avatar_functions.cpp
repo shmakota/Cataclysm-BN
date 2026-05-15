@@ -20,6 +20,7 @@
 #include "player_activity.h"
 #include "skill.h"
 #include "string_formatter.h"
+#include "ui.h"
 #include "trap.h"
 #include "veh_type.h"
 #include "vehicle.h"
@@ -44,6 +45,97 @@ static const itype_id itype_plut_cell( "plut_cell" );
 static const itype_id itype_small_repairkit( "small_repairkit" );
 
 static const skill_id skill_weapon( "weapon" );
+
+namespace avatar_funcs
+{
+static detached_ptr<item> add_or_drop_with_msg( avatar &you, detached_ptr<item> &&it,
+        bool unloading );
+}
+
+namespace
+{
+
+auto select_container_unload_item( item &it ) -> item *
+{
+    std::vector<item *> unloadables = it.contents.all_items_top();
+    if( unloadables.empty() ) {
+        return nullptr;
+    }
+
+    std::vector<uilist_entry> entries;
+    entries.emplace_back( -1, true, 'a', _( "Unload all" ) );
+    for( const item *const contained : unloadables ) {
+        entries.emplace_back( -1, true, MENU_AUTOASSIGN, contained->display_name() );
+    }
+
+    const int ret = uilist( _( "Unload which item?" ), entries );
+    if( ret < 0 ) {
+        return nullptr;
+    }
+    if( ret == 0 ) {
+        return &it;
+    }
+    return unloadables[ ret - 1 ];
+}
+
+auto unload_container_contents( avatar &you, item &container, item *selected ) -> bool
+{
+    if( selected == nullptr ) {
+        return false;
+    }
+
+    if( selected == &container ) {
+        bool changed = false;
+        std::vector<item *> liquids;
+        container.contents.remove_top_items_with( [&changed, &you, &liquids]( detached_ptr<item> &&contained ) {
+            if( contained->made_of( LIQUID ) ) {
+                liquids.push_back( &*contained );
+                return std::move( contained );
+            }
+            const int old_charges = contained->charges;
+            item &obj = *contained;
+            contained = avatar_funcs::add_or_drop_with_msg( you, std::move( contained ), true );
+            if( !contained || contained->charges != old_charges ) {
+                you.mod_moves( -you.item_handling_cost( obj ) );
+                changed = true;
+            }
+            return std::move( contained );
+        } );
+
+        for( item *const liquid : liquids ) {
+            liquid_handler::consume_liquid( *liquid, 1 );
+        }
+
+        if( changed ) {
+            container.on_contents_changed();
+        }
+        return changed;
+    }
+
+    detached_ptr<item> contained = container.contents.remove_top( selected );
+    if( !contained ) {
+        return false;
+    }
+
+    if( contained->made_of( LIQUID ) ) {
+        const bool handled = liquid_handler::consume_liquid( *contained, 1 );
+        if( handled ) {
+            container.on_contents_changed();
+        }
+        return handled;
+    }
+
+    item &obj = *contained;
+    const int old_charges = contained->charges;
+    contained = avatar_funcs::add_or_drop_with_msg( you, std::move( contained ), true );
+    if( !contained || contained->charges != old_charges ) {
+        you.mod_moves( -you.item_handling_cost( obj ) );
+    }
+    container.on_contents_changed();
+    return true;
+}
+
+} // namespace
 
 namespace avatar_funcs
 {
@@ -662,36 +754,22 @@ bool unload_item( avatar &you, item &loc )
             add_msg( m_info, _( "The %s is already empty!" ), it.tname() );
             return false;
         }
-    if( !it.can_unload_liquid() ) {
-        add_msg( m_info, _( "The liquid can't be unloaded in its current state!" ) );
-        return false;
-    }
-
-        bool changed = false;
-        std::vector<item *> liquids;
-        it.contents.remove_top_items_with( [&changed, &you, &liquids]( detached_ptr<item> &&contained ) {
-            if( contained->made_of( LIQUID ) ) {
-                liquids.push_back( &*contained );
-                return std::move( contained );
-            }
-            const int old_charges = contained->charges;
-            item &obj = *contained;
-            contained = add_or_drop_with_msg( you, std::move( contained ), true );
-            if( !contained || contained->charges != old_charges ) {
-                you.mod_moves( -you.item_handling_cost( obj ) );
-                changed = true;
-            }
-            return std::move( contained );
-        } );
-
-        for( item *const liquid : liquids ) {
-            liquid_handler::consume_liquid( *liquid, 1 );
+        if( !it.can_unload_liquid() ) {
+            add_msg( m_info, _( "The liquid can't be unloaded in its current state!" ) );
+            return false;
         }
 
-        if( changed ) {
-            it.on_contents_changed();
+        item *selected = nullptr;
+        if( it.contents.num_item_stacks() > 1 ) {
+            selected = select_container_unload_item( it );
+            if( selected == nullptr ) {
+                return false;
+            }
+        } else {
+            selected = &it;
         }
-        return changed;
+
+        return unload_container_contents( you, it, selected );
     }
 
     // If item can be unloaded more than once (currently only guns) prompt user to choose
