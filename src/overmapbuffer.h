@@ -479,7 +479,8 @@ class overmapbuffer
         /**
          * Adds a nemesis horde into the overmap where the kill_nemesis mission is targeted.
          */
-        void add_nemesis( const tripoint_abs_omt &p );
+        void add_nemesis( const tripoint_abs_omt &p,
+                          const mongroup_id &group_type = mongroup_id( "GROUP_NEMESIS" ) );
         /**
          * Let hordes move a step. Note that this may move monster groups inside the reality bubble,
          * therefore you should probably call @ref map::spawn_monsters to spawn them.

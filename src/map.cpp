@@ -9098,6 +9098,9 @@ void map::spawn_monsters_submap_group( const tripoint &gp, mongroup &group, bool
             // If a monster came from a horde population, configure them to always be willing to rejoin a horde.
             if( group.horde ) {
                 tmp.set_horde_attraction( MHA_ALWAYS );
+                if( group.horde_behaviour == "nemesis" ) {
+                    tmp.nemesis_group = group.type;
+                }
             }
             for( int i = 0; i < spawn_details.pack_size; i++ ) {
                 group.monsters.push_back( tmp );

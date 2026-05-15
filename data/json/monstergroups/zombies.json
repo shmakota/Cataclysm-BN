@@ -146,6 +146,20 @@
   },
   {
     "type": "monstergroup",
+    "name": "GROUP_NEMESIS_DOGS",
+    "default": "mon_zombie_dog",
+    "//": "nemesis pack",
+    "monsters": [ { "monster": "mon_zombie_dog", "freq": 1000, "cost_multiplier": 0, "pack_size": [ 20, 20 ] } ]
+  },
+  {
+    "type": "monstergroup",
+    "name": "GROUP_NEMESIS_DEATH_ANGEL",
+    "default": "mon_death_angel",
+    "//": "nemesis angel",
+    "monsters": [ { "monster": "mon_death_angel", "freq": 1000, "cost_multiplier": 0 } ]
+  },
+  {
+    "type": "monstergroup",
     "name": "GROUP_VANILLA",
     "default": "mon_zombie",
     "monsters": [

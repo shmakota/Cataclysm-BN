@@ -14,5 +14,12 @@
     "name": { "str": "unstabbable monster" },
     "description": "This monster exists only for testing purposes.",
     "armor_stab": 1000
+  },
+  {
+    "id": "mon_test_nemesis",
+    "copy-from": "mon_zombie_nemesis",
+    "type": "MONSTER",
+    "name": { "str": "test nemesis" },
+    "description": "This monster exists only for testing nemesis horde configuration."
   }
 ]

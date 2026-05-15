@@ -316,6 +316,21 @@
     "flags": [ "SEES", "HEARS", "SMELLS", "WARM", "BLEED", "HARDTOSHOOT", "ATTACKMON", "FLIES", "POISON", "REVIVES" ]
   },
   {
+    "id": "mon_death_angel",
+    "copy-from": "mon_flesh_angel",
+    "type": "MONSTER",
+    "name": { "str": "death angel" },
+    "description": "A blasphemous nether thing with a halo of bone and wings that beat faster than they should.  It hunts by sound, gliding through darkness with terrible speed.",
+    "default_faction": "nether",
+    "diff": 8,
+    "species": [ "NETHER" ],
+    "speed": 240,
+    "vision_day": 4,
+    "vision_night": 2,
+    "special_attacks": [ [ "FEAR_PARALYZE", 0 ], { "type": "bite", "cooldown": 4 } ],
+    "flags": [ "SEES", "HEARS", "GOODHEARING", "SMELLS", "WARM", "BLEED", "HARDTOSHOOT", "ATTACKMON", "FLIES", "POISON", "REVIVES" ]
+  },
+  {
     "id": "mon_flying_polyp",
     "type": "MONSTER",
     "name": { "str": "flying polyp" },

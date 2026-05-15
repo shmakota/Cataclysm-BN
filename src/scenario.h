@@ -48,6 +48,7 @@ class scenario
         std::set<std::string> flags; // flags for some special properties of the scenario
         std::string _map_extra;
         std::vector<mission_type_id> _missions;
+        mongroup_id _nemesis_group = mongroup_id( "GROUP_NEMESIS" );
 
         vproto_id _starting_vehicle = vproto_id::NULL_ID();
 
@@ -122,6 +123,7 @@ class scenario
         bool can_pick( const scenario &current_scenario, int points ) const;
 
         const std::vector<mission_type_id> &missions() const;
+        auto nemesis_group() const -> const mongroup_id &; // *NOPAD*
 
         const std::vector<std::pair<mongroup_id, float>> &surround_groups() const;
 };
@@ -140,5 +142,3 @@ void reset_scenarios_blacklist();
 
 const scenario *get_scenario();
 void set_scenario( const scenario *new_scenario );
-
-

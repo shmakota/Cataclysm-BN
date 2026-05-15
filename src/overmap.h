@@ -517,7 +517,7 @@ class overmap
         void process_mongroups();
         void move_hordes();
         void move_nemesis();
-        void place_nemesis( tripoint_abs_omt p );
+        void place_nemesis( tripoint_abs_omt p, const mongroup_id &group_type );
         bool remove_nemesis(); // returns true if nemesis found and removed
 
         // Overall terrain

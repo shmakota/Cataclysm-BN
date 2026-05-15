@@ -85,7 +85,6 @@ static const species_id ZOMBIE( "ZOMBIE" );
 static const mongroup_id GROUP_DIMENSIONAL_SURFACE( "GROUP_DIMENSIONAL_SURFACE" );
 static const mongroup_id GROUP_WORM( "GROUP_WORM" );
 static const mongroup_id GROUP_ZOMBIE( "GROUP_ZOMBIE" );
-static const mongroup_id GROUP_NEMESIS( "GROUP_NEMESIS" );
 
 static const oter_type_str_id oter_type_bridge( "bridge" );
 
@@ -6396,14 +6395,14 @@ void overmap::place_mongroups()
     }
 }
 
-void overmap::place_nemesis( const tripoint_abs_omt p )
+void overmap::place_nemesis( const tripoint_abs_omt p, const mongroup_id &group_type )
 {
     tripoint_abs_sm pos_sm = project_to<coords::sm>( p );
     point_abs_om omp;
     tripoint_om_sm local_sm;
     std::tie( omp, local_sm ) = project_remain<coords::om>( pos_sm );
 
-    mongroup nemesis( GROUP_NEMESIS, local_sm, 1, 1 );
+    mongroup nemesis( group_type, local_sm, 1, 1 );
     nemesis.horde = true;
     nemesis.horde_behaviour = "nemesis";
     nemesis.abs_pos = pos_sm;

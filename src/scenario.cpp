@@ -95,6 +95,8 @@ void scenario::load( const JsonObject &jo, const std::string & )
     optional( jo, was_loaded, "flags", flags, auto_flags_reader<> {} );
     optional( jo, was_loaded, "map_extra", _map_extra, "mx_null" );
     optional( jo, was_loaded, "missions", _missions, auto_flags_reader<mission_type_id> {} );
+    optional( jo, was_loaded, "nemesis_group", _nemesis_group, auto_flags_reader<mongroup_id> {},
+              mongroup_id( "GROUP_NEMESIS" ) );
 
     if( jo.has_string( "vehicle" ) ) {
         _starting_vehicle = vproto_id( jo.get_string( "vehicle" ) );
@@ -202,6 +204,9 @@ void scenario::check_definition() const
     MapExtras::get_function( _map_extra ); // triggers a debug message upon invalid input
 
     check_bionics( _forbidden_bionics, id );
+    if( !_nemesis_group.is_valid() ) {
+        debugmsg( "nemesis group %s for scenario %s does not exist", _nemesis_group.c_str(), id.c_str() );
+    }
     for( auto &m : _missions ) {
         if( !m.is_valid() ) {
             debugmsg( "starting mission %s for scenario %s does not exist", m.c_str(), id.c_str() );
@@ -504,6 +509,10 @@ const std::string &scenario::get_map_extra() const
 const std::vector<mission_type_id> &scenario::missions() const
 {
     return _missions;
+}
+auto scenario::nemesis_group() const -> const mongroup_id &
+{
+    return _nemesis_group;
 }
 const std::vector<std::pair<mongroup_id, float>> &scenario::surround_groups() const
 {

@@ -654,11 +654,11 @@ void overmapbuffer::move_hordes()
     }
 }
 
-void overmapbuffer::add_nemesis( const tripoint_abs_omt &p )
+void overmapbuffer::add_nemesis( const tripoint_abs_omt &p, const mongroup_id &group_type )
 {
     const tripoint_abs_om loc = project_to<coords::om>( p );
     overmap &om = get( loc.xy() );
-    om.place_nemesis( p );
+    om.place_nemesis( p, group_type );
 }
 
 void overmapbuffer::move_nemesis()
@@ -1965,7 +1965,7 @@ void overmapbuffer::despawn_monster( const monster &critter )
     // Store the monster using coordinates local to the overmap.
     if( critter.is_nemesis() ) {
         const tripoint_abs_omt abs_omt( ms_to_omt_copy( critter.pos_abs.raw() ) );
-        om.place_nemesis( abs_omt );
+        om.place_nemesis( abs_omt, critter.nemesis_group );
     } else {
         om.monster_map->insert( std::make_pair( sm, critter ) );
     }

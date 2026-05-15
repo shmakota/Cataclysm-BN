@@ -4,17 +4,20 @@
 #include <memory>
 #include <vector>
 
+#include "coordinate_conversions.h"
 #include "calendar.h"
 #include "enums.h"
 #include "game_constants.h"
 #include "numeric_interval.h"
 #include "omdata.h"
+#include "mongroup.h"
 #include "overmap.h"
 #include "overmap_special.h"
 #include "overmap_types.h"
 #include "overmapbuffer.h"
 #include "point.h"
 #include "rng.h"
+#include "scenario.h"
 #include "state_helpers.h"
 #include "type_id.h"
 
@@ -212,4 +215,22 @@ TEST_CASE( "mutable_overmap_placement", "[overmap][slow]" )
 
         CHECK( successes > num_trials_per_overmap / 2 );
     }
+}
+
+TEST_CASE( "nemesis_spawn_uses_configured_group", "[overmap][nemesis]" )
+{
+    clear_all_state();
+
+    const auto test_scenario_id = string_id<scenario>( "test_hunted" );
+    REQUIRE( test_scenario_id.is_valid() );
+    CHECK( test_scenario_id.obj().nemesis_group() == mongroup_id( "GROUP_TEST_NEMESIS" ) );
+
+    const auto abs_pos = tripoint_abs_omt( 0, 0, 0 );
+    ACTIVE_OVERMAP_BUFFER.add_nemesis( abs_pos, mongroup_id( "GROUP_TEST_NEMESIS" ) );
+
+    const auto groups = ACTIVE_OVERMAP_BUFFER.groups_at( project_to<coords::sm>( abs_pos ) );
+    CHECK( std::ranges::any_of( groups, []( const auto *group ) {
+        return group != nullptr && group->type == mongroup_id( "GROUP_TEST_NEMESIS" ) &&
+               group->horde_behaviour == "nemesis";
+    } ) );
 }

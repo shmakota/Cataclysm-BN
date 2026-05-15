@@ -622,6 +622,8 @@ class monster : public Creature, public location_visitable<monster>
         mfaction_id faction;
         // If we're related to a mission
         int mission_id;
+        // The nemesis horde group this monster belongs to, if any.
+        mongroup_id nemesis_group = mongroup_id( "GROUP_NEMESIS" );
         const mtype *type;
         // If true, don't spawn loot items as part of death.
         bool no_extra_death_drops;
@@ -800,4 +802,3 @@ class monster : public Creature, public location_visitable<monster>
         /** Processes monster-specific effects of an effect. */
         void process_one_effect( effect &it, bool is_new ) override;
 };
-

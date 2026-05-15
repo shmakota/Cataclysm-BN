@@ -282,6 +282,7 @@ monster::monster( const monster &source ) : Creature( source ),
     morale = source.morale;
     faction = source.faction;
     mission_id = source.mission_id;
+    nemesis_group = source.nemesis_group;
     type = source.type;
     no_extra_death_drops = source.no_extra_death_drops;
     no_corpse_quiet = source.no_corpse_quiet;

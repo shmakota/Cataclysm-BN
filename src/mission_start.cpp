@@ -24,6 +24,7 @@
 #include "omdata.h"
 #include "overmap.h"
 #include "overmapbuffer.h"
+#include "scenario.h"
 #include "popup.h"
 #include "rng.h"
 #include "string_formatter.h"
@@ -132,6 +133,8 @@ void mission_start::kill_nemesis( mission *miss )
 {
     const tripoint_abs_omt center = get_player_character().global_omt_location();
     auto &omb = get_overmapbuffer( miss->get_dimension() );
+    const auto *scen = get_scenario();
+    const auto &nemesis_group = scen != nullptr ? scen->nemesis_group() : scenario::generic()->nemesis_group();
     omt_find_params params{};
     params.types.emplace_back( "field", ot_match_type::type );
     params.search_range = { 0, rng( 40, 80 ) };
@@ -142,7 +145,7 @@ void mission_start::kill_nemesis( mission *miss )
         return;
     }
 
-    omb.add_nemesis( site );
+    omb.add_nemesis( site, nemesis_group );
 }
 
 /*

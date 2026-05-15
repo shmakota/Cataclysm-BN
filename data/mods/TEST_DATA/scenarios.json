@@ -1,0 +1,15 @@
+[
+  {
+    "type": "scenario",
+    "id": "test_hunted",
+    "name": "Test - Hunted",
+    "points": -2,
+    "forced_traits": [ "HAS_NEMESIS" ],
+    "description": "A test scenario with a scenario-specific nemesis horde.",
+    "allowed_locs": [ "sloc_house" ],
+    "start_name": "In Town",
+    "flags": [ "CHALLENGE", "LONE_START" ],
+    "missions": [ "MISSION_KILL_NEMESIS" ],
+    "nemesis_group": "GROUP_TEST_NEMESIS"
+  }
+]

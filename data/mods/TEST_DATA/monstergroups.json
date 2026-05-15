@@ -1,0 +1,8 @@
+[
+  {
+    "type": "monstergroup",
+    "name": "GROUP_TEST_NEMESIS",
+    "default": "mon_test_nemesis",
+    "monsters": [ { "monster": "mon_test_nemesis", "freq": 1000, "cost_multiplier": 0 } ]
+  }
+]

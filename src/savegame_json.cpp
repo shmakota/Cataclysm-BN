@@ -2044,6 +2044,7 @@ void monster::load( const JsonObject &data )
     data.read( "friendly", friendly );
     data.read( "training_level", training_level );
     data.read( "mission_id", mission_id );
+    data.read( "nemesis_group", nemesis_group );
     data.read( "no_extra_death_drops", no_extra_death_drops );
     data.read( "dead", dead );
     data.read( "anger", anger );
@@ -2150,6 +2151,7 @@ void monster::store( JsonOut &json ) const
     json.member( "fish_population", fish_population );
     json.member( "faction", faction.id().str() );
     json.member( "mission_id", mission_id );
+    json.member( "nemesis_group", nemesis_group );
     json.member( "no_extra_death_drops", no_extra_death_drops );
     json.member( "dead", dead );
     json.member( "anger", anger );
