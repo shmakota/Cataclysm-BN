@@ -275,6 +275,23 @@ struct scoped_goes_bad_cache {
 };
 } // namespace item_internal
 
+namespace
+{
+
+auto container_contents_are_solid( const item &container ) -> bool
+{
+    return std::ranges::all_of( container.contents.all_items_top(), []( const item *const entry ) {
+        return entry->made_of( SOLID );
+    } );
+}
+
+auto container_remaining_volume( const item &container ) -> units::volume
+{
+    return std::max( 0_ml, container.get_container_capacity() - container.contents.item_size_modifier() );
+}
+
+} // namespace
+
 const int item::INFINITE_CHARGES = INT_MAX;
 
 item::item() : contents( this ),
@@ -7746,6 +7763,8 @@ bool item::is_container_full( bool allow_bucket ) const
     }
     if( is_watertight_container() ) {
         return get_remaining_capacity_for_liquid( contents.front(), allow_bucket ) == 0;
+    } else if( container_contents_are_solid( *this ) ) {
+        return container_remaining_volume( *this ) == 0_ml;
     } else if( !is_reloadable_with( contents.front().typeId() ) ) {
         return true;
     } else {
@@ -7797,6 +7816,8 @@ bool item::is_reloadable_helper( const itype_id &ammo, bool now ) const
             return now ? !is_container_full() : true;
         } else if( ammo->phase == LIQUID ) {
             return false;
+        } else if( ammo->phase == SOLID && !ammo->count_by_charges() ) {
+            return now ? ( container_contents_are_solid( *this ) && !is_container_full() ) : true;
         } else {
             return now ? ( is_container_empty() || contents.front().typeId() == ammo ) : true;
         }
@@ -9074,6 +9095,12 @@ void item_reload_option::qty( int val )
 {
     const auto ammo_in_ammo_container = ammo->is_ammo_container();
     const auto ammo_in_container = ammo->is_container();
+    if( ( ammo_in_ammo_container || ammo_in_container ) &&
+        ammo->contents.num_item_stacks() != 1 ) {
+        qty_ = 0;
+        max_qty = 0;
+        return;
+    }
     auto &ammo_obj = ( ammo_in_ammo_container || ammo_in_container ) ?
                      ammo->contents.front() : *ammo;
 
@@ -9147,6 +9174,9 @@ bool item::reload( Character &who, item &loc, int qty )
 
     item *container = nullptr;
     if( ammo->is_ammo_container() || ammo->is_container() ) {
+        if( ammo->contents.num_item_stacks() != 1 ) {
+            return false;
+        }
         container = ammo;
         ammo = &ammo->contents.front();
     }
@@ -9207,9 +9237,13 @@ bool item::reload( Character &who, item &loc, int qty )
             container->on_contents_changed();
         }
         item &cur = *this;
-        ammo->attempt_split( 0, [&cur, qty]( detached_ptr<item> &&it ) {
-            return cur.fill_with( std::move( it ), qty );
-        } );
+        if( ammo->count_by_charges() ) {
+            ammo->attempt_split( 0, [&cur, qty]( detached_ptr<item> &&it ) {
+                return cur.fill_with( std::move( it ), qty );
+            } );
+        } else {
+            cur.fill_with( ammo->detach(), qty );
+        }
     } else if( !magazine_integral() ) {
         // if we already have a magazine loaded prompt to eject it
         if( magazine_current() ) {
@@ -9481,7 +9515,12 @@ int item::get_remaining_capacity_for_liquid( const item &liquid, bool allow_buck
         }
         remaining_capacity = ammo_capacity() - ammo_remaining();
     } else if( is_container() ) {
-        if( !type->container->watertight && liquid.made_of( LIQUID ) ) {
+        if( liquid.made_of( SOLID ) && !liquid.count_by_charges() ) {
+            if( !container_contents_are_solid( *this ) ) {
+                return error( string_format( _( "You can't mix loads in your %s." ), tname() ) );
+            }
+            remaining_capacity = liquid.charges_per_volume( container_remaining_volume( *this ) );
+        } else if( !type->container->watertight && liquid.made_of( LIQUID ) ) {
             return error( string_format( _( "That %s isn't water-tight." ), tname() ) );
         } else if( !type->container->seals && ( !allow_bucket || !is_bucket() ) ) {
             return error( string_format( is_bucket() ?
@@ -9537,7 +9576,13 @@ int item::get_remaining_capacity_for_id( const itype_id &liquid, bool allow_buck
         }
         rem_cap = ammo_capacity() - ammo_remaining();
     } else if( is_container() ) {
-        if( !type->container->watertight ) {
+        if( obj.phase == SOLID && !obj.count_by_charges() ) {
+            if( !container_contents_are_solid( *this ) ) {
+                return 0;
+            }
+            rem_cap = obj.charges_per_volume( container_remaining_volume( *this ) );
+            return rem_cap;
+        } else if( !type->container->watertight ) {
             return 0;
         } else if( !type->container->seals && ( !allow_buckets || !is_bucket() ) ) {
             return 0;
@@ -9613,6 +9658,14 @@ bool item::allow_crafting_component() const
 
 detached_ptr<item> item::fill_with( detached_ptr<item> &&liquid, int amount )
 {
+    if( is_container() && liquid->made_of( SOLID ) && !liquid->count_by_charges() ) {
+        if( get_remaining_capacity_for_liquid( *liquid, true ) <= 0 ) {
+            return std::move( liquid );
+        }
+        put_in( std::move( liquid ) );
+        on_contents_changed();
+        return detached_ptr<item>();
+    }
     if( amount == -1 ) {
         amount = INT_MAX;
     }

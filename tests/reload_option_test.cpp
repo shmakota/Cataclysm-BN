@@ -1,6 +1,9 @@
 #include "catch/catch.hpp"
 
+#include <algorithm>
+
 #include "avatar.h"
+#include "character_functions.h"
 #include "item.h"
 
 TEST_CASE( "revolver_reload_option", "[reload],[reload_option],[gun]" )
@@ -138,4 +141,105 @@ TEST_CASE( "container_reload_option_with_non_comestible_solid", "[reload],[reloa
     REQUIRE( jug.contents.num_item_stacks() == 1 );
     REQUIRE( jug.contents.front().typeId() == solid_stack.typeId() );
     REQUIRE( jug.contents.front().charges == 10 );
+}
+
+TEST_CASE( "container_reload_option_with_non_stackable_solid", "[reload],[reload_option],[container]" )
+{
+    const time_point bday = calendar::start_of_cataclysm;
+    avatar dummy;
+
+    auto det = item::spawn( "test_jug_plastic", bday, 0 );
+    auto &jug = *det;
+    dummy.i_add( std::move( det ) );
+
+    auto first = item::spawn( "test_solid_item", bday, 0 );
+    auto &first_solid = *first;
+    dummy.i_add( std::move( first ) );
+
+    auto second = item::spawn( "test_solid_item", bday, 0 );
+    auto &second_solid = *second;
+    dummy.i_add( std::move( second ) );
+
+    REQUIRE( dummy.can_reload( jug, first_solid.typeId() ) );
+
+    const item_reload_option first_option( &dummy, &jug, &jug, first_solid );
+    CHECK( first_option.qty() == 1 );
+    REQUIRE( jug.reload( dummy, first_solid, first_option.qty() ) );
+    REQUIRE( jug.contents.num_item_stacks() == 1 );
+    REQUIRE( jug.contents.front().typeId() == first_solid.typeId() );
+
+    REQUIRE( dummy.can_reload( jug, second_solid.typeId() ) );
+
+    const item_reload_option second_option( &dummy, &jug, &jug, second_solid );
+    CHECK( second_option.qty() == 1 );
+    REQUIRE( jug.reload( dummy, second_solid, second_option.qty() ) );
+    REQUIRE( jug.contents.num_item_stacks() == 2 );
+    REQUIRE( std::ranges::all_of( jug.contents.all_items_top(), []( const item *const entry ) {
+        return entry->typeId() == itype_id( "test_solid_item" );
+    } ) );
+}
+
+TEST_CASE( "empty_container_is_not_solid_reload_source", "[reload],[reload_option],[container]" )
+{
+    const time_point bday = calendar::start_of_cataclysm;
+    avatar dummy;
+
+    auto det = item::spawn( "test_jug_plastic", bday, 0 );
+    auto &jug = *det;
+    dummy.i_add( std::move( det ) );
+
+    auto empty = item::spawn( "test_jug_plastic", bday, 0 );
+    auto &empty_jug = *empty;
+    dummy.i_add( std::move( empty ) );
+
+    auto solid = item::spawn( "test_solid_item", bday, 0 );
+    auto &solid_item = *solid;
+    dummy.i_add( std::move( solid ) );
+
+    const auto sources = character_funcs::find_ammo_items_or_mags( dummy, jug, true, -1 );
+    REQUIRE( std::ranges::contains( sources, &solid_item ) );
+    REQUIRE( !std::ranges::contains( sources, &empty_jug ) );
+}
+
+TEST_CASE( "multi_item_container_is_not_solid_reload_source", "[reload],[reload_option],[container]" )
+{
+    const time_point bday = calendar::start_of_cataclysm;
+    avatar dummy;
+
+    auto det = item::spawn( "test_jug_plastic", bday, 0 );
+    auto &jug = *det;
+    dummy.i_add( std::move( det ) );
+
+    auto source = item::spawn( "test_jug_plastic", bday, 0 );
+    auto &source_jug = *source;
+    source_jug.put_in( item::spawn( "test_solid_item", bday, 0 ) );
+    source_jug.put_in( item::spawn( "test_solid_item", bday, 0 ) );
+    dummy.i_add( std::move( source ) );
+
+    const auto sources = character_funcs::find_ammo_items_or_mags( dummy, jug, true, -1 );
+    REQUIRE( !std::ranges::contains( sources, &source_jug ) );
+}
+
+TEST_CASE( "single_item_container_solid_reload_uses_direct_detach", "[reload],[reload_option],[container]" )
+{
+    const time_point bday = calendar::start_of_cataclysm;
+    avatar dummy;
+
+    auto det = item::spawn( "test_jug_plastic", bday, 0 );
+    auto &jug = *det;
+    dummy.i_add( std::move( det ) );
+
+    auto source = item::spawn( "test_jug_plastic", bday, 0 );
+    auto &source_jug = *source;
+    source_jug.put_in( item::spawn( "test_solid_item", bday, 0 ) );
+    dummy.i_add( std::move( source ) );
+
+    REQUIRE( dummy.can_reload( jug, source_jug.contents.front().typeId() ) );
+
+    const item_reload_option option( &dummy, &jug, &jug, source_jug );
+    CHECK( option.qty() == 1 );
+    REQUIRE( jug.reload( dummy, source_jug, option.qty() ) );
+    REQUIRE( jug.contents.num_item_stacks() == 1 );
+    REQUIRE( jug.contents.front().typeId() == itype_id( "test_solid_item" ) );
+    REQUIRE( source_jug.contents.empty() );
 }

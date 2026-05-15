@@ -12285,11 +12285,16 @@ int Character::item_reload_cost( const item &it, item &ammo, int qty ) const
     if( ammo.is_ammo() ) {
         qty = std::max( std::min( ammo.charges, qty ), 1 );
     } else if( ammo.is_ammo_container() || ammo.is_container() ) {
+        if( ammo.contents.num_item_stacks() != 1 ) {
+            return 0;
+        }
         qty = clamp( qty, ammo.contents.front().charges, 1 );
     } else if( ammo.is_magazine() ) {
         qty = 1;
     } else if( ammo.count_by_charges() ) {
         qty = std::max( std::min( qty, ammo.charges ), 1 );
+    } else if( ammo.made_of( SOLID ) ) {
+        qty = 1;
     } else {
         debugmsg( "cannot determine reload cost as %s is neither ammo or magazine", ammo.tname() );
         return 0;

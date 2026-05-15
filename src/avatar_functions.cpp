@@ -19,6 +19,7 @@
 #include "output.h"
 #include "player_activity.h"
 #include "skill.h"
+#include "string_formatter.h"
 #include "trap.h"
 #include "veh_type.h"
 #include "vehicle.h"
@@ -661,10 +662,10 @@ bool unload_item( avatar &you, item &loc )
             add_msg( m_info, _( "The %s is already empty!" ), it.tname() );
             return false;
         }
-        if( !it.can_unload_liquid() ) {
-            add_msg( m_info, _( "The liquid can't be unloaded in its current state!" ) );
-            return false;
-        }
+    if( !it.can_unload_liquid() ) {
+        add_msg( m_info, _( "The liquid can't be unloaded in its current state!" ) );
+        return false;
+    }
 
         bool changed = false;
         std::vector<item *> liquids;
@@ -673,7 +674,7 @@ bool unload_item( avatar &you, item &loc )
                 liquids.push_back( &*contained );
                 return std::move( contained );
             }
-            int old_charges = contained->charges;
+            const int old_charges = contained->charges;
             item &obj = *contained;
             contained = add_or_drop_with_msg( you, std::move( contained ), true );
             if( !contained || contained->charges != old_charges ) {
@@ -683,14 +684,14 @@ bool unload_item( avatar &you, item &loc )
             return std::move( contained );
         } );
 
-        for( item *liquid : liquids ) {
+        for( item *const liquid : liquids ) {
             liquid_handler::consume_liquid( *liquid, 1 );
         }
 
         if( changed ) {
             it.on_contents_changed();
         }
-        return true;
+        return changed;
     }
 
     // If item can be unloaded more than once (currently only guns) prompt user to choose

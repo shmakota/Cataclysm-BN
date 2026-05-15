@@ -96,6 +96,20 @@
   },
   {
     "type": "GENERIC",
+    "id": "test_solid_item",
+    "name": "TEST steel chunk",
+    "description": "A single solid steel chunk.",
+    "category": "spare_parts",
+    "weight": "250 g",
+    "volume": "250 ml",
+    "price": "0 cent",
+    "to_hit": -2,
+    "color": "light_gray",
+    "symbol": "*",
+    "material": [ "steel" ]
+  },
+  {
+    "type": "GENERIC",
     "id": "test_pipe",
     "name": "TEST pipe",
     "description": "A steel pipe, makes a good melee weapon.  Useful in a few crafting recipes.",
