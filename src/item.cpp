@@ -9072,9 +9072,9 @@ int item_reload_option::moves() const
 
 void item_reload_option::qty( int val )
 {
-    bool ammo_in_ammo_container = ammo->is_ammo_container();
-    bool ammo_in_container = ammo->is_container();
-    item &ammo_obj = ( ammo_in_ammo_container || ammo_in_container ) ?
+    const auto ammo_in_ammo_container = ammo->is_ammo_container();
+    const auto ammo_in_container = ammo->is_container();
+    auto &ammo_obj = ( ammo_in_ammo_container || ammo_in_container ) ?
                      ammo->contents.front() : *ammo;
 
     if( ammo_in_ammo_container && !ammo_obj.is_ammo() ) {
@@ -9084,14 +9084,9 @@ void item_reload_option::qty( int val )
 
     // Checking ammo capacity implicitly limits guns with removable magazines to capacity 0.
     // This gets rounded up to 1 later.
-    int remaining_capacity = 0;
-    if( target->is_watertight_container() && ammo_obj.made_of( LIQUID ) ) {
+    auto remaining_capacity = 0;
+    if( target->is_container() ) {
         remaining_capacity = target->get_remaining_capacity_for_liquid( ammo_obj, true );
-    } else if( target->is_container() && ammo_obj.is_comestible() ) {
-        remaining_capacity = ammo_obj.charges_per_volume( target->get_container_capacity() );
-        if( !target->is_container_empty() ) {
-            remaining_capacity -= target->ammo_remaining();
-        }
     } else {
         remaining_capacity = target->ammo_capacity() - target->ammo_remaining();
     }
@@ -9105,8 +9100,8 @@ void item_reload_option::qty( int val )
         }
     }
 
-    bool ammo_by_charges = ammo_obj.is_ammo() || ammo_in_container || ammo->is_comestible();
-    int available_ammo = ammo_by_charges ? ammo_obj.charges : ammo_obj.ammo_remaining();
+    const auto ammo_by_charges = ammo_obj.count_by_charges() || ammo_in_container;
+    const auto available_ammo = ammo_by_charges ? ammo_obj.charges : ammo_obj.ammo_remaining();
     // constrain by available ammo, target capacity and other external factors (max_qty)
     // @ref max_qty is currently set when reloading ammo belts and limits to available linkages
     qty_ = std::min( { val, available_ammo, remaining_capacity, max_qty } );
@@ -9161,14 +9156,9 @@ bool item::reload( Character &who, item &loc, int qty )
     }
 
     // limit quantity of ammo loaded to remaining capacity
-    int limit = 0;
-    if( is_watertight_container() && ammo->made_of( LIQUID ) ) {
+    auto limit = 0;
+    if( is_container() ) {
         limit = get_remaining_capacity_for_liquid( *ammo, true );
-    } else if( is_container() && ammo->is_comestible() ) {
-        limit = ammo->charges_per_volume( get_container_capacity() );
-        if( !is_container_empty() ) {
-            limit -= ammo_remaining();
-        }
     } else {
         limit = ammo_capacity() - ammo_remaining();
     }

@@ -114,3 +114,28 @@ TEST_CASE( "canteen_reload_option", "[reload],[reload_option],[liquid]" )
 
     CHECK( canteen_option.qty() == 2 );
 }
+
+TEST_CASE( "container_reload_option_with_non_comestible_solid", "[reload],[reload_option],[container]" )
+{
+    const time_point bday = calendar::start_of_cataclysm;
+    avatar dummy;
+
+    auto det = item::spawn( "test_jug_plastic", bday, 0 );
+    auto &jug = *det;
+    dummy.i_add( std::move( det ) );
+
+    det = item::spawn( "test_solid_stack", bday, 10 );
+    auto &solid_stack = *det;
+    dummy.i_add( std::move( det ) );
+
+    REQUIRE( dummy.can_reload( jug, solid_stack.typeId() ) );
+
+    const item_reload_option jug_option( &dummy, &jug, &jug, solid_stack );
+    CHECK( jug_option.qty() == 10 );
+
+    const auto ok = jug.reload( dummy, solid_stack, jug_option.qty() );
+    REQUIRE( ok );
+    REQUIRE( jug.contents.num_item_stacks() == 1 );
+    REQUIRE( jug.contents.front().typeId() == solid_stack.typeId() );
+    REQUIRE( jug.contents.front().charges == 10 );
+}
