@@ -1255,7 +1255,7 @@ void find_ammo_helper( T &src, const item &obj, bool empty, Output out, bool nes
             // Look for any contents we can hold
             src.visit_items( [&nested, &out]( item * node ) {
                 if( ( node->is_watertight_container() && node->contents_made_of( LIQUID ) ) ||
-                    ( !node->is_in_container() && ( node->is_ammo() || node->is_comestible() ) &&
+                    ( !node->is_in_container() && node->count_by_charges() &&
                       node->made_of( SOLID ) ) ||
                     ( node->is_container() && node->contents_made_of( SOLID ) ) ) {
                     out = node;
