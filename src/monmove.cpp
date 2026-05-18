@@ -283,7 +283,8 @@ bool monster::can_squeeze_to( const tripoint &p ) const
 
 bool monster::can_move_to( const tripoint &p ) const
 {
-    return can_reach_to( p ) && will_move_to( p ) && !has_flag( MF_STATIONARY );
+    return !has_effect( effect_grabbed ) && can_reach_to( p ) && will_move_to( p ) &&
+           !has_flag( MF_STATIONARY );
 }
 
 void monster::set_dest( const tripoint &p )

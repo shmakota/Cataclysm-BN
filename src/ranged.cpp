@@ -390,6 +390,7 @@ class target_ui
             Fire,
             Throw,
             ThrowBlind,
+            ThrowCreature,
             Turrets,
             TurretManual,
             Reach,
@@ -421,6 +422,8 @@ class target_ui
         aim_activity_actor *activity = nullptr;
         // Generator of AoE shapes
         std::optional<shape_factory> shape_gen;
+        // Preferred initial cursor position.
+        std::optional<tripoint> initial_target;
 
         // Initialize UI and run the event loop
         target_handler::trajectory run();
@@ -658,6 +661,19 @@ target_handler::trajectory target_handler::mode_throw( avatar &you, item &releva
     ui.mode = blind_throwing ? target_ui::TargetMode::ThrowBlind : target_ui::TargetMode::Throw;
     ui.relevant = &relevant;
     ui.range = you.throw_range( relevant );
+
+    restore_on_out_of_scope<tripoint> view_offset_prev( you.view_offset );
+    return ui.run();
+}
+
+target_handler::trajectory target_handler::mode_throw_creature( avatar &you,
+        const Creature &thrown_creature, int range )
+{
+    target_ui ui = target_ui();
+    ui.you = &you;
+    ui.mode = target_ui::TargetMode::ThrowCreature;
+    ui.range = std::max( 1, range );
+    ui.initial_target = thrown_creature.pos();
 
     restore_on_out_of_scope<tripoint> view_offset_prev( you.view_offset );
     return ui.run();
@@ -2877,7 +2893,7 @@ target_handler::trajectory target_ui::run()
             attack_was_confirmed = false;
         }
     } else {
-        initial_dst = choose_initial_target();
+        initial_dst = initial_target.value_or( choose_initial_target() );
     }
     set_cursor_pos( initial_dst );
     if( dst != initial_dst ) {
@@ -3952,6 +3968,8 @@ std::string target_ui::uitext_title()
             return string_format( _( "Throwing %s" ), relevant->tname() );
         case TargetMode::ThrowBlind:
             return string_format( _( "Blind throwing %s" ), relevant->tname() );
+        case TargetMode::ThrowCreature:
+            return _( "Throwing creature" );
         default:
             return _( "Set target" );
     }
@@ -3959,7 +3977,8 @@ std::string target_ui::uitext_title()
 
 std::string target_ui::uitext_fire()
 {
-    if( mode == TargetMode::Throw || mode == TargetMode::ThrowBlind ) {
+    if( mode == TargetMode::Throw || mode == TargetMode::ThrowBlind ||
+        mode == TargetMode::ThrowCreature ) {
         return to_translation( "[Hotkey] to throw", "to throw" ).translated();
     } else if( mode == TargetMode::Reach ) {
         return to_translation( "[Hotkey] to attack", "to attack" ).translated();
