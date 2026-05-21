@@ -52,6 +52,7 @@
 #include "cata_utility.h"
 #include "catalua_hooks.h"
 #include "catalua_sol.h"
+#include "cached_options.h"
 #include "catacharset.h"
 #include "character.h"
 #include "character_display.h"
@@ -646,6 +647,7 @@ void game::setup( bool load_world_modfiles )
     next_npc_id = character_id( 1 );
     next_mission_id = 1;
     new_game = true;
+    saving_blocked_by_failed_load = false;
     uquit = QUIT_NO;   // We haven't quit the game
     bVMonsterLookFire = true;
 
@@ -917,6 +919,7 @@ bool game::start_game()
 
     seed = rng_bits();
     new_game = true;
+    saving_blocked_by_failed_load = false;
     start_calendar();
     get_weather().nextweather = calendar::turn;
     safe_mode = ( get_option<bool>( "SAFEMODE" ) ? SAFE_MODE_ON : SAFE_MODE_OFF );
@@ -3123,7 +3126,7 @@ void game::win_screen()
 void game::move_save_to_graveyard( const std::string &dirname )
 {
     const std::string save_dir           = get_active_world()->info->folder_path();
-    const std::string graveyard_dir      = PATH_INFO::graveyarddir() + "/";
+    const std::string graveyard_dir      = PATH_INFO::graveyarddir();
     const std::string graveyard_save_dir = graveyard_dir + dirname + "/";
     const std::string &prefix            = base64_encode( u.get_save_id() ) + ".";
 
@@ -3135,6 +3138,10 @@ void game::move_save_to_graveyard( const std::string &dirname )
         debugmsg( "could not create graveyard path '%s'", graveyard_save_dir );
     }
 
+    // Close the player SQLite handle before moving files — on Windows, MoveFileExW
+    // fails (ERROR_SHARING_VIOLATION) if the file is open without FILE_SHARE_DELETE.
+    get_active_world()->release_player_db();
+
     const auto save_files = get_files_from_path( prefix, save_dir );
     if( save_files.empty() ) {
         debugmsg( "could not find save files in '%s'", save_dir );
@@ -3142,19 +3149,21 @@ void game::move_save_to_graveyard( const std::string &dirname )
 
     for( const auto &src_path : save_files ) {
         const std::string dst_path = graveyard_save_dir +
-                                     src_path.substr( src_path.rfind( '/' ), std::string::npos );
+                                     src_path.substr( src_path.rfind( '/' ) + 1, std::string::npos );
 
         if( rename_file( src_path, dst_path ) ) {
             continue;
         }
 
-        debugmsg( "could not rename file '%s' to '%s'", src_path, dst_path );
-
-        if( remove_file( src_path ) ) {
+        // rename() fails across filesystems (EXDEV); fall back to copy then delete
+        if( copy_file( src_path, dst_path ) ) {
+            if( !remove_file( src_path ) ) {
+                debugmsg( "could not remove file '%s' after copying to graveyard", src_path );
+            }
             continue;
         }
 
-        debugmsg( "could not remove file '%s'", src_path );
+        debugmsg( "could not move file '%s' to graveyard '%s'", src_path, dst_path );
     }
 }
 
@@ -3200,7 +3209,9 @@ bool game::load( const std::string &world )
     try {
         world_generator->set_active_world( wptr );
         g->setup();
-        g->load( wptr->world_saves.front() );
+        if( !g->load( wptr->world_saves.front() ) ) {
+            return false;
+        }
     } catch( const std::exception &err ) {
         debugmsg( "cannot load world '%s': %s", world, err.what() );
         return false;
@@ -3211,11 +3222,23 @@ bool game::load( const std::string &world )
 
 bool game::load( const save_t &name )
 {
-    background_pane background;
-    static_popup popup;
-    popup.message( "%s", _( "Please wait…\nLoading the save…" ) );
+    auto background = std::unique_ptr<background_pane>();
+    auto popup = std::unique_ptr<static_popup>();
+    if( !test_mode ) {
+        background = std::make_unique<background_pane>();
+        popup = std::make_unique<static_popup>();
+        popup->message( "%s", _( "Please wait…\nLoading the save…" ) );
+    }
 
     using namespace std::placeholders;
+
+    saving_blocked_by_failed_load = true;
+    auto save_json_valid = false;
+    const auto validate_save = [&]( std::istream & fin ) { save_json_valid = validate_save_json( fin ); };
+    if( !get_active_world()->read_from_file( name.base_path() + SAVE_EXTENSION, validate_save ) ||
+        !save_json_valid ) {
+        return false;
+    }
 
     // Now load up the master game data; factions (and more?)
     load_master();
@@ -3238,8 +3261,10 @@ bool game::load( const save_t &name )
         lazy_border_handle_ = 0;
     }
     fire_loader.clear( submap_loader );
-    if( !get_active_world()->read_from_file( name.base_path() + SAVE_EXTENSION,
-            std::bind( &game::unserialize, this, _1 ) ) ) {
+    auto unserialized = false;
+    const auto load_save = [&]( std::istream & fin ) { unserialized = unserialize( fin ); };
+    if( !get_active_world()->read_from_file( name.base_path() + SAVE_EXTENSION, load_save ) ||
+        !unserialized ) {
         return false;
     }
 
@@ -3385,6 +3410,7 @@ bool game::load( const save_t &name )
     m.update_visibility_cache( get_levz() );
     m.invalidate_map_cache( get_levz() );
 
+    saving_blocked_by_failed_load = false;
     return true;
 }
 
@@ -3524,6 +3550,9 @@ bool game::save( bool quitting )
 {
     world *world = get_active_world();
     if( !world ) {
+        return false;
+    }
+    if( saving_blocked_by_failed_load ) {
         return false;
     }
 
@@ -12849,6 +12878,11 @@ void game::vertical_move( int movez, bool force, bool peeking )
                 }
                 add_msg( m_info, _( "There is something above blocking your way." ) );
                 return;
+            } else {
+                if( dest.z > OVERMAP_HEIGHT ) {
+                    add_msg( m_info, _( "Tried to move outside of zlevel world bounds." ) );
+                    return;
+                }
             }
         }
 
@@ -12880,14 +12914,20 @@ void game::vertical_move( int movez, bool force, bool peeking )
             return;
         }
 
-        if( ( m.impassable( dest ) || !standing_on_air ) && !can_noclip ) {
-            add_msg( m_info, _( "You can't go down here!" ) );
-            if( !m.has_flag( "GOES_UP", u.pos() ) ) {
-                suggest_auto_walk_to_stairs( u, m, "down" );
+        if( m.impassable( dest ) || !standing_on_air ) {
+            if( !can_noclip ) {
+                add_msg( m_info, _( "You can't go down here!" ) );
+                if( !m.has_flag( "GOES_UP", u.pos() ) ) {
+                    suggest_auto_walk_to_stairs( u, m, "down" );
+                }
+                return;
+            } else {
+                if( dest.z < -OVERMAP_DEPTH ) {
+                    add_msg( m_info, _( "Tried to move outside of zlevel world bounds." ) );
+                    return;
+                }
             }
-            return;
         }
-
     }
 
     if( force ) {
