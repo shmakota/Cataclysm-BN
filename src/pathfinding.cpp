@@ -95,6 +95,12 @@ auto has_cardinal_wall_support( const map &here, const tripoint &anchor ) -> boo
     } );
 }
 
+auto is_supported_wall_climb_anchor( const map &here, const tripoint &anchor ) -> bool
+{
+    return here.climb_difficulty( anchor ) <= max_wall_climb_difficulty &&
+           has_cardinal_wall_support( here, anchor );
+}
+
 } // namespace
 
 // PathfindingSettings impls
@@ -973,11 +979,11 @@ std::vector<tripoint> Pathfinding::get_route_3d(
 
     const auto can_wall_cling_to_change = [&here]( const Pathfinding::ZLevelChange & change,
     const bool we_go_up ) {
-        const tripoint &anchor = we_go_up ? change.from : change.to;
-        if( here.climb_difficulty( anchor ) > max_wall_climb_difficulty ) {
-            return false;
+        if( we_go_up ) {
+            return is_supported_wall_climb_anchor( here, change.from );
         }
-        return has_cardinal_wall_support( here, anchor );
+        return is_supported_wall_climb_anchor( here, change.to ) ||
+               is_supported_wall_climb_anchor( here, change.from );
     };
 
     // Determine our Z-path
