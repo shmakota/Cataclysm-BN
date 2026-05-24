@@ -36,6 +36,23 @@ auto take_down_deployed_furniture( const tripoint &furniture_pos, const tripoint
     const auto furn_item = here.furn( furniture_pos ).obj().deployed_item;
     auto dropped_item = item::spawn( furn_item, calendar::turn );
     dropped_item->item_vars().merge( *here.furn_vars( furniture_pos ) );
+    auto items = here.i_clear( drop_pos );
+    if( dropped_item->is_container() ) {
+        for( auto &it : items ) {
+            if( !it ) {
+                continue;
+            }
+            const auto amount = it->count_by_charges() ? it->charges : 1;
+            auto remainder = dropped_item->fill_with( std::move( it ), amount );
+            if( remainder ) {
+                here.add_item_or_charges( drop_pos, std::move( remainder ) );
+            }
+        }
+    } else {
+        for( auto &it : items ) {
+            here.add_item_or_charges( drop_pos, std::move( it ) );
+        }
+    }
     here.add_item_or_charges( drop_pos, std::move( dropped_item ) );
     here.furn_set( furniture_pos, f_null );
 }

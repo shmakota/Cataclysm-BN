@@ -265,6 +265,11 @@ void Item_factory::finalize_pre( itype &obj )
             obj.stack_size = 200;
         }
     }
+    if( obj.id == itype_id( "concrete" ) ) {
+        obj.stackable_ = true;
+        obj.stack_size = 200;
+        obj.volume = 250_ml;
+    }
 
     // Items always should have some volume.
     // TODO: handle possible exception software?
@@ -1814,7 +1819,6 @@ void Item_factory::load_ammo( const JsonObject &jo, const std::string &src )
 {
     itype def;
     if( load_definition( jo, src, def ) ) {
-        assign( jo, "stack_size", def.stack_size, is_strict_enabled( src ), 1 );
         if( def.was_loaded ) {
             if( def.ammo ) {
                 def.ammo->was_loaded = true;
@@ -2391,7 +2395,6 @@ void Item_factory::load_comestible( const JsonObject &jo, const std::string &src
 {
     itype def;
     if( load_definition( jo, src, def ) ) {
-        assign( jo, "stack_size", def.stack_size, is_strict_enabled( src ), 1 );
         load_slot( def.comestible, jo, src );
         load_basic_info( jo, def, src );
     }
@@ -2658,6 +2661,9 @@ void Item_factory::load_basic_info( const JsonObject &jo, itype &def, const std:
     assign( jo, "price", def.price, false, 0_cent );
     assign( jo, "price_postapoc", def.price_post, false, 0_cent );
     assign( jo, "stackable", def.stackable_, strict );
+    if( jo.has_member( "stack_size" ) ) {
+        assign( jo, "stack_size", def.stack_size, strict, 1 );
+    }
     assign( jo, "integral_volume", def.integral_volume );
     assign( jo, "bashing", def.melee[DT_BASH], strict, 0 );
     assign( jo, "cutting", def.melee[DT_CUT], strict, 0 );

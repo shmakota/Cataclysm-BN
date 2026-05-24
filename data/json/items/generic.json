@@ -335,7 +335,7 @@
     "symbol": "/",
     "material": [ "steel" ],
     "techniques": [ "WRAP" ],
-    "volume": "1 L",
+    "volume": "250 ml",
     "bashing": 26,
     "to_hit": -2,
     "price": "80 USD",
@@ -426,7 +426,7 @@
     "name": { "str": "bundle of leather", "str_pl": "bundles of leather" },
     "description": "Leather patches, bundled tightly together for storage.  Disassemble to unpack.",
     "weight": "1000 g",
-    "volume": "1 L",
+    "volume": "250 ml",
     "price": "200 USD",
     "price_postapoc": "50 cent",
     "material": "leather",
@@ -797,6 +797,8 @@
     "material": "powder_nonflam",
     "weight": "2340 g",
     "volume": "1 L",
+    "stackable": true,
+    "stack_size": 200,
     "bashing": 4
   },
   {

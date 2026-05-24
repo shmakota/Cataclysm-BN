@@ -9687,18 +9687,6 @@ detached_ptr<item> item::fill_with( detached_ptr<item> &&liquid, int amount )
         return std::move( liquid );
     }
 
-    if( is_container() && liquid->made_of( SOLID ) ) {
-        detached_ptr<item> liquid_copy = item::spawn( *liquid );
-        liquid_copy->charges = amount;
-        put_in( std::move( liquid_copy ) );
-        liquid->mod_charges( -amount );
-        on_contents_changed();
-        if( liquid->charges > 0 ) {
-            return std::move( liquid );
-        }
-        return detached_ptr<item>();
-    }
-
     if( !is_container() ) {
         if( !is_reloadable_with( liquid->typeId() ) ) {
             debugmsg( "Tried to fill %s which is not a container and can't be reloaded with %s.",
@@ -9711,6 +9699,29 @@ detached_ptr<item> item::fill_with( detached_ptr<item> &&liquid, int amount )
 
         cts.set_rot( weighted_averaged_rot( &cts, &*liquid ) );
         cts.mod_charges( amount );
+    } else if( liquid->made_of( SOLID ) ) {
+        if( !liquid->count_by_charges() ) {
+            put_in( std::move( liquid ) );
+            on_contents_changed();
+            return detached_ptr<item>();
+        }
+
+        detached_ptr<item> liquid_copy = item::spawn( *liquid );
+        liquid_copy->charges = amount;
+        if( is_container_empty() ) {
+            put_in( std::move( liquid_copy ) );
+        } else if( contents.front().count_by_charges() &&
+                   contents.front().typeId() == liquid->typeId() ) {
+            contents.front().mod_charges( amount );
+        } else {
+            put_in( std::move( liquid_copy ) );
+        }
+        liquid->mod_charges( -amount );
+        on_contents_changed();
+        if( liquid->charges > 0 ) {
+            return std::move( liquid );
+        }
+        return detached_ptr<item>();
     } else if( !is_container_empty() ) {
         // if container already has liquid we need to set the amount
         item &cts = contents.front();
