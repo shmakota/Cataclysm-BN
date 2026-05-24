@@ -103,6 +103,13 @@ static const trait_flag_str_id trait_flag_MUTATION_SWIM( "MUTATION_SWIM" );
 namespace
 {
 
+bool manual_combat_mode = false;
+
+} // namespace
+
+namespace
+{
+
 auto find_grabbed_creature( const avatar &you ) -> Creature *
 {
     if( !you.has_effect( effect_grabbing ) ) {
@@ -787,6 +794,73 @@ void avatar_action::autoattack( avatar &you, map &m )
     you.reach_attack( best.pos() );
 }
 
+static auto is_manual_attack_target( const avatar &you, const Creature &critter ) -> bool
+{
+    if( &critter == &you ) {
+        return false;
+    }
+
+    if( const auto *const mon = dynamic_cast<const monster *>( &critter ) ) {
+        return mon->friendly == 0;
+    }
+
+    if( const auto *const target_npc = dynamic_cast<const npc *>( &critter ) ) {
+        return target_npc->is_enemy();
+    }
+
+    return false;
+}
+
+static auto prompt_manual_attack_target( avatar &you ) -> void
+{
+    const auto target = choose_adjacent_highlight(
+                            _( "Attack where?" ),
+                            _( "No hostile creature nearby." ),
+                            [&you]( const tripoint & pos ) {
+        const auto *const critter = g->critter_at<Creature>( pos, true );
+        return critter != nullptr && is_manual_attack_target( you, *critter );
+    } );
+
+    if( !target ) {
+        return;
+    }
+
+    if( g->critter_at( *target ) == nullptr ) {
+        add_msg( m_info, _( "There is no creature there to attack." ) );
+        return;
+    }
+
+    if( monster *const critter = g->critter_at<monster>( *target, true ) ) {
+        you.melee_attack( *critter, true );
+        if( critter->is_hallucination() ) {
+            critter->die( &you );
+        }
+        g->draw_hit_mon( *target, *critter, critter->is_dead() );
+        return;
+    }
+
+    if( npc *const target_npc = g->critter_at<npc>( *target ) ) {
+        you.melee_attack( *target_npc, true );
+        target_npc->make_angry();
+    }
+}
+
+auto avatar_action::manual_attack( avatar &you, map & ) -> void
+{
+    prompt_manual_attack_target( you );
+}
+
+auto avatar_action::toggle_manual_combat_mode() -> void
+{
+    manual_combat_mode = !manual_combat_mode;
+    add_msg( m_info, manual_combat_mode ? _( "Manual combat mode ON!" ) :
+                                          _( "Manual combat mode OFF!" ) );
+}
+
+auto avatar_action::is_manual_combat_mode() -> bool
+{
+    return manual_combat_mode;
+}
 bool avatar_action::can_fire_weapon( avatar &you, const map &m, const item &weapon )
 {
     if( !weapon.is_gun() ) {
