@@ -404,7 +404,7 @@ class target_ui
         TargetMode mode = TargetMode::Fire;
         // Weapon being fired/thrown
         item *relevant = nullptr;
-        // Cached selection range from player's position
+        // Cached selection range from the targeting source.
         int range = 0;
         // Turret being manually fired
         turret_data *turret = nullptr;
@@ -449,9 +449,9 @@ class target_ui
         // Cached current ammo to display
         const itype *ammo = nullptr;
         // Current trajectory
-        std::vector<tripoint> traj;
-        // Aiming source (player's position)
-        tripoint src;
+        std::vector<tripoint_bub_ms> traj;
+        // Aiming source.
+        tripoint_bub_ms src;
         // Aiming destination (cursor position)
         // Use set_cursor_pos() to modify
         tripoint dst;
@@ -2874,7 +2874,10 @@ target_handler::trajectory target_ui::run()
     }
 
     // Initialize cursor position
-    src = you->pos();
+    src = you->bub_pos();
+    if( mode == TargetMode::ThrowCreature && initial_target ) {
+        src = *initial_target;
+    }
     update_target_list();
 
     if( activity && activity->abort_if_no_targets && targets.empty() ) {
