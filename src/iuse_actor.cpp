@@ -1492,7 +1492,14 @@ int deploy_furn_actor::use( player &p, item &it, bool t, const tripoint &pos ) c
         p.add_msg_if_player( m_info, _( "Can't put that here - items in the way." ) );
         return 0;
     }
+    if( ( furn_obj.has_flag( TFLAG_SEALED ) || furn_obj.has_flag( TFLAG_NOITEM ) ) &&
+        !it.contents.empty() ) {
+        p.add_msg_if_player( m_info, _( "You need to empty the %s before deploying it." ),
+                             it.tname() );
+        return 0;
+    }
 
+    it.contents.spill_contents( pnt );
     here.furn_set( pnt, furn_type );
     here.furn_vars( pnt )->merge( it.item_vars() );
     p.mod_moves( to_turns<int>( 2_seconds ) );
