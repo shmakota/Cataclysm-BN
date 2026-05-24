@@ -280,14 +280,15 @@ namespace
 
 auto container_contents_are_solid( const item &container ) -> bool
 {
-    return std::ranges::all_of( container.contents.all_items_top(), []( const item *const entry ) {
+    return std::ranges::all_of( container.contents.all_items_top(), []( const item * const entry ) {
         return entry->made_of( SOLID );
     } );
 }
 
 auto container_remaining_volume( const item &container ) -> units::volume
 {
-    return std::max( 0_ml, container.get_container_capacity() - container.contents.item_size_modifier() );
+    return std::max( 0_ml, container.get_container_capacity() -
+                     container.contents.item_size_modifier() );
 }
 
 } // namespace
@@ -7761,10 +7762,10 @@ bool item::is_container_full( bool allow_bucket ) const
     if( is_container_empty() ) {
         return false;
     }
-    if( is_watertight_container() ) {
-        return get_remaining_capacity_for_liquid( contents.front(), allow_bucket ) == 0;
-    } else if( container_contents_are_solid( *this ) ) {
+    if( container_contents_are_solid( *this ) ) {
         return container_remaining_volume( *this ) == 0_ml;
+    } else if( is_watertight_container() ) {
+        return get_remaining_capacity_for_liquid( contents.front(), allow_bucket ) == 0;
     } else if( !is_reloadable_with( contents.front().typeId() ) ) {
         return true;
     } else {
@@ -7808,6 +7809,8 @@ bool item::is_reloadable_helper( const itype_id &ammo, bool now ) const
     } else if( is_watertight_container() ) {
         if( ammo.is_empty() ) {
             return now ? !is_container_full() : true;
+        } else if( ammo->phase == SOLID ) {
+            return now ? ( container_contents_are_solid( *this ) && !is_container_full() ) : true;
         } else {
             return now ? ( is_container_empty() || contents.front().typeId() == ammo ) : true;
         }
@@ -9127,6 +9130,11 @@ void item_reload_option::qty( int val )
         }
     }
 
+    if( remaining_capacity <= 0 ) {
+        qty_ = 0;
+        return;
+    }
+
     const auto ammo_by_charges = ammo_obj.count_by_charges() || ammo_in_container;
     const auto available_ammo = ammo_by_charges ? ammo_obj.charges : ammo_obj.ammo_remaining();
     // constrain by available ammo, target capacity and other external factors (max_qty)
@@ -9198,6 +9206,10 @@ bool item::reload( Character &who, item &loc, int qty )
     }
 
     qty = std::min( qty, limit );
+
+    if( qty <= 0 ) {
+        return false;
+    }
 
     // Lua iranged can_reload callback: blocks reloading before ammo is consumed
     if( const auto *iranged_cb = type->iranged_callbacks ) {
@@ -9515,7 +9527,7 @@ int item::get_remaining_capacity_for_liquid( const item &liquid, bool allow_buck
         }
         remaining_capacity = ammo_capacity() - ammo_remaining();
     } else if( is_container() ) {
-        if( liquid.made_of( SOLID ) && !liquid.count_by_charges() ) {
+        if( liquid.made_of( SOLID ) ) {
             if( !container_contents_are_solid( *this ) ) {
                 return error( string_format( _( "You can't mix loads in your %s." ), tname() ) );
             }
@@ -9576,7 +9588,7 @@ int item::get_remaining_capacity_for_id( const itype_id &liquid, bool allow_buck
         }
         rem_cap = ammo_capacity() - ammo_remaining();
     } else if( is_container() ) {
-        if( obj.phase == SOLID && !obj.count_by_charges() ) {
+        if( obj.phase == SOLID ) {
             if( !container_contents_are_solid( *this ) ) {
                 return 0;
             }
@@ -9673,6 +9685,18 @@ detached_ptr<item> item::fill_with( detached_ptr<item> &&liquid, int amount )
                        std::min( amount, liquid->charges ) );
     if( amount <= 0 ) {
         return std::move( liquid );
+    }
+
+    if( is_container() && liquid->made_of( SOLID ) ) {
+        detached_ptr<item> liquid_copy = item::spawn( *liquid );
+        liquid_copy->charges = amount;
+        put_in( std::move( liquid_copy ) );
+        liquid->mod_charges( -amount );
+        on_contents_changed();
+        if( liquid->charges > 0 ) {
+            return std::move( liquid );
+        }
+        return detached_ptr<item>();
     }
 
     if( !is_container() ) {

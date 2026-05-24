@@ -82,18 +82,6 @@ static const skill_id skill_throw( "throw" );
 
 static const quality_id qual_SLEEP_AID( "SLEEP_AID" );
 
-namespace
-{
-
-auto container_contents_are_solid( const item &container ) -> bool
-{
-    return std::ranges::all_of( container.contents.all_items_top(), []( const item *const entry ) {
-        return entry->made_of( SOLID );
-    } );
-}
-
-} // namespace
-
 namespace character_funcs
 {
 
@@ -1256,37 +1244,44 @@ template <typename T, typename Output>
 void find_ammo_helper( T &src, const item &obj, bool empty, Output out, bool nested )
 {
     if( obj.is_container() ) {
-        if( obj.contents.num_item_stacks() == 1 ) {
-            const auto contents_id = obj.contents.front().typeId();
-            const bool solid_contents = container_contents_are_solid( obj );
+        const auto can_reload_from = [&obj]( const item & candidate ) {
+            if( candidate.is_container() ) {
+                if( candidate.contents.num_item_stacks() != 1 ) {
+                    return false;
+                }
+                const item &payload = candidate.contents.front();
+                return obj.is_reloadable_with( payload.typeId() ) &&
+                       obj.get_remaining_capacity_for_liquid( payload, true ) > 0;
+            }
+            return obj.is_reloadable_with( candidate.typeId() ) &&
+                   obj.get_remaining_capacity_for_liquid( candidate, true ) > 0;
+        };
 
+        if( obj.contents.num_item_stacks() == 1 ) {
             // Look for containers with the same type of liquid as that already in our container
-            src.visit_items( [&nested, &out, &contents_id, &obj, solid_contents]( item * node ) {
+            src.visit_items( [&nested, &out, &obj, &can_reload_from]( item * node ) {
                 if( node == &obj ) {
                     // This stops containers and magazines counting *themselves* as ammo sources.
                     return VisitResponse::SKIP;
                 }
 
-                if( node->is_container() && node->contents.num_item_stacks() == 1 ) {
-                    if( solid_contents && container_contents_are_solid( *node ) ) {
-                        out = node;
-                    } else if( node->contents.front().typeId() == contents_id ) {
+                if( node->is_container() ) {
+                    if( can_reload_from( *node ) ) {
                         out = node;
                     }
-                } else if( !node->is_container() && !node->is_in_container() && node->made_of( SOLID ) ) {
-                    if( solid_contents || node->typeId() == contents_id ) {
-                        out = node;
-                    }
+                } else if( !node->is_in_container() && can_reload_from( *node ) ) {
+                    out = node;
                 }
                 return nested ? VisitResponse::NEXT : VisitResponse::SKIP;
             } );
         } else {
             // Look for any contents we can hold
-            src.visit_items( [&nested, &out]( item * node ) {
-                if( ( node->is_watertight_container() && node->contents_made_of( LIQUID ) ) ||
-                    ( !node->is_in_container() && node->made_of( SOLID ) ) ||
-                    ( node->is_container() && node->contents.num_item_stacks() == 1 &&
-                      container_contents_are_solid( *node ) ) ) {
+            src.visit_items( [&nested, &out, &can_reload_from]( item * node ) {
+                if( node->is_container() ) {
+                    if( can_reload_from( *node ) ) {
+                        out = node;
+                    }
+                } else if( !node->is_in_container() && can_reload_from( *node ) ) {
                     out = node;
                 }
                 return nested ? VisitResponse::NEXT : VisitResponse::SKIP;

@@ -118,7 +118,8 @@ TEST_CASE( "canteen_reload_option", "[reload],[reload_option],[liquid]" )
     CHECK( canteen_option.qty() == 2 );
 }
 
-TEST_CASE( "container_reload_option_with_non_comestible_solid", "[reload],[reload_option],[container]" )
+TEST_CASE( "container_reload_option_with_non_comestible_solid",
+           "[reload],[reload_option],[container]" )
 {
     const time_point bday = calendar::start_of_cataclysm;
     avatar dummy;
@@ -143,7 +144,8 @@ TEST_CASE( "container_reload_option_with_non_comestible_solid", "[reload],[reloa
     REQUIRE( jug.contents.front().charges == 10 );
 }
 
-TEST_CASE( "container_reload_option_with_non_stackable_solid", "[reload],[reload_option],[container]" )
+TEST_CASE( "container_reload_option_with_non_stackable_solid",
+           "[reload],[reload_option],[container]" )
 {
     const time_point bday = calendar::start_of_cataclysm;
     avatar dummy;
@@ -174,9 +176,74 @@ TEST_CASE( "container_reload_option_with_non_stackable_solid", "[reload],[reload
     CHECK( second_option.qty() == 1 );
     REQUIRE( jug.reload( dummy, second_solid, second_option.qty() ) );
     REQUIRE( jug.contents.num_item_stacks() == 2 );
-    REQUIRE( std::ranges::all_of( jug.contents.all_items_top(), []( const item *const entry ) {
+    REQUIRE( std::ranges::all_of( jug.contents.all_items_top(), []( const item * const entry ) {
         return entry->typeId() == itype_id( "test_solid_item" );
     } ) );
+}
+
+TEST_CASE( "watertight_container_reload_option_accepts_mixed_solids",
+           "[reload],[reload_option],[container]" )
+{
+    const auto bday = calendar::start_of_cataclysm;
+    auto dummy = avatar{};
+
+    auto det = item::spawn( "bottle_plastic", bday, 0 );
+    auto &bottle = *det;
+    dummy.i_add( std::move( det ) );
+
+    det = item::spawn( "aspirin", bday, 20 );
+    auto &aspirin = *det;
+    dummy.i_add( std::move( det ) );
+
+    const auto aspirin_option = item_reload_option( &dummy, &bottle, &bottle, aspirin );
+    REQUIRE( bottle.reload( dummy, aspirin, aspirin_option.qty() ) );
+    REQUIRE( bottle.contents.num_item_stacks() == 1 );
+    REQUIRE( bottle.contents.front().typeId() == itype_id( "aspirin" ) );
+
+    det = item::spawn( "antifungal", bday, 5 );
+    auto &antifungal = *det;
+    dummy.i_add( std::move( det ) );
+
+    REQUIRE( dummy.can_reload( bottle, antifungal.typeId() ) );
+
+    const auto antifungal_option = item_reload_option( &dummy, &bottle, &bottle, antifungal );
+    CHECK( antifungal_option.qty() > 0 );
+    REQUIRE( bottle.reload( dummy, antifungal, antifungal_option.qty() ) );
+    REQUIRE( bottle.contents.num_item_stacks() == 2 );
+}
+
+TEST_CASE( "full_container_reload_option_does_not_consume_solid_source",
+           "[reload],[reload_option],[container]" )
+{
+    const auto bday = calendar::start_of_cataclysm;
+    auto dummy = avatar{};
+
+    auto det = item::spawn( "bottle_plastic_small", bday, 0 );
+    auto &bottle = *det;
+    dummy.i_add( std::move( det ) );
+
+    det = item::spawn( "aspirin", bday, 200 );
+    auto &filling_aspirin = *det;
+    dummy.i_add( std::move( det ) );
+
+    const auto full_option = item_reload_option( &dummy, &bottle, &bottle, filling_aspirin );
+    REQUIRE( bottle.reload( dummy, filling_aspirin, full_option.qty() ) );
+    REQUIRE( bottle.is_container_full() );
+    const auto contained_charges = bottle.contents.front().charges;
+
+    det = item::spawn( "aspirin", bday, 20 );
+    auto &extra_aspirin = *det;
+    dummy.i_add( std::move( det ) );
+    const auto source_charges = extra_aspirin.charges;
+
+    const auto blocked_option = item_reload_option( &dummy, &bottle, &bottle, extra_aspirin );
+    CHECK( blocked_option.qty() == 0 );
+    const auto sources = character_funcs::find_ammo_items_or_mags( dummy, bottle, true, -1 );
+    CHECK_FALSE( std::ranges::contains( sources, &extra_aspirin ) );
+    CHECK_FALSE( bottle.reload( dummy, extra_aspirin, 1 ) );
+    CHECK( extra_aspirin.charges == source_charges );
+    REQUIRE( bottle.contents.num_item_stacks() == 1 );
+    CHECK( bottle.contents.front().charges == contained_charges );
 }
 
 TEST_CASE( "empty_container_is_not_solid_reload_source", "[reload],[reload_option],[container]" )
@@ -201,7 +268,8 @@ TEST_CASE( "empty_container_is_not_solid_reload_source", "[reload],[reload_optio
     REQUIRE( !std::ranges::contains( sources, &empty_jug ) );
 }
 
-TEST_CASE( "multi_item_container_is_not_solid_reload_source", "[reload],[reload_option],[container]" )
+TEST_CASE( "multi_item_container_is_not_solid_reload_source",
+           "[reload],[reload_option],[container]" )
 {
     const time_point bday = calendar::start_of_cataclysm;
     avatar dummy;
@@ -220,7 +288,8 @@ TEST_CASE( "multi_item_container_is_not_solid_reload_source", "[reload],[reload_
     REQUIRE( !std::ranges::contains( sources, &source_jug ) );
 }
 
-TEST_CASE( "single_item_container_solid_reload_uses_direct_detach", "[reload],[reload_option],[container]" )
+TEST_CASE( "single_item_container_solid_reload_uses_direct_detach",
+           "[reload],[reload_option],[container]" )
 {
     const time_point bday = calendar::start_of_cataclysm;
     avatar dummy;
