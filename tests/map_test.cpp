@@ -5,6 +5,7 @@
 
 #include "action.h"
 #include "avatar.h"
+#include "coordinates.h"
 #include "enums.h"
 #include "game.h"
 #include "game_constants.h"
@@ -19,17 +20,17 @@ TEST_CASE( "destroy_grabbed_furniture" )
 {
     clear_all_state();
     GIVEN( "Furniture grabbed by the player" ) {
-        const tripoint test_origin( 60, 60, 0 );
+        const tripoint_bub_ms test_origin( 60, 60, 0 );
         map &here = get_map();
         g->u.setpos( test_origin );
-        const tripoint grab_point = test_origin + tripoint_east;
+        const tripoint_bub_ms grab_point = test_origin + tripoint_rel_ms::east();
         here.furn_set( grab_point, furn_id( "f_chair" ) );
-        g->u.grab( OBJECT_FURNITURE, grab_point );
+        g->u.grab( OBJECT_FURNITURE, tripoint_rel_ms::east() );
         WHEN( "The furniture grabbed by the player is destroyed" ) {
             here.destroy( grab_point );
             THEN( "The player's grab is released" ) {
                 CHECK( g->u.get_grab_type() == OBJECT_NONE );
-                CHECK( g->u.grab_point == tripoint_zero );
+                CHECK( g->u.grab_point == tripoint_rel_ms::zero() );
             }
         }
     }
@@ -47,7 +48,7 @@ TEST_CASE( "place_player_can_safely_move_multiple_submaps" )
     // Regression test for the situation where game::place_player would misuse
     // map::shift if the resulting shift exceeded a single submap, leading to a
     // broken active item cache.
-    g->place_player( tripoint_zero );
+    g->place_player( tripoint_bub_ms::zero() );
     CHECK( get_map().check_submap_active_item_consistency().empty() );
 }
 
@@ -56,15 +57,15 @@ TEST_CASE( "auto_stair_travel_finds_remembered_stairs", "[map][stair][autotravel
     clear_all_state();
     g->u.clear_map_memory();
 
-    const auto origin = tripoint( 60, 60, 0 );
+    const auto origin = tripoint_bub_ms( 60, 60, 0 );
     const auto remembered_stairs = origin + tripoint_east * 5;
     auto &here = get_map();
 
     g->u.setpos( origin );
     here.ter_set( remembered_stairs, ter_id( "t_floor" ) );
-    g->u.memorize_terrain_tile( here.getabs( remembered_stairs ), "t_stairs_up", 0, 0 );
+    g->u.memorize_terrain_tile( here.bub_to_abs( remembered_stairs ), "t_stairs_up", 0, 0 );
 
-    const auto found_stairs = g->find_local_stairs_leading_to( here, origin.z + 1 );
+    const auto found_stairs = g->find_local_stairs_leading_to( here, origin.z() + 1 );
 
     REQUIRE( found_stairs );
     CHECK( *found_stairs == remembered_stairs );
@@ -74,7 +75,7 @@ TEST_CASE( "auto_stair_travel_route_continues_with_vertical_move", "[map][stair]
 {
     clear_all_state();
 
-    const auto origin = tripoint( 60, 60, 0 );
+    const auto origin = tripoint_bub_ms( 60, 60, 0 );
     const auto stairs = origin + tripoint_east;
     auto &you = g->u;
     auto &here = get_map();
@@ -82,14 +83,14 @@ TEST_CASE( "auto_stair_travel_route_continues_with_vertical_move", "[map][stair]
     you.setpos( origin );
     here.ter_set( stairs, ter_id( "t_stairs_up" ) );
 
-    auto route = here.route( you.pos(), stairs, you.get_legacy_pathfinding_settings(),
+    auto route = here.route( you.bub_pos(), stairs, you.get_legacy_pathfinding_settings(),
                              you.get_legacy_path_avoid() );
     REQUIRE( !route.empty() );
-    route.emplace_back( stairs.xy(), origin.z + 1 );
+    route.emplace_back( stairs.xy(), origin.z() + 1 );
     you.set_destination( route );
 
     CHECK( you.get_next_auto_move_direction() ==
-           get_movement_action_from_delta( stairs - origin, iso_rotate::yes ) );
+           get_movement_action_from_delta( tripoint_rel_ms( stairs - origin ), iso_rotate::yes ) );
 
     you.setpos( stairs );
     CHECK( you.get_next_auto_move_direction() == ACTION_MOVE_UP );
@@ -112,7 +113,7 @@ TEST_CASE( "bash_through_roof_can_destroy_multiple_times" )
     static const ter_str_id t_strong_roof( "t_strong_roof" );
     static const ter_str_id t_rock_floor_no_roof( "t_rock_floor_no_roof" );
     static const ter_str_id t_open_air( "t_open_air" );
-    static const tripoint p( 65, 65, 1 );
+    static const tripoint_bub_ms p( 65, 65, 1 );
     WHEN( "A wall has a matching roof above it, but the roof turns to a stronger roof on successful bash" ) {
         static const ter_str_id t_fragile_wall( "t_fragile_wall" );
         here.ter_set( p + tripoint_below, t_fragile_wall );
