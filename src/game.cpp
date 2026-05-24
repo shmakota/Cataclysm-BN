@@ -268,6 +268,20 @@ static void init_bubble_config()
 
 static constexpr int DANGEROUS_PROXIMITY = 5;
 
+namespace
+{
+
+auto fling_bash_damage( const Creature &c, const float flvel ) -> int
+{
+    const auto weight_bonus = std::clamp( static_cast<int>( to_gram( c.get_weight() ) / 100000 ),
+                                          0, 10 );
+    const auto size_bonus = std::max( 0, static_cast<int>( c.get_size() ) -
+                                         static_cast<int>( creature_size::medium ) ) * 4;
+    return std::max( 0, static_cast<int>( flvel ) + weight_bonus + size_bonus );
+}
+
+} // namespace
+
 static const activity_id ACT_OPERATION( "ACT_OPERATION" );
 static const activity_id ACT_AUTODRIVE( "ACT_AUTODRIVE" );
 
@@ -886,6 +900,7 @@ bool game::start_game()
     start_calendar();
     get_weather().nextweather = calendar::turn;
     safe_mode = ( get_option<bool>( "SAFEMODE" ) ? SAFE_MODE_ON : SAFE_MODE_OFF );
+    manual_combat_mode = false;
     mostseen = 0; // ...and mostseen is 0, we haven't seen any monsters yet.
     get_safemode().load_global();
     get_distraction_manager().load();
@@ -3295,6 +3310,7 @@ bool game::load( const save_t &name )
     }
 
     safe_mode = get_option<bool>( "SAFEMODE" ) ? SAFE_MODE_ON : SAFE_MODE_OFF;
+    manual_combat_mode = false;
     mostseen = 0; // ...and mostseen is 0, we haven't seen any monsters yet.
 
     init_autosave();
@@ -12584,7 +12600,7 @@ void game::fling_creature( Creature *c, const units::angle &dir, float flvel, bo
             c->impact( damage, pt );
             if( m.is_bashable( pt ) ) {
                 // Only go through if we successfully make the tile passable
-                m.bash( pt, flvel );
+                m.bash( pt, fling_bash_damage( *c, flvel ) );
                 thru = m.passable( pt );
             } else {
                 thru = false;
@@ -12651,7 +12667,8 @@ void game::fling_creature( Creature *c, const units::angle &dir, float flvel, bo
             if( force > 0 ) {
                 int dmg = c->impact( force, c->pos() );
                 // TODO: Make landing damage the floor
-                m.bash( c->pos(), dmg / 4, false, false, false );
+                m.bash( c->pos(), std::max( dmg / 4, fling_bash_damage( *c, flvel ) / 4 ), false,
+                        false, false );
             }
             // Always apply traps to creature i.e. bear traps, tele traps etc.
             m.creature_on_trap( *c, false );

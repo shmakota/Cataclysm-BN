@@ -67,6 +67,22 @@
 
 class player;
 
+namespace
+{
+
+auto melee_attack_from_movement( avatar &you, Creature &target ) -> void
+{
+    if( g->manual_combat_mode ) {
+        you.melee_attack( target, true );
+        return;
+    }
+
+    const melee::technique_prompt_suppression_guard suppress_technique_prompt;
+    you.melee_attack( target, true );
+}
+
+} // namespace
+
 static const efftype_id effect_amigara( "amigara" );
 static const efftype_id effect_glowing( "glowing" );
 static const efftype_id effect_grabbed( "grabbed" );
@@ -99,13 +115,6 @@ static const std::string flag_SWIMMABLE( "SWIMMABLE" );
 static const std::string flag_LADDER( "LADDER" );
 
 static const trait_flag_str_id trait_flag_MUTATION_SWIM( "MUTATION_SWIM" );
-
-namespace
-{
-
-bool manual_combat_mode = false;
-
-} // namespace
 
 namespace
 {
@@ -411,7 +420,7 @@ bool avatar_action::move( avatar &you, map &m, const tripoint &d )
                 return false;
             }
 
-            you.melee_attack( critter, true );
+            melee_attack_from_movement( you, critter );
             if( critter.is_hallucination() ) {
                 critter.die( &you );
             }
@@ -439,7 +448,7 @@ bool avatar_action::move( avatar &you, map &m, const tripoint &d )
             return false;
         }
 
-        you.melee_attack( np, true );
+        melee_attack_from_movement( you, np );
         np.make_angry();
         return false;
     }
@@ -852,14 +861,14 @@ auto avatar_action::manual_attack( avatar &you, map & ) -> void
 
 auto avatar_action::toggle_manual_combat_mode() -> void
 {
-    manual_combat_mode = !manual_combat_mode;
-    add_msg( m_info, manual_combat_mode ? _( "Manual combat mode ON!" ) :
+    g->manual_combat_mode = !g->manual_combat_mode;
+    add_msg( m_info, g->manual_combat_mode ? _( "Manual combat mode ON!" ) :
                                           _( "Manual combat mode OFF!" ) );
 }
 
 auto avatar_action::is_manual_combat_mode() -> bool
 {
-    return manual_combat_mode;
+    return g->manual_combat_mode;
 }
 bool avatar_action::can_fire_weapon( avatar &you, const map &m, const item &weapon )
 {
