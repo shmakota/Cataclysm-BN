@@ -1893,7 +1893,17 @@ bool game::handle_action()
             } else if( act == ACTION_DESCRIBE_TILE && !sees_mouse_pos ) {
                 act = ACTION_DESCRIBE_TILE;
             } else if( act == ACTION_SEC_SELECT ) {
-                if( !try_get_right_click_action( act, *mouse_target ) ) {
+                if( mouse_target->xy() == u.bub_pos().xy() ) {
+                    u.clear_destination();
+                    destination_preview.clear();
+                    previewed_right_click_action_.reset();
+                    queued_right_click_action_.reset();
+                    mouse_target = std::nullopt;
+                    act = handle_action_menu();
+                    if( act == ACTION_NULL ) {
+                        return false;
+                    }
+                } else if( !try_get_right_click_action( act, *mouse_target ) ) {
                     return false;
                 }
             }
@@ -2983,7 +2993,11 @@ bool game::handle_action()
                 break;
 
             case ACTION_AUTOATTACK:
-                avatar_action::autoattack( u, m );
+                if( mouse_target ) {
+                    mouse_attack( *mouse_target );
+                } else {
+                    avatar_action::autoattack( u, m );
+                }
                 break;
 
             case ACTION_MANUAL_ATTACK:
