@@ -92,12 +92,14 @@ namespace
 
 constexpr auto max_wall_climb_difficulty = 10;
 
-auto get_wall_support( const map &here, const tripoint_bub_ms &anchor ) -> std::optional<tripoint_bub_ms>
+auto get_wall_support( const map &here,
+                       const tripoint_bub_ms &anchor ) -> std::optional<tripoint_bub_ms>
 {
     const auto neighbor_range = points_in_radius( anchor, 1 );
     const std::vector<tripoint_bub_ms> neighbors( neighbor_range.begin(), neighbor_range.end() );
 
-    const auto support = std::ranges::find_if( neighbors, [&anchor, &here]( const tripoint_bub_ms & pt ) {
+    const auto support = std::ranges::find_if( neighbors, [&anchor,
+    &here]( const tripoint_bub_ms & pt ) {
         return pt.z() == anchor.z() && pt != anchor && here.impassable_ter_furn( pt );
     } );
 

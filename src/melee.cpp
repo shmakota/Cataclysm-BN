@@ -151,7 +151,7 @@ auto technique_move_cost( const Character &self, const Creature &target, const i
                           const ma_technique &technique ) -> int
 {
     auto move_cost = with_cross_z_melee_cost( self.attack_cost( weapon ), self.bub_pos(),
-                                              target.bub_pos() );
+                     target.bub_pos() );
     move_cost *= technique.move_cost_multiplier( self );
     move_cost += technique.move_cost_penalty( self );
     return move_cost;
@@ -315,19 +315,19 @@ auto aoe_technique_is_valid( Character &self, Creature &target,
 
     if( technique.aoe == "wide" ) {
         const tripoint_bub_ms left = self.bub_pos() + tripoint_rel_ms( offset_a[lookup],
-                                              offset_b[lookup], 0 );
+                                     offset_b[lookup], 0 );
         const tripoint_bub_ms right = self.bub_pos() + tripoint_rel_ms( offset_b[lookup],
-                                               -offset_a[lookup], 0 );
+                                      -offset_a[lookup], 0 );
         return has_enemy( g->critter_at<monster>( left ) ) || has_enemy( g->critter_at<npc>( left ) ) ||
                has_enemy( g->critter_at<monster>( right ) ) || has_enemy( g->critter_at<npc>( right ) );
     }
 
     if( technique.aoe == "impale" ) {
         const tripoint_bub_ms left = target.bub_pos() + tripoint_rel_ms( offset_a[lookup],
-                                                 offset_b[lookup], 0 );
+                                     offset_b[lookup], 0 );
         const tripoint_bub_ms target_pos = target.bub_pos() + ( target.bub_pos() - self.bub_pos() );
         const tripoint_bub_ms right = target.bub_pos() + tripoint_rel_ms( offset_b[lookup],
-                                                  -offset_b[lookup], 0 );
+                                      -offset_b[lookup], 0 );
         return has_enemy( g->critter_at<monster>( left ) ) || has_enemy( g->critter_at<npc>( left ) ) ||
                has_enemy( g->critter_at<monster>( target_pos ) ) ||
                has_enemy( g->critter_at<npc>( target_pos ) ) ||
@@ -376,9 +376,9 @@ auto technique_aoe_reason( Character &self, Creature &target,
 
     if( technique.aoe == "wide" ) {
         const tripoint_bub_ms left = self.bub_pos() + tripoint_rel_ms( offset_a[lookup],
-                                              offset_b[lookup], 0 );
+                                     offset_b[lookup], 0 );
         const tripoint_bub_ms right = self.bub_pos() + tripoint_rel_ms( offset_b[lookup],
-                                               -offset_a[lookup], 0 );
+                                      -offset_a[lookup], 0 );
         if( has_enemy( g->critter_at<monster>( left ) ) || has_enemy( g->critter_at<npc>( left ) ) ||
             has_enemy( g->critter_at<monster>( right ) ) || has_enemy( g->critter_at<npc>( right ) ) ) {
             return {};
@@ -388,10 +388,10 @@ auto technique_aoe_reason( Character &self, Creature &target,
 
     if( technique.aoe == "impale" ) {
         const tripoint_bub_ms left = target.bub_pos() + tripoint_rel_ms( offset_a[lookup],
-                                                 offset_b[lookup], 0 );
+                                     offset_b[lookup], 0 );
         const tripoint_bub_ms target_pos = target.bub_pos() + ( target.bub_pos() - self.bub_pos() );
         const tripoint_bub_ms right = target.bub_pos() + tripoint_rel_ms( offset_b[lookup],
-                                                  -offset_b[lookup], 0 );
+                                      -offset_b[lookup], 0 );
         if( has_enemy( g->critter_at<monster>( left ) ) || has_enemy( g->critter_at<npc>( left ) ) ||
             has_enemy( g->critter_at<monster>( target_pos ) ) ||
             has_enemy( g->critter_at<npc>( target_pos ) ) ||
@@ -490,7 +490,8 @@ struct mutation_attack_description_options {
     const mut_attack &attack;
 };
 
-auto mutation_attack_description( const mutation_attack_description_options &options ) -> std::string
+auto mutation_attack_description( const mutation_attack_description_options &options ) ->
+std::string
 {
     auto attack_text = std::string();
     if( options.self.is_player() ) {
@@ -520,7 +521,7 @@ auto weapon_requirement_reason( const item &weapon, const ma_requirements &reqs 
         }
         if( !missing_flags.empty() ) {
             return string_format( _( "missing required weapon flag: %s" ),
-                                 enumerate_as_string( missing_flags ) );
+                                  enumerate_as_string( missing_flags ) );
         }
     }
 
@@ -529,12 +530,12 @@ auto weapon_requirement_reason( const item &weapon, const ma_requirements &reqs 
         for( const auto &req : reqs.min_damage ) {
             if( weapon.damage_melee( req.first ) < req.second ) {
                 missing_damage.push_back( string_format( _( "%s %d+" ), name_by_dt( req.first ),
-                                                         req.second ) );
+                                          req.second ) );
             }
         }
         if( !missing_damage.empty() ) {
             return string_format( _( "needs weapon damage: %s" ),
-                                 enumerate_as_string( missing_damage ) );
+                                  enumerate_as_string( missing_damage ) );
         }
     }
 
@@ -583,7 +584,7 @@ auto character_requirement_reason( const Character &self, const ma_technique &te
 
     if( !style_muts.empty() ) {
         const auto has_style_mut = std::ranges::any_of( style_muts,
-        [&self]( const trait_id &mut ) {
+        [&self]( const trait_id & mut ) {
             return self.has_trait( mut );
         } );
         if( !has_style_mut ) {
@@ -592,7 +593,7 @@ auto character_requirement_reason( const Character &self, const ma_technique &te
                 required_mutations.push_back( mut->name() );
             }
             return string_format( _( "requires mutation: %s" ),
-                                 enumerate_as_string( required_mutations ) );
+                                  enumerate_as_string( required_mutations ) );
         }
     }
 
@@ -606,19 +607,19 @@ auto character_requirement_reason( const Character &self, const ma_technique &te
             const auto current_skill = cqb ? 5 : self.get_skill_level( req.first );
             if( current_skill < req.second ) {
                 missing_skills.push_back( string_format( _( "%s %d+ (have %d)" ),
-                                                        req.first->name(), req.second,
-                                                        current_skill ) );
+                                          req.first->name(), req.second,
+                                          current_skill ) );
             }
         }
         if( !missing_skills.empty() ) {
             return string_format( _( "missing skill requirement: %s" ),
-                                 enumerate_as_string( missing_skills ) );
+                                  enumerate_as_string( missing_skills ) );
         }
     }
 
     if( !tec.reqs.weapon_categories_allowed.empty() && is_armed ) {
         const auto matches_category = std::ranges::any_of( tec.reqs.weapon_categories_allowed,
-        [&weapon]( const weapon_category_id &cat ) {
+        [&weapon]( const weapon_category_id & cat ) {
             return weapon.typeId()->weapon_category.contains( cat );
         } );
         if( !matches_category ) {
@@ -627,13 +628,13 @@ auto character_requirement_reason( const Character &self, const ma_technique &te
                 categories.push_back( cat->name().translated() );
             }
             return string_format( _( "wrong weapon category: %s" ),
-                                 enumerate_as_string( categories ) );
+                                  enumerate_as_string( categories ) );
         }
     }
 
     if( !tec.reqs.mutations_required.empty() ) {
         const auto has_required_mutation = std::ranges::any_of( tec.reqs.mutations_required,
-        [&self]( const trait_id &mut ) {
+        [&self]( const trait_id & mut ) {
             return self.has_trait( mut );
         } );
         if( !has_required_mutation ) {
@@ -642,7 +643,7 @@ auto character_requirement_reason( const Character &self, const ma_technique &te
                 required_mutations.push_back( mut->name() );
             }
             return string_format( _( "requires mutation: %s" ),
-                                 enumerate_as_string( required_mutations ) );
+                                  enumerate_as_string( required_mutations ) );
         }
     }
 
@@ -655,7 +656,7 @@ auto character_requirement_reason( const Character &self, const ma_technique &te
         }
         if( !missing_buffs.empty() ) {
             return string_format( _( "missing required buff: %s" ),
-                                 enumerate_as_string( missing_buffs ) );
+                                  enumerate_as_string( missing_buffs ) );
         }
     }
 
@@ -951,7 +952,7 @@ auto choose_melee_technique( Character &self, Creature &target, const item &weap
             .selectable = false,
             .requirements = entry.requirements,
             .why_unavailable = entry.available ? _( "automatic extra attack" ) :
-                               entry.why_unavailable,
+            entry.why_unavailable,
             .description = replace_colors( entry.description ),
         } );
     }

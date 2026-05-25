@@ -133,7 +133,8 @@ void mission_start::kill_nemesis( mission *miss )
     const tripoint_abs_omt center = get_player_character().abs_omt_pos();
     auto &omb = get_overmapbuffer( miss->get_dimension() );
     const auto *scen = get_scenario();
-    const auto &nemesis_group = scen != nullptr ? scen->nemesis_group() : scenario::generic()->nemesis_group();
+    const auto &nemesis_group = scen != nullptr ? scen->nemesis_group() :
+                                scenario::generic()->nemesis_group();
     omt_find_params params{};
     params.types.emplace_back( "field", ot_match_type::type );
     params.search_range = { 0, rng( 40, 80 ) };
