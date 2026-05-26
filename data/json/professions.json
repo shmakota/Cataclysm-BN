@@ -2769,7 +2769,7 @@
         "entries": [
           { "group": "charged_two_way_radio" },
           { "item": "sw629", "ammo-item": "44fmj", "charges": 6, "container-item": "shoulder_holster" },
-          { "item": "legpouch_large", "contents-group": "speedloaders_44_detective" },
+          { "item": "shoulder_pouch", "contents-group": "speedloaders_44_detective" },
           { "item": "44fmj", "charges": 12 }
         ]
       },
@@ -5753,7 +5753,7 @@
     "id": "jr_survivalist",
     "name": "Survivalist Jr.",
     "description": "Your parents were crazy preppers who thought some \"Cataclysm\" was coming, and insisted on preparing you for it.  Turns out they were right.  You didn't get a chance to thank them.  The only thing you can do for them now is what they always hoped you would do in the dark days ahead: survive.",
-    "points": 3,
+    "points": 1,
     "skills": [ { "level": 1, "name": "survival" }, { "level": 1, "name": "fabrication" }, { "level": 1, "name": "firstaid" } ],
     "items": {
       "both": {
@@ -6630,7 +6630,7 @@
         "items": [ "fancy_sunglasses", "platinum_watch", "money_bundle" ],
         "entries": [
           { "item": "shoulder_holster", "contents-group": "hitman_pistol" },
-          { "item": "legpouch_large", "contents-group": "hitman_mags_ppq" }
+          { "item": "shoulder_pouch", "contents-group": "hitman_mags_ppq" }
         ]
       },
       "male": [

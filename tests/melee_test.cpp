@@ -7,6 +7,7 @@
 
 #include "character_martial_arts.h"
 #include "creature.h"
+#include "coordinates.h"
 #include "game_constants.h"
 #include "item.h"
 #include "itype.h"
@@ -93,7 +94,7 @@ static void check_near( float prob, const float expected, const float tolerance 
 
 static const int num_iters = 10000;
 
-static const tripoint dude_pos( g_half_mapsize_x, g_half_mapsize_y, 0 );
+static const tripoint_bub_ms dude_pos( g_half_mapsize_x, g_half_mapsize_y, 0 );
 
 TEST_CASE( "Character attacking a zombie", "[.melee]" )
 {

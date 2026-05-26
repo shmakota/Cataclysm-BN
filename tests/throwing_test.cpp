@@ -11,6 +11,7 @@
 #include "ballistics.h"
 #include "calendar.h"
 #include "creature_throw.h"
+#include "coordinates.h"
 #include "damage.h"
 #include "dispersion.h"
 #include "game.h"
@@ -25,7 +26,6 @@
 #include "npc.h"
 #include "player.h"
 #include "player_helpers.h"
-#include "point.h"
 #include "projectile.h"
 #include "ranged.h"
 #include "state_helpers.h"
@@ -35,7 +35,7 @@
 TEST_CASE( "throwing distance test", "[throwing], [balance]" )
 {
     clear_all_state();
-    const standard_npc thrower( "Thrower", tripoint( 60, 60, 0 ), {}, 4, 10, 10, 10, 10 );
+    const standard_npc thrower( "Thrower", tripoint_bub_ms( 60, 60, 0 ), {}, 4, 10, 10, 10, 10 );
     item &grenade = *item::spawn_temporary( "grenade" );
     CHECK( thrower.throw_range( grenade ) >= 30 );
     CHECK( thrower.throw_range( grenade ) <= 35 );
@@ -88,8 +88,8 @@ TEST_CASE( "flung creatures only trigger landing traps if they cannot fly", "[th
     clear_map();
 
     map &here = g->m;
-    const tripoint start = g->u.pos() + tripoint_east;
-    const tripoint landing = start + tripoint_east;
+    const tripoint_bub_ms start = g->u.bub_pos() + tripoint_east;
+    const tripoint_bub_ms landing = start + tripoint_east;
     const trap_str_id beartrap( "tr_beartrap" );
     const efftype_id effect_beartrap( "beartrap" );
 
@@ -102,7 +102,7 @@ TEST_CASE( "flung creatures only trigger landing traps if they cannot fly", "[th
 
         g->fling_creature( &zombie, coord_to_angle( start, landing ), 10.0f );
 
-        CHECK( zombie.pos() == landing );
+        CHECK( zombie.bub_pos() == landing );
         CHECK( zombie.has_effect( effect_beartrap ) );
     }
 
@@ -112,7 +112,7 @@ TEST_CASE( "flung creatures only trigger landing traps if they cannot fly", "[th
 
         g->fling_creature( &bat, coord_to_angle( start, landing ), 10.0f );
 
-        CHECK( bat.pos() == landing );
+        CHECK( bat.bub_pos() == landing );
         CHECK_FALSE( bat.has_effect( effect_beartrap ) );
     }
 }
@@ -123,23 +123,23 @@ TEST_CASE( "flung creatures take damage when they slam into a wall", "[throwing]
     clear_map();
 
     map &here = g->m;
-    const tripoint source = { 40, 30, 0 };
-    const tripoint target = { 41, 30, 0 };
-    const tripoint landing = { 42, 30, 0 };
-    const tripoint wall = { 43, 30, 0 };
+    const tripoint_bub_ms source = { 40, 30, 0 };
+    const tripoint_bub_ms target = { 41, 30, 0 };
+    const tripoint_bub_ms landing = { 42, 30, 0 };
+    const tripoint_bub_ms wall = { 43, 30, 0 };
 
     here.ter_set( source, ter_id( "t_floor" ) );
     here.ter_set( target, ter_id( "t_floor" ) );
     here.ter_set( landing, ter_id( "t_floor" ) );
     here.ter_set( wall, ter_id( "t_wall" ) );
-    g->u.setpos( { 10, 10, 0 } );
+    g->u.setpos( tripoint_bub_ms( 10, 10, 0 ) );
 
     monster &zombie = spawn_test_monster( "mon_zombie", target );
     const int hp_before = zombie.get_hp();
 
     g->fling_creature( &zombie, coord_to_angle( source, target ), 30.0f );
 
-    CHECK( zombie.pos() == landing );
+    CHECK( zombie.bub_pos() == landing );
     CHECK( zombie.get_hp() < hp_before );
 }
 
@@ -165,7 +165,7 @@ static std::ostream &operator<<( std::ostream &stream, const throw_test_pstats &
 
 static const skill_id skill_throw = skill_id( "throw" );
 
-static void reset_player( player &p, const throw_test_pstats &pstats, const tripoint &pos )
+static void reset_player( player &p, const throw_test_pstats &pstats, const tripoint_bub_ms &pos )
 {
     clear_character( p );
     CHECK( !p.in_vehicle );
@@ -196,8 +196,8 @@ static void test_throwing_player_versus(
     const int range, const throw_test_pstats &pstats,
     const epsilon_threshold &hit_thresh, const epsilon_threshold &dmg_thresh )
 {
-    const tripoint monster_start = { 30 + range, 30, 0 };
-    const tripoint player_start = { 30, 30, 0 };
+    const tripoint_bub_ms monster_start = { 30 + range, 30, 0 };
+    const tripoint_bub_ms player_start = { 30, 30, 0 };
     bool hit_thresh_met = false;
     bool dmg_thresh_met = false;
     throw_test_data data;
@@ -227,7 +227,8 @@ static void test_throwing_player_versus(
             return;
         }
 
-        dealt_projectile_attack atk = ranged::throw_item( p, mon.pos(), std::move( det ), std::nullopt );
+        dealt_projectile_attack atk = ranged::throw_item( p, mon.bub_pos(), std::move( det ),
+                                      std::nullopt );
         data.hits.add( atk.hit_critter != nullptr );
         data.dmg.add( atk.dealt_dam.total_damage() );
 
