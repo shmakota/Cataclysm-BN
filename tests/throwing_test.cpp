@@ -117,6 +117,29 @@ TEST_CASE( "flung creatures only trigger landing traps if they cannot fly", "[th
     }
 }
 
+TEST_CASE( "wall climbing creatures are downed after being flung", "[throwing][movement]" )
+{
+    clear_all_state();
+    clear_map();
+
+    map &here = g->m;
+    const tripoint_bub_ms start = g->u.bub_pos() + tripoint_east;
+    const tripoint_bub_ms landing = start + tripoint_east;
+    const tripoint_bub_ms below_landing = landing + tripoint_below;
+
+    here.ter_set( start, ter_id( "t_open_air" ) );
+    here.ter_set( landing, ter_id( "t_open_air" ) );
+    here.ter_set( below_landing, ter_id( "t_floor" ) );
+
+    monster &clinger = spawn_test_monster( "mon_zombie_crawler_clinger", start );
+    REQUIRE( clinger.climbs_walls() );
+
+    g->fling_creature( &clinger, coord_to_angle( start, landing ), 10.0f );
+
+    CHECK( clinger.bub_pos() == below_landing );
+    CHECK( clinger.has_effect( efftype_id( "downed" ) ) );
+}
+
 TEST_CASE( "flung creatures take damage when they slam into a wall", "[throwing][impact]" )
 {
     clear_all_state();

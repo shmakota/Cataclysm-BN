@@ -12964,6 +12964,26 @@ void game::fling_creature( Creature *c, const units::angle &dir, float flvel, bo
         }
     }
 
+    if( monster *const mon = c->as_monster(); mon != nullptr && mon->climbs_walls() ) {
+        mon->add_effect( effect_downed, 1_turns );
+    }
+
+    if( m.has_zlevels() && !can_recover_from_fling( *c ) ) {
+        bool fell = false;
+        while( m.has_flag( TFLAG_NO_FLOOR, c->bub_pos() ) &&
+               c->bub_pos().z() > -OVERMAP_DEPTH ) {
+            const tripoint_bub_ms below = c->bub_pos() + tripoint_below;
+            if( !m.inbounds( below ) || m.impassable( below ) ) {
+                break;
+            }
+            c->setpos( below );
+            fell = true;
+        }
+        if( fell ) {
+            m.creature_on_trap( *c, false );
+        }
+    }
+
     if( can_recover_from_fling( *c ) ) {
         return;
     }

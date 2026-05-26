@@ -83,6 +83,25 @@ TEST_CASE( "Monster losing grabbing effect", "[player][melee][grab]" )
     }
 }
 
+TEST_CASE( "Monster loses wall clinging when grabbed", "[player][melee][grab]" )
+{
+    clear_all_state();
+    avatar &dummy = g->u;
+    clear_character( dummy );
+
+    monster &zed = spawn_test_monster( "mon_zombie_crawler_clinger", dummy.bub_pos() + tripoint_north );
+    const efftype_id effect_grabbed( "grabbed" );
+    const efftype_id effect_wall_clinging( "wall_clinging" );
+
+    zed.add_effect( effect_wall_clinging, 1_days );
+    REQUIRE( zed.has_effect( effect_wall_clinging ) );
+
+    zed.add_effect( effect_grabbed, 1_days );
+
+    CHECK( zed.has_effect( effect_grabbed ) );
+    CHECK_FALSE( zed.has_effect( effect_wall_clinging ) );
+}
+
 TEST_CASE( "Avatar drags manually grabbed monster while moving", "[player][melee][grab]" )
 {
     clear_all_state();

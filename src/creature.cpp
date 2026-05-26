@@ -81,6 +81,7 @@ static const ammo_effect_str_id ammo_effect_THROWN( "THROWN" );
 static const efftype_id effect_badpoison( "badpoison" );
 static const efftype_id effect_blind( "blind" );
 static const efftype_id effect_bounced( "bounced" );
+static const efftype_id effect_grabbed( "grabbed" );
 static const efftype_id effect_downed( "downed" );
 static const efftype_id effect_lying_down( "lying_down" );
 static const efftype_id effect_no_sight( "no_sight" );
@@ -95,6 +96,7 @@ static const efftype_id effect_sleep( "sleep" );
 static const efftype_id effect_stunned( "stunned" );
 static const efftype_id effect_tied( "tied" );
 static const efftype_id effect_zapped( "zapped" );
+static const efftype_id effect_wall_clinging( "wall_clinging" );
 
 static const skill_id skill_throw( "throw" );
 
@@ -1358,6 +1360,10 @@ void Creature::add_effect( const efftype_id &eff_id, const time_duration &dur,
         if( mons && mons->mounted_player ) {
             mons->mounted_player->forced_dismount();
         }
+    }
+
+    if( eff_id == effect_grabbed && has_effect( effect_wall_clinging ) ) {
+        remove_effect( effect_wall_clinging );
     }
 
     if( !eff_id.is_valid() ) {

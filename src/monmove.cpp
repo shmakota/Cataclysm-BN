@@ -1595,7 +1595,9 @@ void monster::execute_action( const monster_action_t &action )
     nursebot_operate( dragged_foe );
 
     // Wall-cling handling plus floor / drowning / moves-negative guards.
-    const auto anchored_on_wall_now = climbs_walls() && anchored_on_wall( g->m, bub_pos() );
+    const auto anchored_on_wall_now = climbs_walls() && !has_effect( effect_grabbed ) &&
+                                      !has_effect( effect_downed ) &&
+                                      anchored_on_wall( g->m, bub_pos() );
     const auto anchored_on_wall_then = has_effect( effect_wall_clinging );
 
     if( !flies() && !anchored_on_wall_now &&
@@ -2495,7 +2497,8 @@ bool monster::move_to( const tripoint_bub_ms &p, bool force, bool step_on_critte
         remove_effect( effect_no_sight );
     }
 
-    const bool anchored_on_wall_move = climbs_walls() && destination_has_no_floor &&
+    const bool anchored_on_wall_move = climbs_walls() && !has_effect( effect_grabbed ) &&
+                                       !has_effect( effect_downed ) && destination_has_no_floor &&
                                        anchored_on_wall( g->m, destination );
     if( !( anchored_on_wall_move && on_ground ) ) {
         g->m.creature_on_trap( *this );
@@ -2504,7 +2507,9 @@ bool monster::move_to( const tripoint_bub_ms &p, bool force, bool step_on_critte
         }
     }
 
-    const bool anchored_on_wall_here = climbs_walls() && anchored_on_wall( g->m, bub_pos() );
+    const bool anchored_on_wall_here = climbs_walls() && !has_effect( effect_grabbed ) &&
+                                       !has_effect( effect_downed ) &&
+                                       anchored_on_wall( g->m, bub_pos() );
     if( anchored_on_wall_here ) {
         add_effect( effect_wall_clinging, 1_turns );
     } else if( has_effect( effect_wall_clinging ) ) {
