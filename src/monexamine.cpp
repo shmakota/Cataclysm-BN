@@ -75,6 +75,123 @@ static const flag_id json_flag_MECH_BAT( "MECH_BAT" );
 namespace
 {
 
+struct monster_reload_option {
+    itype_id ammo_id;
+    int missing_ammo = 0;
+    int available_ammo = 0;
+};
+
+auto has_reloadable_ammo( const monster &z ) -> bool
+{
+    return z.has_flag( MF_DROPS_AMMO ) && !z.type->starting_ammo.empty();
+}
+
+auto monster_reload_options( const avatar &you,
+                             const monster &z ) -> std::vector<monster_reload_option>
+{
+    auto reload_options = std::vector<monster_reload_option> {};
+    if( !has_reloadable_ammo( z ) ) {
+        return reload_options;
+    }
+
+    for( const auto &[ammo_id, max_ammo] : z.type->starting_ammo ) {
+        const auto current_ammo_iter = z.ammo.find( ammo_id );
+        const auto current_ammo = current_ammo_iter != z.ammo.end() ? current_ammo_iter->second : 0;
+        const auto missing_ammo = max_ammo - current_ammo;
+        if( missing_ammo <= 0 ) {
+            continue;
+        }
+        reload_options.emplace_back( monster_reload_option{
+            .ammo_id = ammo_id,
+            .missing_ammo = missing_ammo,
+            .available_ammo = you.charges_of( ammo_id ),
+        } );
+    }
+
+    return reload_options;
+}
+
+auto needs_ammo_reload( const monster &z ) -> bool
+{
+    if( !has_reloadable_ammo( z ) ) {
+        return false;
+    }
+
+    for( const auto &[ammo_id, max_ammo] : z.type->starting_ammo ) {
+        const auto current_ammo_iter = z.ammo.find( ammo_id );
+        const auto current_ammo = current_ammo_iter != z.ammo.end() ? current_ammo_iter->second : 0;
+        if( current_ammo < max_ammo ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+auto has_compatible_reload_ammo( const avatar &you, const monster &z ) -> bool
+{
+    for( const auto &reload_option : monster_reload_options( you, z ) ) {
+        if( reload_option.available_ammo > 0 ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+auto ammo_state_text( const monster &z ) -> std::string
+{
+    if( !has_reloadable_ammo( z ) ) {
+        return {};
+    }
+
+    return enumerate_as_string( z.type->starting_ammo.begin(), z.type->starting_ammo.end(),
+    [&z]( const auto & ammo_entry ) {
+        const auto &[ammo_id, max_ammo] = ammo_entry;
+        const auto current_ammo_iter = z.ammo.find( ammo_id );
+        const auto current_ammo = current_ammo_iter != z.ammo.end() ? current_ammo_iter->second : 0;
+        return string_format( _( "%s %d/%d" ), ammo_id->nname( 1 ), current_ammo, max_ammo );
+    }, enumeration_conjunction::none );
+}
+
+auto reload_menu_text( const avatar &you, const monster &z ) -> std::string
+{
+    const auto ammo_text = ammo_state_text( z );
+    if( has_compatible_reload_ammo( you, z ) ) {
+        return string_format( _( "Reload weapons (%s)" ), ammo_text );
+    }
+    if( needs_ammo_reload( z ) ) {
+        return string_format( _( "Reload weapons (%s; need compatible ammo)" ), ammo_text );
+    }
+    return string_format( _( "Reload weapons (%s; already full)" ), ammo_text );
+}
+
+auto reload_monster_weapons( avatar &you, monster &z ) -> void
+{
+    auto any_reloaded = false;
+    for( const auto &reload_option : monster_reload_options( you, z ) ) {
+        const auto reload_amount = std::min( reload_option.missing_ammo, reload_option.available_ammo );
+        if( reload_amount <= 0 ) {
+            continue;
+        }
+        z.ammo[reload_option.ammo_id] += reload_amount;
+        you.use_charges( reload_option.ammo_id, reload_amount );
+        any_reloaded = true;
+    }
+
+    if( !any_reloaded ) {
+        if( needs_ammo_reload( z ) ) {
+            add_msg( m_info, _( "You don't have compatible ammo to reload the %s." ), z.get_name() );
+        } else {
+            add_msg( m_info, _( "The %s's weapons are already fully loaded." ), z.get_name() );
+        }
+        return;
+    }
+
+    add_msg( _( "You reload the %s's weapons." ), z.get_name() );
+    you.moves -= 100;
+}
+
 } // namespace
 
 bool monexamine::pet_menu( monster &z )
@@ -108,6 +225,7 @@ bool monexamine::pet_menu( monster &z )
         remove_bat,
         insert_bat,
         check_bat,
+        reload_weapons,
         change_orders,
         disable_pet,
         attack
@@ -275,6 +393,9 @@ bool monexamine::pet_menu( monster &z )
             amenu.addentry( insert_bat, false, 'x', _( "You need a %s to power this mech" ), type.nname( 1 ) );
         }
     }
+    if( has_reloadable_ammo( z ) ) {
+        amenu.addentry( reload_weapons, true, 'R', reload_menu_text( you, z ) );
+    }
     if( z.has_flag( MF_CAN_BE_ORDERED ) ) {
         if( z.has_effect( effect_docile ) ) {
             amenu.addentry( change_orders, true, 'O', _( "Order to engage targets" ), pet_name );
@@ -381,6 +502,9 @@ bool monexamine::pet_menu( monster &z )
             insert_battery( z );
             break;
         case check_bat:
+            break;
+        case reload_weapons:
+            reload_monster_weapons( you, z );
             break;
         case change_orders:
             toggle_ignore_targets( z );
@@ -565,6 +689,7 @@ bool monexamine::mfriend_menu( monster &z )
     enum choices {
         push_monster = 0,
         rename,
+        reload_weapons,
         change_orders,
         disable_pet,
         attack
@@ -578,6 +703,9 @@ bool monexamine::mfriend_menu( monster &z )
 
     amenu.addentry( push_monster, true, 'p', _( "Push %s" ), pet_name );
     amenu.addentry( rename, true, 'e', _( "Rename" ) );
+    if( has_reloadable_ammo( z ) ) {
+        amenu.addentry( reload_weapons, true, 'R', reload_menu_text( get_avatar(), z ) );
+    }
     if( z.has_flag( MF_CAN_BE_ORDERED ) ) {
         if( z.has_effect( effect_docile ) ) {
             amenu.addentry( change_orders, true, 'O', _( "Order to engage targets" ), pet_name );
@@ -599,6 +727,9 @@ bool monexamine::mfriend_menu( monster &z )
             break;
         case rename:
             rename_pet( z );
+            break;
+        case reload_weapons:
+            reload_monster_weapons( get_avatar(), z );
             break;
         case change_orders:
             toggle_ignore_targets( z );
