@@ -18,8 +18,10 @@ namespace
 auto remove_migo_nerve_cage_terrain( mapbuffer &buffer, const tripoint_abs_ms &p ) -> bool
 {
     auto open = false;
+    const auto tile_reader = buffer.make_abs_tile_reader();
     for( const auto &tmp : points_in_radius( p, 12 ) ) {
-        if( buffer.get_ter( tmp ) == ter_id( "t_wall_resin_cage" ) ) {
+        const auto tile = tile_reader.get_tile( tmp );
+        if( tile && tile->get_ter() == ter_id( "t_wall_resin_cage" ) ) {
             buffer.set_ter( tmp, ter_id( "t_floor_resin" ) );
             open = true;
         }
@@ -80,9 +82,6 @@ auto climbing_cost( mapbuffer &buffer, const tripoint_abs_ms &from,
 auto climbing_cost( const map &m, const tripoint_bub_ms &from,
                     const tripoint_bub_ms &to ) -> std::optional<int>
 {
-    if( from.z() != to.z() && !m.has_zlevels() ) {
-        return {};
-    }
     return climbing_cost( MAPBUFFER_REGISTRY.get( m.get_bound_dimension() ),
                           map_local_to_abs( m, from ), map_local_to_abs( m, to ) );
 }

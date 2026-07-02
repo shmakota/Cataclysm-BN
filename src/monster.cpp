@@ -42,6 +42,7 @@
 #include "make_static.h"
 #include "mapdata.h"
 #include "map.h"
+#include "mapbuffer.h"
 #include "map_iterator.h"
 #include "mattack_common.h"
 #include "melee.h"
@@ -131,6 +132,22 @@ static const species_id MOLLUSK( "MOLLUSK" );
 static const species_id PLANT( "PLANT" );
 static const species_id ROBOT( "ROBOT" );
 static const species_id ZOMBIE( "ZOMBIE" );
+
+namespace
+{
+
+auto adjacent_grabber_for( const monster &target ) -> Creature *
+{
+    for( const auto &p : get_map().points_in_radius( target.bub_pos(), 1, 0 ) ) {
+        Creature *const grabber = g->critter_at<Creature>( p );
+        if( grabber != nullptr && grabber != &target && grabber->has_effect( effect_grabbing ) ) {
+            return grabber;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
 
 static const trait_id trait_ANIMALDISCORD( "ANIMALDISCORD" );
 static const trait_id trait_ANIMALDISCORD2( "ANIMALDISCORD2" );
@@ -390,6 +407,10 @@ monster::monster( const monster &source ) : Creature( source ),
     path = source.path;
     effect_cache = source.effect_cache;
     summon_time_limit = source.summon_time_limit;
+    training_level = source.training_level;
+    bonded_character_id = source.bonded_character_id;
+    pet_bond_level = source.pet_bond_level;
+    monster_flags = source.monster_flags;
 
     set_tied_item( item::spawn( *source.tied_item ) );
     set_tack_item( item::spawn( *source.tack_item ) );
@@ -454,8 +475,9 @@ void monster::poly( const mtype_id &id )
     reproduces = type->reproduces;
 
     // HACK: We should know if the monster is in the bubble instead of checking it like this
-    if( g->critter_tracker->temporary_id( *this ) >= 0 ) {
-        g->critter_tracker->update_faction( *this );
+    auto &tracker = get_mapbuffer().creature_tracker();
+    if( tracker.temporary_id( *this ) >= 0 ) {
+        tracker.update_faction( *this );
     }
 }
 
@@ -1044,7 +1066,7 @@ std::string monster::extended_description() const
     std::string_view if_empty = "" ) {
         std::string flag_descriptions = enumerate_as_string( flags_names.begin(),
         flags_names.end(), [this]( const flag_description & fd ) {
-            return type->has_flag( fd.first ) ? fd.second : "";
+            return type->has_flag( fd.first ) || monster_flags.contains( fd.first ) ? fd.second : "";
         } );
         if( !flag_descriptions.empty() ) {
             ss += string_format( format, flag_descriptions ) + "\n";
@@ -1142,6 +1164,9 @@ std::string monster::extended_description() const
         if( dodge_ratio > 1.0f ) {
             ss += string_format( _( "It is %s more agile than normal." ), training_adj( dodge_ratio ) ) + "\n";
         }
+    }
+    if( monster_flags.contains( m_flag::MF_COMBAT_MOUNT ) ) {
+        ss += _( "It has been trained for combat and will not be scared easily.\n" );
     }
 
     ss += "--\n";
@@ -2605,6 +2630,11 @@ bool monster::move_effects( bool )
         }
     }
     if( has_effect( effect_grabbed ) ) {
+        Creature *const grabber = adjacent_grabber_for( *this );
+        if( grabber == nullptr ) {
+            remove_effect( effect_grabbed );
+            return true;
+        }
         if( dice( type->melee_dice + type->melee_sides, 3 ) < get_effect_int( effect_grabbed ) ||
             !one_in( 4 ) ) {
             return false;
@@ -2613,6 +2643,7 @@ bool monster::move_effects( bool )
                 add_msg( _( "The %s breaks free from the grab!" ), name() );
             }
             remove_effect( effect_grabbed );
+            grabber->remove_effect( effect_grabbing );
         }
     }
     return true;
@@ -3005,15 +3036,20 @@ void monster::process_turn()
     }
     // Persist grabs as long as there's an adjacent target.
     if( has_effect( effect_grabbing ) ) {
-        for( auto &dest : g->m.points_in_radius( bub_pos(), 1, 0 ) ) {
-            const player *const p = g->critter_at<player>( dest );
-            if( p && p->has_effect( effect_grabbed ) ) {
+        auto found_grabbed_target = false;
+        for( const auto &dest : g->m.points_in_radius( bub_pos(), 1, 0 ) ) {
+            const Creature *const target = g->critter_at<Creature>( dest );
+            if( target != nullptr && target != this && target->has_effect( effect_grabbed ) ) {
+                found_grabbed_target = true;
                 add_effect( effect_grabbing, 2_turns );
             }
         }
+        if( !found_grabbed_target ) {
+            remove_effect( effect_grabbing );
+        }
     }
     // We update electrical fields here since they act every turn.
-    if( has_flag( MF_ELECTRIC_FIELD ) ) {
+    if( !is_hallucination() && has_flag( MF_ELECTRIC_FIELD ) ) {
         if( has_effect( effect_emp ) ) {
             if( action_time_scale::once_every_this_tick( 10_turns ) ) {
                 sound_event se;
@@ -3290,6 +3326,12 @@ void monster::die( Creature *nkiller )
                                       _( "The last enemy holding <npcname> collapses!" ) );
             p->remove_effect( effect_grabbed );
         }
+    }
+    if( has_effect( effect_grabbed ) ) {
+        if( Creature *const grabber = adjacent_grabber_for( *this ) ) {
+            grabber->remove_effect( effect_grabbing );
+        }
+        remove_effect( effect_grabbed );
     }
     if( !is_hallucination() ) {
         for( detached_ptr<item> &it : inv.clear() ) {
@@ -3745,7 +3787,7 @@ void monster::make_ally( const monster &z )
 void monster::make_pet()
 {
     friendly = -1;
-    g->critter_tracker->update_faction( *this );
+    get_mapbuffer().creature_tracker().update_faction( *this );
     add_effect( effect_pet, 1_turns );
 }
 

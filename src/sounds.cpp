@@ -34,6 +34,7 @@
 #include "itype.h"
 #include "line.h"
 #include "map.h"
+#include "mapbuffer.h"
 #include "map_iterator.h"
 #include "mapdata.h"
 #include "messages.h"
@@ -90,9 +91,6 @@ static const efftype_id effect_deaf( "deaf" );
 static const efftype_id effect_narcosis( "narcosis" );
 static const efftype_id effect_sleep( "sleep" );
 static const efftype_id effect_slept_through_alarm( "slept_through_alarm" );
-
-static const trait_id trait_HEAVYSLEEPER2( "HEAVYSLEEPER2" );
-static const trait_id trait_HEAVYSLEEPER( "HEAVYSLEEPER" );
 
 static const itype_id fuel_type_muscle( "muscle" );
 static const itype_id fuel_type_wind( "wind" );
@@ -1718,7 +1716,8 @@ bool map::build_absorption_cache( const int zlev )
         for( int smy = 0; smy < my_MAPSIZE; ++smy ) {
 
             const auto sm_pos = tripoint_bub_sm( smx, smy, zlev );
-            auto *cur_submap = get_submap_at_grid( sm_pos );
+            auto *cur_submap = get_mapbuffer().lookup_submap_in_memory(
+                                   map_local_to_abs( *this, sm_pos ) );
             const auto sm_offset = project_to<coords::ms>( sm_pos );
 
             if( cur_submap == nullptr ) {
@@ -2575,7 +2574,7 @@ void sounds::process_sound_markers( Character *who )
                                           static_cast<int>( std::floor( 1500 + 500 * volume_multiplier ) ) );
     // is the npc underground?
     const bool pcunderground = loc.z() < 0;
-    const bool pcoutdoors = map.is_outside( loc.xy() );
+    const bool pcoutdoors = map.is_outside( loc );
     const weather_manager &weather = get_weather();
     const short player_t_absorp = level_cache.absorption_cache[level_cache.idx( loc.x(), loc.y() )];
     const bool  player_indoors = !level_cache.outside_cache[level_cache.idx( loc.x(), loc.y() )];
@@ -2727,17 +2726,16 @@ void sounds::process_sound_markers( Character *who )
             const int db_vol = mdBspl_to_dBspl( tile_vol - passive_sound_dampening );
             // See if we need to wake someone up
             // Remember we are working with dB spl volumes instead of tile volumes and dB spl is a logarithmic unit. 60dB is normal conversation, 80-100 is a car horn, ~160 is a gunshot, 180+ can kill a human.
-            // We want somewhat less swingy results, so use d10s
-            // Noise past 60dB should automatically wake up not heavy sleepers.
-            // Noise past 100dB should automatically wake up heavy sleepers.
-            // Noise past 120dB will cause pain and should automatically wake up heavy sleeper 2.
+            // Noise past +10 dB should automatically wake up normal sleepers.
+            // Noise past +40 dB should automatically wake up heavy sleepers.
+            // Noise past +60 dB will cause pain and should automatically wake up heavy sleeper 2.
             if( who->has_effect( effect_sleep ) ) {
-                if( ( ( !( who->has_trait( trait_HEAVYSLEEPER ) ||
-                           who->has_trait( trait_HEAVYSLEEPER2 ) ) && dice( 6, 10 ) <= db_vol ) ||
-                      ( who->has_trait( trait_HEAVYSLEEPER ) && dice( 10, 10 ) <= db_vol ) ||
-                      ( who->has_trait( trait_HEAVYSLEEPER2 ) && dice( 12, 10 ) <= db_vol ) ) &&
-                    !who->has_effect( effect_narcosis ) ) {
-                    //Not kidding about sleep-through-firefight
+                const int diff_db_vol = mdBspl_to_dBspl( tile_vol - passive_sound_dampening - tile_vol );
+                int wake_up_vol = 10;
+                wake_up_vol += who->bonus_from_enchantments( wake_up_vol,
+                               enchantment_value_id( "SLEEP_DB_RESIST" ) );
+
+                if( rng( wake_up_vol / 2, wake_up_vol ) <= db_vol && !who->has_effect( effect_narcosis ) ) {
                     who->wake_up();
                     who->add_msg_if_player( m_warning, _( "Something is making noise." ) );
                 } else {

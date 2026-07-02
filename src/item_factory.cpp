@@ -541,10 +541,10 @@ void Item_factory::finalize_pre( itype &obj )
 
             // For comestibles composed of multiple edible materials we calculate the average.
             for( const auto &v : vitamin::all() ) {
-                if( !vitamins.contains( v.first ) ) {
+                if( !vitamins.contains( v.id ) ) {
                     for( const auto &m : mat ) {
-                        double amount = m->vitamin( v.first ) * healthy / mat.size();
-                        vitamins[v.first] += std::ceil( amount );
+                        double amount = m->vitamin( v.id ) * healthy / mat.size();
+                        vitamins[v.id] += std::ceil( amount );
                     }
                 }
             }
@@ -585,6 +585,10 @@ void Item_factory::finalize_pre( itype &obj )
 
     for( auto &e : obj.use_methods ) {
         e.second.get_actor_ptr()->finalize( obj.id );
+    }
+
+    if( obj.relic_data ) {
+        obj.relic_data->finalize();
     }
 
     if( obj.drop_action.get_actor_ptr() != nullptr ) {
@@ -784,7 +788,7 @@ void Item_factory::finalize_item_blacklist()
         }
 
         for( std::pair<const item_group_id, std::unique_ptr<Item_spawn_data>> &g : m_template_groups ) {
-            g.second->replace_item( migrate.first, migrate.second.replace );
+            g.second->replace_item( migrate.first, migrate.second.replace, g.first.str() );
         }
 
         // replace migrated items in requirements
@@ -1445,13 +1449,23 @@ void Item_factory::check_definitions() const
                     for( const auto &pr : type->mod->magazine_adaptor ) {
                         acceptable_ammo.insert( pr.first );
                     }
-                    auto &acceptable_magazines = !type->mod->magazine_adaptor.empty()
-                                                 ? type->mod->magazine_adaptor
-                                                 : target->magazines;
-                    for( const ammotype &ammo : acceptable_ammo ) {
-                        if( !acceptable_magazines.contains( ammo ) ) {
-                            msg += string_format( "gunmod can be applied to %s, which has no magazines for ammo %s\n",
-                                                  t.c_str(), ammo.str() );
+                    // Only check magazine compatibility if either the mod provides
+                    // magazine adaptors or the target gun uses external magazines.
+                    // Guns with only internal clip_size (no magazine_well, no magazines
+                    // map) load rounds directly and don't need magazine entries for the
+                    // converted ammo type.
+                    bool mod_has_adaptor = !type->mod->magazine_adaptor.empty();
+                    bool gun_uses_magazines = !target->magazines.empty() ||
+                                              target->magazine_well > 0_ml;
+                    if( mod_has_adaptor || gun_uses_magazines ) {
+                        auto &acceptable_magazines = mod_has_adaptor
+                                                     ? type->mod->magazine_adaptor
+                                                     : target->magazines;
+                        for( const ammotype &ammo : acceptable_ammo ) {
+                            if( !acceptable_magazines.contains( ammo ) ) {
+                                msg += string_format( "gunmod can be applied to %s, which has no magazines for ammo %s\n",
+                                                      t.c_str(), ammo.str() );
+                            }
                         }
                     }
                 }
@@ -2366,7 +2380,7 @@ void Item_factory::load( islot_comestible &slot, const JsonObject &jo, const std
         if( relative.has_int( "vitamins" ) ) {
             // allows easy specification of 'fortified' comestibles
             for( auto &v : vitamin::all() ) {
-                slot.default_nutrition.vitamins[ v.first ] += relative.get_int( "vitamins" );
+                slot.default_nutrition.vitamins[ v.id ] += relative.get_int( "vitamins" );
             }
         } else if( relative.has_array( "vitamins" ) ) {
             for( JsonArray pair : relative.get_array( "vitamins" ) ) {

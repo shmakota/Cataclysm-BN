@@ -21,6 +21,7 @@
 #include "cursesdef.h"
 #include "damage.h"
 #include "debug.h"
+#include "enchantments/enchantment.h"
 #include "enum_conversions.h"
 #include "enums.h"
 #include "event.h"
@@ -33,7 +34,6 @@
 #include "item.h"
 #include "json.h"
 #include "line.h"
-#include "magic_enchantment.h"
 #include "map.h"
 #include "messages.h"
 #include "monster.h"
@@ -1130,7 +1130,7 @@ void spell::make_sound( const tripoint_bub_ms & /*target*/, Creature &caster, in
 {
     sound_event se;
     se.origin = caster.bub_pos();
-    se.volume = loudness;
+    se.volume = std::max( 190, loudness );
     se.category = type->sound_type;
     se.description = type->sound_description.translated();
     se.movement_noise = ( type->sound_type == sounds::sound_t::movement );
@@ -1754,7 +1754,8 @@ int known_magic::max_mana( const Character &guy ) const
     float mut_add = guy.mutation_value( "mana_modifier" );
     int natural_cap = std::max( 0.0f, ( ( mana_base + int_bonus ) * mut_mul ) + mut_add );
 
-    int ench_bonus = guy.bonus_from_enchantments( natural_cap, enchant_vals::mod::MANA_CAP, true );
+    int ench_bonus = guy.bonus_from_enchantments( natural_cap, enchantment_value_id( "MANA_CAP" ),
+                     true );
 
     return std::max( 0, natural_cap + ench_bonus );
 }
@@ -1778,7 +1779,8 @@ double known_magic::mana_regen_rate( const Character &guy ) const
     double natural_regen = std::max( 0.0, base_rate * mut_mul );
 
 
-    double ench_bonus = guy.bonus_from_enchantments( natural_regen, enchant_vals::mod::MANA_REGEN );
+    double ench_bonus = guy.bonus_from_enchantments( natural_regen,
+                        enchantment_value_id( "MANA_REGEN" ) );
 
     return std::max( 0.0, natural_regen + ench_bonus );
 }

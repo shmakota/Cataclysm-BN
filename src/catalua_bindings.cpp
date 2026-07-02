@@ -265,6 +265,7 @@ void cata::detail::reg_technique( sol::state &lua )
         luna::set( ut, "knockback_dist", &ma_technique::knockback_dist );
         luna::set( ut, "knockback_spread", &ma_technique::knockback_spread );
         luna::set( ut, "powerful_knockback", &ma_technique::powerful_knockback );
+        luna::set( ut, "controlled_knockback", &ma_technique::controlled_knockback );
         luna::set( ut, "crit_tec", &ma_technique::crit_tec );
         luna::set( ut, "crit_ok", &ma_technique::crit_ok );
         luna::set( ut, "knockback_follow", &ma_technique::knockback_follow );
@@ -875,7 +876,7 @@ void cata::detail::reg_hooks_examples( sol::state &lua )
 
     DOC( "Called right after mapgen has completed.  " );
     DOC( "The hook receives a table with keys:  " );
-    DOC( "* `map` (Map): The tinymap that represents 24x24 area (2x2 submaps, or 1x1 omt).  " );
+    DOC( "* `map` (MapgenConstructor): The OMT-local mapgen surface.  " );
     DOC( "* `omt` (TripointAbsOmt): The absolute overmap terrain position.  " );
     DOC( "* `when` (TimePoint): The current time (for time-based effects).  " );
     DOC_PARAMS( "params" );

@@ -402,14 +402,14 @@ std::vector<sphere> npc::find_dangerous_explosives() const
             continue;
         }
 
-        if( !sees( tripoint_bub_ms( elem->position() ) ) ) {
+        if( !sees( elem->bub_pos() ) ) {
             continue;   // We can't worry about what we can't see.
         }
 
         const explosion_iuse *actor = dynamic_cast<const explosion_iuse *>( use->get_actor_ptr() );
         const int safe_range = actor->explosion.safe_range();
 
-        if( rl_dist( bub_pos(), elem->position() ) >= safe_range ) {
+        if( rl_dist( abs_pos(), elem->abs_pos() ) >= safe_range ) {
             continue;   // Far enough.
         }
 
@@ -419,7 +419,7 @@ std::vector<sphere> npc::find_dangerous_explosives() const
             continue;   // Consider only imminent dangers.
         }
 
-        result.emplace_back( elem->position().raw(), safe_range );
+        result.emplace_back( elem->bub_pos().raw(), safe_range );
     }
 
     return result;
@@ -2720,7 +2720,7 @@ void npc::move_to( const tripoint_bub_ms &pt, bool no_bashing, std::set<tripoint
         // Let NPCs push each other when non-hostile
         // TODO: Have them attack each other when hostile
         npc *np = dynamic_cast<npc *>( critter );
-        if( np != nullptr && !np->in_sleep_state() ) {
+        if( !is_hallucination() && np != nullptr && !np->in_sleep_state() ) {
             std::unique_ptr<std::set<tripoint_bub_ms>> newnomove;
             std::set<tripoint_bub_ms> *realnomove;
             if( nomove != nullptr ) {
@@ -2832,12 +2832,15 @@ void npc::move_to( const tripoint_bub_ms &pt, bool no_bashing, std::set<tripoint
 
     if( moved ) {
         const auto old_pos = bub_pos();
-        setpos( p );
+        setpos_preserving_movement_state( p );
         set_underwater( g->m.is_divable( p ) );
         if( old_pos.x() - p.x() < 0 ) {
             facing = FD_RIGHT;
         } else {
             facing = FD_LEFT;
+        }
+        if( is_hallucination() ) {
+            return;
         }
         if( is_mounted() ) {
             if( mounted_creature->bub_pos() != bub_pos() ) {
@@ -3640,10 +3643,10 @@ bool npc::find_corpse_to_pulp()
         const auto &around = is_walking_with() ? player_character.bub_pos() : bub_pos();
         for( item *&location : here.get_active_items_in_radius( around, range,
                 special_item_type::corpse ) ) {
-            corpse = check_tile( location->position() );
+            corpse = check_tile( location->bub_pos() );
 
             if( corpse != nullptr ) {
-                pulp_location.emplace( location->position() );
+                pulp_location.emplace( location->bub_pos() );
                 break;
             }
 
@@ -4050,6 +4053,10 @@ bool npc::alt_attack()
 
 void npc::activate_item( int item_index )
 {
+    if( is_hallucination() ) {
+        move_pause();
+        return;
+    }
     const int oldmoves = moves;
     item &it = i_at( item_index );
     if( it.is_tool() || it.is_food() ) {
@@ -4107,6 +4114,10 @@ void npc:: pretend_heal( Character &patient, item &used )
 
 void npc::heal_self()
 {
+    if( is_hallucination() ) {
+        move_pause();
+        return;
+    }
     if( has_effect( effect_asthma ) ) {
         item *treatment = &null_item_reference();
         std::string iusage = "OXYGEN_BOTTLE";
@@ -4144,6 +4155,10 @@ void npc::heal_self()
 
 void npc::use_painkiller()
 {
+    if( is_hallucination() ) {
+        move_pause();
+        return;
+    }
     // First, find the best painkiller for our pain level
     item *it = inv.most_appropriate_painkiller( get_pain() );
 
@@ -4248,6 +4263,10 @@ static float rate_food( const item &it, int want_nutr, int want_quench )
 
 bool npc::consume_food()
 {
+    if( is_hallucination() ) {
+        move_pause();
+        return false;
+    }
     float best_weight = 0.0f;
     int index = -1;
     int want_hunger = std::max<int>( 0, ( max_stored_kcal() - get_stored_kcal() ) / 10 );
@@ -4490,13 +4509,6 @@ void npc::set_omt_destination()
      */
     if( is_stationary( true ) ) {
         guard_current_pos();
-        return;
-    }
-
-    // all of the following luxuries are at ground level.
-    // so please wallow in hunger & fear if below ground.
-    if( bub_pos().z() != 0 && !get_map().has_zlevels() ) {
-        goal = no_goal_point;
         return;
     }
 
@@ -4949,6 +4961,10 @@ bool npc::complain()
 
 void npc::do_reload( item &it )
 {
+    if( is_hallucination() ) {
+        move_pause();
+        return;
+    }
     item_reload_option reload_opt = character_funcs::select_ammo( *this, it );
 
     if( !reload_opt ) {

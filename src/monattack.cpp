@@ -329,6 +329,23 @@ static std::unique_ptr<npc> make_fake_npc( monster *z, int str, int dex, int int
     return tmp;
 }
 
+namespace
+{
+constexpr auto shriek_stun_hearing_protection_threshold = 40;
+
+auto has_shriek_stun_hearing_protection( const Creature &target ) -> bool
+{
+    if( target.is_immune_effect( effect_deaf ) ) {
+        return true;
+    }
+
+    const auto *const character = target.as_character();
+    return character != nullptr && character->get_char_hearing_protection() +
+           character->get_char_hearing_protection( true ) >= shriek_stun_hearing_protection_threshold;
+}
+
+} // namespace
+
 bool mattack::none( monster * )
 {
     return true;
@@ -545,7 +562,7 @@ bool mattack::shriek_stun( monster *z )
         if( target == nullptr ) {
             continue;
         }
-        if( one_in( dist / 2 ) && !( target->is_immune_effect( effect_deaf ) ) ) {
+        if( one_in( dist / 2 ) && !has_shriek_stun_hearing_protection( *target ) ) {
             target->add_effect( effect_dazed, rng( 1_minutes, 2_minutes ), bodypart_str_id::NULL_ID(),
                                 rng( 1, ( 15 - dist ) / 3 ) );
         }
@@ -4124,8 +4141,7 @@ void mattack::flame( monster *z, Creature *target )
             // TODO: Z
             if( here.hit_with_fire( tripoint_bub_ms( i.xy(), z->bub_pos().z() ) ) ) {
                 if( g->u.sees( i ) ) {
-                    add_msg( _( "The tongue of flame hits the %s!" ),
-                             here.tername( i.xy() ) );
+                    add_msg( _( "The tongue of flame hits the %s!" ), here.tername( i ) );
                 }
                 return;
             }
@@ -4153,19 +4169,17 @@ void mattack::flame( monster *z, Creature *target )
             } else {
                 intervening.y() = prev_point.y();
             }
-            if( here.hit_with_fire( tripoint_bub_ms( intervening.xy(), z->bub_pos().z() ) ) ) {
+            if( here.hit_with_fire( intervening ) ) {
                 if( g->u.sees( i ) ) {
-                    add_msg( _( "The tongue of flame hits the %s!" ),
-                             here.tername( intervening.xy() ) );
+                    add_msg( _( "The tongue of flame hits the %s!" ), here.tername( intervening ) );
                 }
                 return;
             }
         }
         // break out of attack if flame hits a wall
-        if( here.hit_with_fire( tripoint_bub_ms( i.xy(), z->bub_pos().z() ) ) ) {
+        if( here.hit_with_fire( i ) ) {
             if( g->u.sees( i ) ) {
-                add_msg( _( "The tongue of flame hits the %s!" ),
-                         here.tername( i.xy() ) );
+                add_msg( _( "The tongue of flame hits the %s!" ), here.tername( i ) );
             }
             return;
         }
@@ -5188,8 +5202,10 @@ bool mattack::thrown_by_judo( monster *z )
         ///\EFFECT_DEX increases chance judo-throwing a monster
 
         ///\EFFECT_UNARMED increases chance of judo-throwing monster, vs their melee skill
-        if( ( ( foe->dex_cur + foe->get_skill_level( skill_unarmed ) ) > ( z->type->melee_skill + rng( 0,
-                3 ) ) ) ) {
+        const auto unarmed_skill = foe->get_skill_level( skill_unarmed );
+        const auto size_penalty = static_cast<int>( z->type->size ) * 2;
+        if( ( foe->dex_cur + unarmed_skill ) > ( z->type->melee_skill + size_penalty + rng( 0,
+                3 ) ) ) {
             target->add_msg_if_player( m_good, _( "but you grab its arm and flip it to the ground!" ) );
 
             // most of the time, when not isolated
@@ -5204,10 +5220,9 @@ bool mattack::thrown_by_judo( monster *z )
                 foe->check_dead_state();
             }
             // Monster is down,
-            z->add_effect( effect_downed, 5_turns );
-            const int min_damage = 10 + foe->get_skill_level( skill_unarmed );
-            const int max_damage = 20 + foe->get_skill_level( skill_unarmed );
-            // Deal moderate damage
+            z->add_effect( effect_downed, 3_turns );
+            const auto min_damage = 3 + unarmed_skill / 2;
+            const auto max_damage = 8 + unarmed_skill;
             const auto damage = rng( min_damage, max_damage );
             z->apply_damage( foe, bodypart_id( "torso" ), damage );
             z->check_dead_state();
