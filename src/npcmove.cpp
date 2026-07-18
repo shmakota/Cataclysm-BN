@@ -11,6 +11,7 @@
 #include <ostream>
 #include <tuple>
 #include <unordered_set>
+#include <unordered_map>
 
 #include "action_time_scale.h"
 #include "active_item_cache.h"
@@ -18,7 +19,7 @@
 #include "creature_tracker.h"
 #include "bionics.h"
 #include "bodypart.h"
-#include "cata_algo.h"
+#include "utils/algo.h"
 #include "catalua_coord.h"
 #include "catalua_hooks.h"
 #include "catalua_sol.h"
@@ -75,6 +76,7 @@
 #include "sounds.h"
 #include "stomach.h"
 #include "translations.h"
+#include "type_id.h"
 #include "units.h"
 #include "value_ptr.h"
 #include "veh_type.h"
@@ -165,7 +167,6 @@ static const bionic_id bio_furnace( "bio_furnace" );
 static const bionic_id bio_heat_absorb( "bio_heat_absorb" );
 static const bionic_id bio_heatsink( "bio_heatsink" );
 static const bionic_id bio_hydraulics( "bio_hydraulics" );
-static const bionic_id bio_infolink( "bio_infolink" );
 static const bionic_id bio_leukocyte( "bio_leukocyte" );
 static const bionic_id bio_nanobots( "bio_nanobots" );
 static const bionic_id bio_ods( "bio_ods" );
@@ -247,6 +248,34 @@ enum npc_action : int {
     npc_return_to_guard_pos,
     npc_player_activity,
     num_npc_actions
+};
+
+static const std::unordered_map<std::string, npc_action> npc_action_map = {
+    {"npc_pause", npc_pause},
+    {"npc_reload", npc_reload},
+    {"npc_sleep", npc_sleep},
+    {"npc_pickup", npc_pickup},
+    {"npc_heal", npc_heal},
+    {"npc_use_painkiller", npc_use_painkiller},
+    {"npc_drop_items", npc_drop_items},
+    {"npc_flee", npc_flee},
+    {"npc_melee", npc_melee},
+    {"npc_shoot", npc_shoot},
+    {"npc_look_for_player",  npc_look_for_player},
+    {"npc_heal_player",  npc_heal_player},
+    {"npc_follow_player",  npc_follow_player},
+    {"npc_follow_embarked", npc_follow_embarked},
+    {"npc_talk_to_player",  npc_talk_to_player},
+    {"npc_mug_player", npc_mug_player},
+    {"npc_goto_to_this_pos", npc_goto_to_this_pos},
+    {"npc_goto_destination", npc_goto_destination},
+    {"npc_avoid_friendly_fire", npc_avoid_friendly_fire},
+    {"npc_escape_explosion", npc_escape_explosion},
+    {"npc_reach_attack", npc_reach_attack},
+    {"npc_aim", npc_aim},
+    {"npc_investigate_sound", npc_investigate_sound},
+    {"npc_return_to_guard_pos", npc_return_to_guard_pos},
+    {"npc_player_activity", npc_player_activity},
 };
 
 namespace
@@ -1005,6 +1034,9 @@ void npc::move()
                      ai_cache.s_abs_pos.x(), ai_cache.s_abs_pos.y() );
         }
     } else {
+        if( sleep_at_this_pos.has_value() ) {
+            action = npc_sleep;
+        }
         // No present danger
         deactivate_combat_cbms();
 
@@ -1047,6 +1079,10 @@ void npc::move()
                      return_guard_pos.x(), return_guard_pos.y() );
             action = npc_return_to_guard_pos;
         }
+    }
+
+    if( action == npc_undecided && sleep_at_this_pos.has_value() ) {
+        action = npc_sleep;
     }
 
     if( action == npc_undecided && is_walking_with() && goto_to_this_pos ) {
@@ -1164,6 +1200,15 @@ void npc::move()
     }
 }
 
+void npc::execute_action( const std::string &action_str )
+{
+    if( const auto _act = npc_action_map.find( action_str ); _act != npc_action_map.end() ) {
+        this->execute_action( _act->second );
+    } else {
+        debugmsg( "Unknown npc action %s", action_str );
+    }
+}
+
 void npc::execute_action( npc_action action )
 {
     const auto oldmoves = moves;
@@ -1225,6 +1270,28 @@ void npc::execute_action( npc_action action )
         case npc_sleep: {
             ZoneScopedN( "npc_exec_sleep" );
             // TODO: Allow stims when not too tired
+            auto sleep_or_move = [this, &player_character]( tripoint_abs_ms target_pos ) {
+                // TODO: Handle empty path better
+                if( target_pos == abs_pos() || path.empty() ) {
+                    sleep_at_this_pos = std::nullopt;
+                    move_pause();
+                    if( !has_effect( effect_lying_down ) ) {
+                        activate_bionic_by_id( bio_soporific );
+                        add_effect( effect_lying_down, 30_minutes, bodypart_str_id::NULL_ID(), 1 );
+                        if( player_character.sees( *this ) && !player_character.in_sleep_state() ) {
+                            add_msg( _( "%s lies down to sleep." ), name );
+                        }
+                    }
+                } else {
+                    move_to_next();
+                }
+            };
+
+            if( sleep_at_this_pos.has_value() ) {
+                sleep_or_move( *sleep_at_this_pos );
+                break;
+            }
+
             // Find a nice spot to sleep
             int best_sleepy = character_funcs::rate_sleep_spot( *this, bub_pos() );
             auto best_spot = bub_pos();
@@ -1243,20 +1310,9 @@ void npc::execute_action( npc_action action )
             if( is_walking_with() ) {
                 complain_about( "napping", 30_minutes, _( "<warn_sleep>" ) );
             }
+            sleep_at_this_pos = bub_to_abs( best_spot );
             update_path( best_spot );
-            // TODO: Handle empty path better
-            if( best_spot == bub_pos() || path.empty() ) {
-                move_pause();
-                if( !has_effect( effect_lying_down ) ) {
-                    activate_bionic_by_id( bio_soporific );
-                    add_effect( effect_lying_down, 30_minutes, bodypart_str_id::NULL_ID(), 1 );
-                    if( player_character.sees( *this ) && !player_character.in_sleep_state() ) {
-                        add_msg( _( "%s lies down to sleep." ), name );
-                    }
-                }
-            } else {
-                move_to_next();
-            }
+            sleep_or_move( *sleep_at_this_pos );
         }
         break;
 
@@ -2818,7 +2874,7 @@ void npc::move_to( const tripoint_bub_ms &pt, bool no_bashing, std::set<tripoint
         }
     } else if( !no_bashing && smash_ability() > 0 && here.is_bashable( p ) &&
                here.bash_rating( smash_ability(), p ) > 0 ) {
-        moves -= !is_armed() ? 80 : primary_weapon().attack_cost() * 0.8;
+        moves -= !is_armed() ? 80 : attack_cost( primary_weapon() ) * 0.8;
         here.bash( p, smash_ability() );
     } else {
         if( attitude == NPCATT_MUG ||
@@ -3530,8 +3586,10 @@ void npc::drop_items( units::mass drop_weight, units::volume drop_volume, int mi
         // decreasing that variable is not important.
         int dWeight = units::to_gram<int>( drop_weight ) <= 0 ? -1 :
                       units::to_gram<int>( drop_weight - weight_dropped ) / 250;
-        int dVolume = units::to_milliliter<int>( drop_volume ) <= 0 ? -1 :
-                      units::to_milliliter<int>( drop_volume - volume_dropped ) / 250;
+        const auto d_volume = drop_volume <= 0_ml ? -1 : std::min(
+                                  units::to_milliliter( drop_volume - volume_dropped ) / 250,
+                                  static_cast<decltype( units::to_milliliter( drop_volume ) )>( INT_MAX ) );
+        const auto dVolume = static_cast<int>( d_volume );
         int index;
         // Which is more important, weight or volume?
         if( dWeight > dVolume ) {
@@ -4451,8 +4509,9 @@ void npc::reach_omt_destination()
             if( rl_dist( player_character.bub_pos(), bub_pos() ) > SEEX * 2 ||
                 !player_character.sees( bub_pos() ) ) {
                 if( ( player_character.has_item_with_flag( flag_TWO_WAY_RADIO, true ) ||
-                      player_character.has_bionic( bio_infolink ) ) &&
-                    ( has_item_with_flag( flag_TWO_WAY_RADIO, true ) || has_bionic( bio_infolink ) ) ) {
+                      player_character.has_enchantment_flag( enchantment_flag_id( "RADIO" ) ) ) &&
+                    ( has_item_with_flag( flag_TWO_WAY_RADIO, true ) ||
+                      has_enchantment_flag( enchantment_flag_id( "RADIO" ) ) ) ) {
                     add_msg( m_info, _( "From your two-way radio you hear %s reporting in, "
                                         "'I've arrived, boss!'" ), disp_name() );
                 }

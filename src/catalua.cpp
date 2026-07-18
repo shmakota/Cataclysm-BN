@@ -12,6 +12,12 @@
 #include <string_view>
 #include <vector>
 
+#include "enchantments/enchantment_condition.h"
+#include "iexamine.h"
+#include "sol/sol.hpp"
+#include "trap.h"
+#include "type_id.h"
+
 constexpr int LUA_API_VERSION = 2;
 
 #include "action_time_scale.h"
@@ -337,6 +343,7 @@ void init_global_state_tables( lua_state &state, const std::vector<mod_id> &modl
     gt["istate_functions"] = lua.create_table();
     gt["imelee_functions"] = lua.create_table();
     gt["iranged_functions"] = lua.create_table();
+    gt["itrap_functions"] = lua.create_table();
     gt["examine_functions"] = lua.create_table();
     gt["activity_functions"] = lua.create_table();
 
@@ -406,6 +413,63 @@ void init_global_state_tables( lua_state &state, const std::vector<mod_id> &modl
         debugmsg( "add_hook expects function or table entry, got type: %s for hook: %s",
                   sol::type_name( lua, entry.get_type() ).c_str(), hook_name.c_str() );
     };
+
+    gt["add_lua_condition"] = [&lua]( const std::string & condition_name, const sol::object & entry ) {
+        auto *L = lua.lua_state();
+
+        if( entry.is<sol::table>() ) {
+            auto table = entry.as<sol::table>();
+            sol::protected_function global = sol::lua_nil;
+            sol::protected_function item = sol::lua_nil;
+            sol::protected_function character = sol::lua_nil;
+            sol::protected_function item_and_character = sol::lua_nil;
+            if( table["global"].valid() ) {
+                if( table["global"].get_type() == sol::type::function ) {
+                    global = table["global"].get_or<sol::function>( sol::lua_nil );
+                } else {
+                    debugmsg( "add_lua_condition table value `global` expects function, got type: %s for condition: %s",
+                              sol::type_name( lua, table["global"].get_type() ).c_str(), condition_name.c_str() );
+                }
+            }
+            if( table["item"].valid() ) {
+                if( table["item"].get_type() == sol::type::function ) {
+                    item = table["item"].get_or<sol::function>( sol::lua_nil );
+                } else {
+                    debugmsg( "add_lua_condition table value `item` expects function, got type: %s for condition: %s",
+                              sol::type_name( lua, table["item"].get_type() ).c_str(), condition_name.c_str() );
+                }
+            }
+            if( table["character"].valid() ) {
+                if( table["character"].get_type() == sol::type::function ) {
+                    character = table["character"].get_or<sol::function>( sol::lua_nil );
+                } else {
+                    debugmsg( "add_lua_condition table value `character` expects function, got type: %s for condition: %s",
+                              sol::type_name( lua, table["character"].get_type() ).c_str(), condition_name.c_str() );
+                }
+            }
+            if( table["item_and_character"].valid() ) {
+                if( table["item_and_character"].get_type() == sol::type::function ) {
+                    item_and_character = table["item_and_character"].get_or<sol::function>( sol::lua_nil );
+                } else {
+                    debugmsg( "add_lua_condition table value `item_and_character` expects function, got type: %s for condition: %s",
+                              sol::type_name( lua, table["item_and_character"].get_type() ).c_str(), condition_name.c_str() );
+                }
+            }
+
+            enchantment_condition::condition_functions[condition_name] =
+                std::make_shared<enchantment_condition_lua>(
+                    condition_name,
+                    std::move( global ),
+                    std::move( character ),
+                    std::move( item ),
+                    std::move( item_and_character )
+                );
+            return;
+        }
+
+        debugmsg( "add_lua_condition expects table, got type: %s for condition: %s",
+                  sol::type_name( lua, entry.get_type() ).c_str(), condition_name.c_str() );
+    };
 }
 
 void set_mod_being_loaded( lua_state &state, const mod_id &mod )
@@ -467,6 +531,7 @@ namespace
 // Populated during reg_lua_icallback_actors(), resolved during resolve_lua_bionic_and_mutation_callbacks().
 std::map<std::string, std::unique_ptr<lua_bionic_callback_actor>> bionic_callback_actors;
 std::map<std::string, std::unique_ptr<lua_mutation_callback_actor>> mutation_callback_actors;
+std::map<std::string, std::unique_ptr<lua_itrap_actor>> lua_itrap_actors;
 } // namespace
 
 namespace
@@ -686,6 +751,7 @@ void reg_lua_icallback_actors( lua_state &state, Item_factory &ifactory )
     const sol::table istate_funcs = lua.globals()["game"]["istate_functions"];
     const sol::table imelee_funcs = lua.globals()["game"]["imelee_functions"];
     const sol::table iranged_funcs = lua.globals()["game"]["iranged_functions"];
+    const sol::table itrap_funcs = lua.globals()["game"]["itrap_functions"];
 
     auto it = iuse_funcs.begin();
     while( it != iuse_funcs.end() ) {
@@ -952,12 +1018,43 @@ void reg_lua_icallback_actors( lua_state &state, Item_factory &ifactory )
             ++it;
         }
     }
+
+    // --- itrap registration ---
+    {
+        auto it = itrap_funcs.begin();
+        while( it != itrap_funcs.end() ) {
+            const auto ref = *it;
+            std::string key;
+            try {
+                key = ref.first.as<std::string>();
+                if( ref.second.get_type() != sol::type::table ) {
+                    throw std::runtime_error( "itrap entry must be a table" );
+                }
+
+                const auto tbl = ref.second.as<sol::table>();
+                auto on_trigger_aftermath = tbl.get_or<sol::function>( "on_trigger_aftermath", sol::lua_nil );
+                auto on_trigger = tbl.get_or<sol::function>( "on_trigger", sol::lua_nil );
+                auto can_trigger = tbl.get_or<sol::function>( "can_trigger", sol::lua_nil );
+                lua_itrap_actors[key] = std::make_unique<lua_itrap_actor>(
+                                            key,
+                                            std::move( can_trigger ),
+                                            std::move( on_trigger ),
+                                            std::move( on_trigger_aftermath )
+                                        );
+            } catch( std::runtime_error &e ) {
+                debugmsg( "Failed to extract itrap_functions k='%s': %s", key, e.what() );
+                break;
+            }
+            ++it;
+        }
+    }
 }
 
-void resolve_lua_bionic_and_mutation_callbacks()
+void resolve_extra_lua_callbacks()
 {
     bionic_data::resolve_lua_callbacks( bionic_callback_actors );
     mutation_branch::resolve_lua_callbacks( mutation_callback_actors );
+    trap::resolve_lua_callbacks( lua_itrap_actors );
 }
 
 void run_on_every_x_hooks( lua_state &state )
@@ -1040,6 +1137,7 @@ void lua_state_deleter::operator()( lua_state *state ) const
     cata::lua_action_menu::clear_entries();
     bionic_callback_actors.clear();
     mutation_callback_actors.clear();
+    lua_itrap_actors.clear();
     get_hook_cache().clear();
     delete state;
 }

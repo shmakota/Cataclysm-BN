@@ -954,7 +954,7 @@
     "subtype": "collection",
     "ammo": 100,
     "entries": [
-      { "item": "hk_mp5", "ammo-group": "on_hand_9mm", "charges": [ 0, 30 ] },
+      { "item": "hk_mp5sd", "ammo-group": "on_hand_9mm", "charges": [ 0, 30 ] },
       { "group": "nested_mp5_mag" },
       { "group": "nested_mp5_mag", "prob": 50 },
       { "group": "on_hand_9mm" }
@@ -2360,14 +2360,8 @@
     "//": "Handmade revolver with 50% chance of a caliber conversion kit installed.",
     "subtype": "distribution",
     "entries": [
-      {
-        "item": "handmade_revolver",
-        "charges-min": 0,
-        "charges-max": 6,
-        "contents-group": "gunmod_hmr_conversion",
-        "prob": 50
-      },
-      { "item": "handmade_revolver", "charges-min": 0, "charges-max": 6, "prob": 50 }
+      { "item": "handmade_revolver", "contents-group": "gunmod_hmr_conversion", "prob": 50 },
+      { "item": "handmade_revolver", "prob": 50 }
     ]
   }
 ]

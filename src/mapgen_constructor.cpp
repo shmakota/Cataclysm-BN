@@ -9,6 +9,7 @@
 #include "catalua_hooks.h"
 #include "catalua_sol.h"
 #include "computer.h"
+#include "coordinates.h"
 #include "debug.h"
 #include "field.h"
 #include "field_type.h"
@@ -35,10 +36,12 @@
 #include "text_snippets.h"
 #include "thread_pool.h"
 #include "trap.h"
+#include "units_utility.h"
 #include "vehicle.h"
 #include "vehicle_group.h"
 #include "vehicle_part.h"
 #include "vpart_position.h"
+#include "vpart_range.h"
 #include "veh_type.h"
 
 static const trait_id trait_NPC_STATIC_NPC( "NPC_STATIC_NPC" );
@@ -484,6 +487,13 @@ auto mapgen_constructor::furn_set( const point_omt_ms &p, const furn_id &furnitu
         return false;
     }
     sm->set_furn( local, furniture );
+    const auto &new_furniture = furniture.obj();
+    if( new_furniture.active ) {
+        cata::poly_serialized<active_tile_data> atd;
+        atd.reset( new_furniture.active->clone() );
+        atd->set_last_updated( calendar::turn );
+        sm->active_furniture[local] = atd;
+    }
     return true;
 }
 
@@ -1201,10 +1211,127 @@ auto mapgen_constructor::add_vehicle( const std::variant<vgroup_id, vproto_id> &
     if( place_on_submap == nullptr ) {
         return nullptr;
     }
-    auto *const result = veh.get();
-    place_on_submap->vehicles.push_back( std::move( veh ) );
-    place_on_submap->is_uniform = false;
-    return result;
+    auto result = add_vehicle( std::move( veh ), true );
+    if( result ) {
+        auto *const real_result = result.get();
+        place_on_submap->vehicles.push_back( std::move( result ) );
+        place_on_submap->is_uniform = false;
+        return real_result;
+    }
+    return nullptr;
+}
+
+auto mapgen_constructor::add_vehicle( std::unique_ptr<vehicle> veh,
+                                      const bool merge_wrecks ) -> std::unique_ptr<vehicle>
+{
+    //We only want to check once per square, so loop over all structural parts
+    std::vector<int> frame_indices = veh->all_standalone_parts();
+
+    const bool can_float = !veh->get_avail_parts( "FLOATS" ).empty();
+
+    bool needs_smashing = false;
+    for( const int pt : frame_indices ) {
+        //Don't spawn anything in water
+        const auto abs_pos = veh->abs_part_location( pt );
+        const auto omt_pos = project_remain<coords::omt>( abs_pos ).remainder;
+
+        if( has_flag_ter( TFLAG_DEEP_WATER, omt_pos ) && !can_float ) {
+            return nullptr;
+        }
+        // Don't spawn shopping carts on top of another vehicle or other obstacle.
+        if( veh->type == vproto_id( "shopping_cart" ) ) {
+            if( veh_at( omt_pos ) || impassable( omt_pos ) ) {
+                return nullptr;
+            }
+        }
+        //For other vehicles, simulate collisions with (non-shopping cart) stuff
+        vehicle *const other_veh = veh_pointer_or_null( veh_at( omt_pos ) );
+        if( other_veh != nullptr && other_veh->type != vproto_id( "shopping_cart" ) ) {
+            if( !merge_wrecks ) {
+                return nullptr;
+            }
+
+            // Hard wreck-merging limit: 250 tiles
+            // Merging is slow for big vehicles which lags the mapgen
+            if( frame_indices.size() + other_veh->all_standalone_parts().size() > 250 ) {
+                return nullptr;
+            }
+
+            // We must remove the vehicle from the map before we move away its parts
+            std::unique_ptr<vehicle> old_veh = detach_vehicle( other_veh );
+            if( old_veh == nullptr ) {
+                return nullptr;
+            }
+
+            for( const vpart_reference &vpr : old_veh->get_all_parts() ) {
+                const auto part_pos = veh->abs_to_mount( old_veh->abs_part_location( vpr.part() ) );
+                auto transferred_part = vehicle_part{ vpr.part(), & *veh };
+                transferred_part.direction = normalize( old_veh->face.dir() + transferred_part.direction -
+                                                        veh->face.dir() );
+                veh->install_part( part_pos, std::move( transferred_part ) );
+            }
+
+            veh->name = _( "Wreckage" );
+
+
+            // Try again with the wreckage
+            std::unique_ptr<vehicle> new_veh = add_vehicle( std::move( veh ), true );
+            if( new_veh != nullptr ) {
+                new_veh->smash( *this );
+                return new_veh;
+            }
+
+            // If adding the wreck failed, we want to restore the vehicle we tried to merge with
+            add_vehicle( std::move( old_veh ), false );
+            return nullptr;
+
+        } else if( impassable( omt_pos ) ) {
+            if( !merge_wrecks ) {
+                return nullptr;
+            }
+
+            // There's a wall or other obstacle here; destroy it
+            destroy( omt_pos );
+
+            // Some weird terrain, don't place the vehicle
+            if( impassable( omt_pos ) ) {
+                return nullptr;
+            }
+
+            needs_smashing = true;
+        }
+    }
+    if( needs_smashing ) {
+        veh->smash( *this );
+    }
+    return veh;
+}
+
+auto mapgen_constructor::detach_vehicle( vehicle *veh ) -> std::unique_ptr<vehicle>
+{
+    if( veh == nullptr ) {
+        debugmsg( "mapgen_constructor::detach_vehicle was passed nullptr" );
+        return std::unique_ptr<vehicle>();
+    }
+    auto *const sm = submap_at_grid( project_remain<coords::omt>( veh->abs_sm_pos ).remainder );
+    if( sm == nullptr ) {
+        debugmsg( "detach_vehicle can't find submap!  name=%s, submap:%d,%d,%d",
+                  veh->name, veh->abs_sm_pos.x(), veh->abs_sm_pos.y(), veh->abs_sm_pos.z() );
+        return std::unique_ptr<vehicle>();
+    }
+    auto iter = std::ranges::find_if( sm->vehicles, [&]( const auto & candidate ) {
+        return candidate.get() == veh;
+    } );
+    if( iter != sm->vehicles.end() ) {
+        std::unique_ptr<vehicle> result = std::move( *iter );
+        sm->vehicles.erase( iter );
+        result->detach();
+        result->refresh_position();
+        return std::move( result );
+    }
+    debugmsg( "detach_vehicle can't find it!  name=%s, submap:%d,%d,%d", veh->name, veh->abs_sm_pos.x(),
+              veh->abs_sm_pos.y(), veh->abs_sm_pos.z() );
+    return std::unique_ptr<vehicle>();
 }
 
 auto mapgen_constructor::destroy_vehicle( vehicle *veh ) -> void
@@ -1278,18 +1405,99 @@ auto mapgen_constructor::make_rubble( const point_omt_ms &p,
     make_rubble( p, rubble_type, t_dirt, false );
 }
 
-auto mapgen_constructor::bash( const point_omt_ms &p, const int /*str*/,
+auto mapgen_constructor::bash( const point_omt_ms &p, const int str,
                                const bool destroy, const bool /*bash_floor*/,
                                const vehicle * /*bashing_vehicle*/ ) -> void
 {
-    if( has_furn( p ) ) {
-        furn_set( p, f_null );
+    bool bashed_sealed = false;
+    if( has_flag( "SEALED", p ) ) {
+        bash_ter_furn( p, destroy );
+        bashed_sealed = true;
+    }
+
+    bash_field( p );
+
+    // Don't bash items inside terrain/furniture with SEALED flag
+    if( !bashed_sealed ) {
+        bash_items( p );
+    }
+
+    const vehicle *veh = veh_pointer_or_null( veh_at( p ) );
+    if( veh != nullptr ) {
+        bash_vehicle( p, str );
+    } else if( !bashed_sealed ) {
+        // If we still didn't bash anything solid (a vehicle) or a tile with SEALED flag, bash ter/furn
+        bash_ter_furn( p, destroy );
+    }
+
+    return;
+}
+
+void mapgen_constructor::bash_items( const point_omt_ms &p )
+{
+    auto bashed_items = i_clear( p );
+    if( bashed_items.empty() ) {
         return;
     }
-    if( destroy || ter( p ).obj().bash.str_max != -1 ) {
-        ter_set( p, t_dirt );
+
+    for( auto &bashed_item : bashed_items ) {
+        // the check for active suppresses Molotovs smashing themselves with their own explosion
+        if( bashed_item->can_shatter() && !bashed_item->is_active() && one_in( 2 ) ) {
+            spawn_items( p, bashed_item->contents.clear_items() );
+        } else {
+            add_item( p, std::move( bashed_item ) );
+        }
     }
 }
+
+void mapgen_constructor::bash_vehicle( const point_omt_ms &p, int str )
+{
+    // Smash vehicle if present
+    if( const optional_vpart_position vp = veh_at( p ) ) {
+        vp->vehicle().damage( vp->part_index(), str, DT_BASH, true );
+    }
+}
+
+void mapgen_constructor::bash_field( const point_omt_ms &p )
+{
+    remove_field( p, fd_web );
+}
+
+void mapgen_constructor::bash_ter_furn( const point_omt_ms &p, bool destroy )
+{
+    const auto &ter_obj = ter( p ).obj();
+    const auto &furn_obj = furn( p ).obj();
+    bool smash_ter = false;
+    const map_bash_info *bash = nullptr;
+
+    if( furn_obj.id && furn_obj.bash.str_max != -1 ) {
+        bash = &furn_obj.bash;
+    } else if( ter_obj.bash.str_max != -1 ) {
+        bash = &ter_obj.bash;
+        smash_ter = true;
+    }
+
+    if( bash == nullptr || ( bash->destroy_only && !destroy ) ) {
+        // Nothing bashable here
+        return;
+    }
+
+    spawn_items( p, item_group::items_from( bash->drop_group, calendar::turn ) );
+    if( smash_ter ) {
+        if( bash->ter_set ) {
+            ter_set( p, bash->ter_set );
+        } else if( destroy ) {
+            ter_set( p, t_dirt );
+        }
+    } else {
+        if( bash->furn_set ) {
+            furn_set( p, bash->furn_set );
+        } else if( destroy ) {
+            furn_set( p, f_null );
+        }
+    }
+}
+
 
 auto mapgen_constructor::destroy( const point_omt_ms &p ) -> void
 {

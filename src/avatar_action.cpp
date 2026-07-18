@@ -238,16 +238,21 @@ auto find_grabbed_creature( const avatar &you ) -> Creature *
     return nullptr;
 }
 
-auto throw_descriptor( const float throwforce ) -> std::string
+auto throw_message( const float throwforce, const std::string &target_name ) -> std::string
 {
-    if( throwforce < 30.0f ) {
-        return _( "shove" );
-    } else if( throwforce < 40.0f ) {
-        return _( "throw" );
-    } else if( throwforce < 60.0f ) {
-        return _( "hurl" );
+    if( throwforce >= 60.0f ) {
+        return string_format( _( "You send %s flying!" ), target_name );
     }
-    return _( "send flying" );
+
+    auto action = std::string {};
+    if( throwforce < 30.0f ) {
+        action = _( "shove" );
+    } else if( throwforce < 40.0f ) {
+        action = _( "throw" );
+    } else {
+        action = _( "hurl" );
+    }
+    return string_format( _( "You %1$s %2$s!" ), action, target_name );
 }
 
 auto apply_thrown_creature_downed_effect( Creature &target ) -> void
@@ -342,7 +347,7 @@ auto throw_grabbed_creature( avatar &you ) -> bool
         mon->on_hit( &you, body_part_torso.id(), nullptr, false );
     }
 
-    add_msg( _( "You %1$s %2$s!" ), throw_descriptor( fling_velocity ), target->disp_name() );
+    add_msg( throw_message( fling_velocity, target->disp_name() ) );
     g->fling_creature( target, target_angle, fling_velocity );
     apply_thrown_creature_downed_effect( *target );
     return true;
@@ -742,19 +747,23 @@ bool avatar_action::move( avatar &you, map &m, const tripoint_rel_ms &d )
             you.moves -= 100;
         }
         // Add to map memory if blind
+        // TODO: make this not ugly by having the rotation and connections without
+        // Also revealing the nearby tiles to the player
         if( you.is_blind() ) {
-            std::string obstacle;
             if( m.veh_at( dest_loc ) ) {
                 char part_mod = 0;
                 const vpart_id &vp_id = m.veh_at( dest_loc )->vehicle().part_id_string( m.veh_at(
                                             dest_loc )->part_index(), false, part_mod );
-                obstacle = "vp_" + vp_id.str();
+                you.memorize_tile( bub_to_abs( dest_loc ), "vp_" + vp_id.str(), 0, 0 );
             } else {
-                obstacle = m.has_furn( dest_loc ) ? m.furn( dest_loc ).id().str() : m.ter(
-                               dest_loc ).id().str();
+                if( m.has_furn( dest_loc ) ) {
+                    you.memorize_tile( bub_to_abs( dest_loc ), m.furn( dest_loc ).id().str(), 0, 0 );
+                } else {
+                    std::string ter = m.ter( dest_loc ).id().str();
+                    you.memorize_tile( bub_to_abs( dest_loc ), ter, 0, 0 );
+                    you.memorize_terrain_tile( bub_to_abs( dest_loc ), ter, 0, 0 );
+                }
             }
-            // TODO: Figure out how to make subtile and rotation work right here
-            you.memorize_tile( bub_to_abs( dest_loc ), obstacle, 0, 0 );
         }
     } else if( m.ter( dest_loc ) == t_door_locked || m.ter( dest_loc ) == t_door_locked_peep ||
                m.ter( dest_loc ) == t_door_locked_alarm || m.ter( dest_loc ) == t_door_locked_interior ) {
@@ -1318,7 +1327,7 @@ void avatar_action::plthrow( avatar &you, item *loc,
         }
     }
     // if you're wearing the item you need to be able to take it off
-    if( you.is_wearing( loc->typeId() ) ) {
+    if( you.is_worn( *loc ) ) {
         ret_val<bool> ret = you.can_takeoff( *loc );
         if( !ret.success() ) {
             add_msg( m_info, "%s", ret.c_str() );
