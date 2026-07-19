@@ -184,7 +184,7 @@
         "cooldown": 1,
         "move_cost": 150,
         "gun_type": "ksub2000_turret_fake",
-        "ammo_type": "9mmfmj",
+        "ammo_type": [ "9mmfmj", "9mm" ],
         "fake_skills": [ [ "gun", 5 ], [ "rifle", 5 ] ],
         "fake_str": 16,
         "fake_dex": 12,
