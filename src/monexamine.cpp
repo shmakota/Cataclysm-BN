@@ -118,7 +118,8 @@ auto loaded_slot_ammo( const monster &z, const itype_id &ammo_id )
 {
     auto ammo_options = std::vector<monster_ammo_option> {};
     for( const auto &compatible_ammo_id : z.ammo_slot_items( ammo_id ) ) {
-        const auto available_ammo = z.ammo.contains( compatible_ammo_id ) ? z.ammo.at( compatible_ammo_id ) : 0;
+        const auto available_ammo = z.ammo.contains( compatible_ammo_id ) ? z.ammo.at(
+                                        compatible_ammo_id ) : 0;
         if( available_ammo <= 0 ) {
             continue;
         }

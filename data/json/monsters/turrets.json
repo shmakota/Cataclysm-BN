@@ -395,17 +395,7 @@
         "cooldown": 1,
         "move_cost": 150,
         "gun_type": "m2browning_turret_fake",
-        "ammo_type": [
-          "50bmg",
-          "50_incendiary",
-          "50match",
-          "50ss",
-          "50_mk211",
-          "bp_50bmg",
-          "bp_50_incendiary",
-          "bp_50ss",
-          "bp_50_mk211"
-        ],
+        "ammo_type": [ "50bmg", "50_incendiary", "50match", "50ss", "50_mk211", "bp_50bmg", "bp_50_incendiary", "bp_50ss", "bp_50_mk211" ],
         "fake_skills": [ [ "gun", 8 ], [ "rifle", 8 ] ],
         "fake_str": 16,
         "fake_dex": 12,
@@ -470,13 +460,7 @@
         "cooldown": 1,
         "move_cost": 150,
         "gun_type": "mark19_turret_fake",
-        "ammo_type": [
-          "40x53mm_m430a1",
-          "40x53mm_m1001",
-          "40x53mm_buckshot_m169",
-          "40x53mm_slug_m169",
-          "40x53mm_makeshift_he"
-        ],
+        "ammo_type": [ "40x53mm_m430a1", "40x53mm_m1001", "40x53mm_buckshot_m169", "40x53mm_slug_m169", "40x53mm_makeshift_he" ],
         "fake_skills": [ [ "gun", 8 ], [ "rifle", 8 ] ],
         "fake_str": 16,
         "fake_dex": 12,
