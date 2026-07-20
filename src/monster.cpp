@@ -37,6 +37,7 @@
 #include "int_id.h"
 #include "init.h"
 #include "item_group.h"
+#include "item_factory.h"
 #include "item.h"
 #include "item_category.h"
 #include "itype.h"
@@ -93,6 +94,42 @@ static const efftype_id effect_corroding( "corroding" );
 static const efftype_id effect_dazed( "dazed" );
 static const efftype_id effect_deaf( "deaf" );
 static const efftype_id effect_docile( "docile" );
+
+namespace
+{
+
+auto compatible_ammo_for_gun( const gun_actor &gun_attack ) -> std::vector<itype_id>
+{
+    namespace ranges = std::ranges;
+
+    if( !gun_attack.ammo_types.empty() ) {
+        return gun_attack.ammo_types;
+    }
+
+    const auto gun = item::spawn_temporary( gun_attack.gun_type );
+    if( !gun ) {
+        return {};
+    }
+
+    auto compatible_ammo = std::vector<itype_id> {};
+    const auto default_ammo = gun->ammo_default();
+    if( !default_ammo.is_null() ) {
+        compatible_ammo.push_back( default_ammo );
+    }
+
+    const auto gun_ammo_types = gun->ammo_types();
+    for( const auto *const ammo_item : item_controller->find( [&gun_ammo_types]( const itype &candidate ) {
+        return candidate.ammo != nullptr && gun_ammo_types.contains( candidate.ammo->type );
+    } ) ) {
+        if( !ranges::contains( compatible_ammo, ammo_item->get_id() ) ) {
+            compatible_ammo.push_back( ammo_item->get_id() );
+        }
+    }
+
+    return compatible_ammo;
+}
+
+} // namespace
 static const efftype_id effect_downed( "downed" );
 static const efftype_id effect_emp( "emp" );
 static const efftype_id effect_feral_infighting_punishment( "feral_infighting_punishment" );
@@ -794,10 +831,14 @@ auto monster::ammo_slot_items( const itype_id &ammo_id ) const -> std::vector<it
             continue;
         }
         const auto *const gun_attack = dynamic_cast<const gun_actor *>( special_attack.get() );
-        if( gun_attack == nullptr || !ranges::contains( gun_attack->ammo_types, ammo_id ) ) {
+        if( gun_attack == nullptr ) {
             continue;
         }
-        for( const auto &compatible_ammo_id : gun_attack->ammo_types ) {
+        const auto compatible_ammo = compatible_ammo_for_gun( *gun_attack );
+        if( !ranges::contains( compatible_ammo, ammo_id ) ) {
+            continue;
+        }
+        for( const auto &compatible_ammo_id : compatible_ammo ) {
             if( !ranges::contains( slot_items, compatible_ammo_id ) ) {
                 slot_items.push_back( compatible_ammo_id );
             }
