@@ -118,8 +118,9 @@ auto compatible_ammo_for_gun( const gun_actor &gun_attack ) -> std::vector<itype
     }
 
     const auto gun_ammo_types = gun->ammo_types();
-    for( const auto *const ammo_item : item_controller->find( [&gun_ammo_types]( const itype &candidate ) {
-        return candidate.ammo != nullptr && gun_ammo_types.contains( candidate.ammo->type );
+    for( const auto *const ammo_item : item_controller->find( [&gun_ammo_types](
+    const itype & candidate ) {
+    return candidate.ammo != nullptr && gun_ammo_types.contains( candidate.ammo->type );
     } ) ) {
         if( !ranges::contains( compatible_ammo, ammo_item->get_id() ) ) {
             compatible_ammo.push_back( ammo_item->get_id() );

@@ -172,8 +172,9 @@ TEST_CASE("monster ammo slots accept configured alternate ammo items", "[monster
     CHECK(test_monster.loaded_ammo_for_slot(itype_id("9mmfmj")) == itype_id("9mm"));
 }
 
-TEST_CASE("monster ammo slots derive compatible ammo from the gun when no override is set",
-          "[monster][ammo]") {
+TEST_CASE(
+    "monster ammo slots derive compatible ammo from the gun when no override is set",
+    "[monster][ammo]") {
     clear_all_state();
     move_player_out_of_the_way();
 

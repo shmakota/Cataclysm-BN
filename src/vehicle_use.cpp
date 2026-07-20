@@ -2009,11 +2009,13 @@ void vehicle::interact_with( const tripoint_bub_ms &pos, int interact_part )
 
     auto turret = turret_query( bub_to_abs( pos ) );
     const auto turret_menu_name = [&turret]() -> std::string {
-        if( !turret ) {
+        if( !turret )
+        {
             return {};
         }
         const auto *const ammo_data = turret.ammo_data();
-        if( ammo_data == nullptr ) {
+        if( ammo_data == nullptr )
+        {
             return turret.base().tname();
         }
         return string_format( _( "%1$s (%2$s)" ), turret.base().tname(), ammo_data->nname( 1 ) );
