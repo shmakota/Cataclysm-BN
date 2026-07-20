@@ -113,7 +113,7 @@ inline auto specimen_mutations_to_string( const Character &source ) -> std::stri
     }
     std::vector<std::string> names;
     names.reserve( muts.size() );
-    std::ranges::for_each( muts, [&]( const trait_id &trait ) {
+    std::ranges::for_each( muts, [&]( const trait_id & trait ) {
         const mutation_branch &trait_data = trait.obj();
         if( trait_data.flags.contains( trait_flag_NO_CLONE ) ) {
             return;
@@ -136,7 +136,7 @@ inline auto specimen_mutations_from_string( const std::string &mutations ) -> st
     }
     const std::vector<std::string> parts = string_split( mutations, ',' );
     result.reserve( parts.size() );
-    std::ranges::for_each( parts, [&]( const std::string &part ) {
+    std::ranges::for_each( parts, [&]( const std::string & part ) {
         if( part.empty() ) {
             return;
         }

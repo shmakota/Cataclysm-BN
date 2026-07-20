@@ -10,7 +10,7 @@
 template<typename T>
 void game_object<T>::destroy()
 {
-    if constexpr ( std::is_same_v<T, item> ) {
+    if constexpr( std::is_same_v<T, item> ) {
         if( static_cast<T *>( this ) == &null_item_reference() ) {
             return;
         }
