@@ -42,6 +42,7 @@ extern const flag_id flag_BIO_IMMUNE;
 extern const flag_id flag_BIPOD;
 extern const flag_id flag_BIRD;
 extern const flag_id flag_BLIND;
+extern const flag_id flag_BLINDS_EYES_ON_HIT;
 extern const flag_id flag_BLOCK_WHILE_WORN;
 extern const flag_id flag_BOMB;
 extern const flag_id flag_BOOK_CANNIBAL;
@@ -115,6 +116,7 @@ extern const flag_id flag_ELECTRIC_IMMUNE;
 extern const flag_id flag_ETHEREAL_ITEM;
 extern const flag_id flag_EXPLOSION_SMASHED;
 extern const flag_id flag_EXPLOSION_PROPELLED;
+extern const flag_id flag_DRONE_CAM;
 extern const flag_id flag_FAKE_MILL;
 extern const flag_id flag_FAKE_CLONING_VAT;
 extern const flag_id flag_FAKE_SMOKE;
@@ -151,6 +153,7 @@ extern const flag_id flag_GAS_DISCOUNT;
 extern const flag_id flag_GAS_PROOF;
 extern const flag_id flag_GIBBED;
 extern const flag_id flag_GNV_EFFECT;
+extern const flag_id flag_GNVE_EFFECT;
 extern const flag_id flag_HEATS_FOOD;
 extern const flag_id flag_HEATS_FOOD_IS_CONSUMED;
 extern const flag_id flag_HEATS_FOOD_USING_CHARGES;
@@ -204,6 +207,8 @@ extern const flag_id flag_MOUNTED_GUN;
 extern const flag_id flag_MYCUS_OK;
 extern const flag_id flag_NANOFAB_TEMPLATE;
 extern const flag_id flag_NAT_UPS;
+extern const flag_id flag_NATURE_CAMO;
+extern const flag_id flag_URBAN_CAMO;
 extern const flag_id flag_NEEDS_NO_LUBE;
 extern const flag_id flag_NEEDS_UNFOLD;
 extern const flag_id flag_NEGATIVE_MONOTONY_OK;
@@ -240,6 +245,7 @@ extern const flag_id flag_OUTER;
 extern const flag_id flag_OVERSIZE;
 extern const flag_id flag_PARTIAL_DEAF;
 extern const flag_id flag_PERFECT_LOCKPICK;
+extern const flag_id flag_DURABLE_LOCKPICK;
 extern const flag_id flag_PERPETUAL;
 extern const flag_id flag_PERSONAL;
 extern const flag_id flag_PLACE_RANDOMLY;
@@ -283,6 +289,7 @@ extern const flag_id flag_REACH;
 extern const flag_id flag_REACH_ATTACK;
 extern const flag_id flag_REBREATHER;
 extern const flag_id flag_RECHARGE;
+extern const flag_id flag_RECON_VISION;
 extern const flag_id flag_REDUCED_BASHING;
 extern const flag_id flag_REDUCED_WEIGHT;
 extern const flag_id flag_RELOAD_AND_SHOOT;
@@ -299,6 +306,7 @@ extern const flag_id flag_ROLLER_ONE;
 extern const flag_id flag_ROLLER_QUAD;
 extern const flag_id flag_SAFECRACK;
 extern const flag_id flag_SEMITANGIBLE;
+extern const flag_id flag_SECRET_ENCHANTMENTS;
 extern const flag_id flag_SHATTERS;
 extern const flag_id flag_SHOCKING;
 extern const flag_id flag_ACIDIC;
@@ -316,6 +324,7 @@ extern const flag_id flag_SNIPPET_NEEDS_LITERACY;
 extern const flag_id flag_SOLARPACK;
 extern const flag_id flag_SOLARPACK_ON;
 extern const flag_id flag_SPAWN_FRIENDLY;
+extern const flag_id flag_SPAWN_HOSTILE;
 extern const flag_id flag_SPEAR;
 extern const flag_id flag_SPEEDLOADER;
 extern const flag_id flag_SPLINT;
@@ -328,6 +337,7 @@ extern const flag_id flag_SUN_GLASSES;
 extern const flag_id flag_SUPER_FANCY;
 extern const flag_id flag_SWIM_GOGGLES;
 extern const flag_id flag_TACK;
+extern const flag_id flag_NET_TANGLE;
 extern const flag_id flag_TANGLE;
 extern const flag_id flag_TARDIS;
 extern const flag_id flag_THERMOMETER;
@@ -367,6 +377,7 @@ extern const flag_id flag_WATER_DISABLE;
 extern const flag_id flag_WET;
 extern const flag_id flag_WHIP;
 extern const flag_id flag_WIND_EXTINGUISH;
+extern const flag_id flag_WORN_GUN;
 extern const flag_id flag_WRITE_MESSAGE;
 extern const flag_id flag_ZERO_WEIGHT;
 extern const flag_id flag_ZOOM;
@@ -430,6 +441,9 @@ class json_flag
             return requires_flag_;
         }
 
+        /** The tag to be displayed on the item's display name when it has this flag */
+        auto tag() const -> const translation & { return tag_; } // *NOPAD*
+
         /** The flag's modifier on the fun value of comestibles */
         int taste_mod() const {
             return taste_mod_;
@@ -454,6 +468,7 @@ class json_flag
         bool inherit_ = true;
         bool craft_inherit_ = false;
         std::string requires_flag_;
+        translation tag_;
         int taste_mod_ = 0;
 
         /** Load flag definition from JSON */
@@ -471,5 +486,3 @@ class json_flag
         /** Clear all loaded flags (invalidating any pointers) */
         static void reset();
 };
-
-

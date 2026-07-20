@@ -29,6 +29,7 @@
 #include "translations.h"
 #include "trap.h"
 #include "type_id.h"
+#include "type_id_implement.h"
 
 static const std::string flag_TRANSPARENT( "TRANSPARENT" );
 
@@ -47,103 +48,79 @@ bool is_json_check_strict( const std::string &src )
     return json_report_strict || is_strict_enabled( src );
 }
 
+auto fluid_grid_connected_variants() -> std::map<furn_str_id, furn_str_id> &
+{
+    static auto variants = std::map<furn_str_id, furn_str_id> {};
+    return variants;
+}
+
+auto fluid_grid_disconnected_variants() -> std::map<furn_str_id, furn_str_id> &
+{
+    static auto variants = std::map<furn_str_id, furn_str_id> {};
+    return variants;
+}
+
+auto add_fluid_grid_variant( std::map<furn_str_id, furn_str_id> &variants,
+                             const furn_str_id &from,
+                             const furn_str_id &to,
+                             const char *label ) -> void
+{
+    const auto iter = variants.find( from );
+    if( iter != variants.end() && iter->second != to ) {
+        debugmsg( "fluid grid %s variant conflict for %s: %s vs %s",
+                  label, from.c_str(), iter->second.c_str(), to.c_str() );
+        return;
+    }
+    variants[from] = to;
+}
+
+auto build_fluid_grid_variant_maps() -> void
+{
+    auto &connected = fluid_grid_connected_variants();
+    auto &disconnected = fluid_grid_disconnected_variants();
+    connected.clear();
+    disconnected.clear();
+
+    std::ranges::for_each( furniture_data.get_all(), [&]( const furn_t &furn ) {
+        if( !furn.fluid_grid || furn.fluid_grid->role != fluid_grid_role::tank ) {
+            return;
+        }
+        if( furn.fluid_grid->connected_variant ) {
+            add_fluid_grid_variant( connected, furn.id, *furn.fluid_grid->connected_variant, "connected" );
+        }
+        if( furn.fluid_grid->disconnected_variant ) {
+            add_fluid_grid_variant( disconnected, furn.id, *furn.fluid_grid->disconnected_variant,
+                                    "disconnected" );
+        }
+    } );
+
+    std::ranges::for_each( connected, [&]( const auto & entry ) {
+        add_fluid_grid_variant( disconnected, entry.second, entry.first, "disconnected" );
+    } );
+    std::ranges::for_each( disconnected, [&]( const auto & entry ) {
+        add_fluid_grid_variant( connected, entry.second, entry.first, "connected" );
+    } );
+}
+
+auto parse_fluid_grid_role( const std::string &role ) -> std::optional<fluid_grid_role>
+{
+    static const auto role_map = std::unordered_map<std::string, fluid_grid_role> {
+        { "tank", fluid_grid_role::tank },
+        { "fixture", fluid_grid_role::fixture },
+        { "transformer", fluid_grid_role::transformer },
+        { "rain_collector", fluid_grid_role::rain_collector }
+    };
+    const auto iter = role_map.find( role );
+    if( iter == role_map.end() ) {
+        return std::nullopt;
+    }
+    return iter->second;
+}
+
 } // namespace
 
-/** @relates int_id */
-template<>
-bool int_id<ter_t>::is_valid() const
-{
-    return terrain_data.is_valid( *this );
-}
-
-/** @relates int_id */
-template<>
-const ter_t &int_id<ter_t>::obj() const
-{
-    return terrain_data.obj( *this );
-}
-
-/** @relates int_id */
-template<>
-const string_id<ter_t> &int_id<ter_t>::id() const
-{
-    return terrain_data.convert( *this );
-}
-
-/** @relates int_id */
-template<>
-int_id<ter_t> string_id<ter_t>::id() const
-{
-    return terrain_data.convert( *this, t_null );
-}
-
-/** @relates int_id */
-template<>
-int_id<ter_t>::int_id( const string_id<ter_t> &id ) : _id( id.id() )
-{
-}
-
-/** @relates string_id */
-template<>
-const ter_t &string_id<ter_t>::obj() const
-{
-    return terrain_data.obj( *this );
-}
-
-/** @relates string_id */
-template<>
-bool string_id<ter_t>::is_valid() const
-{
-    return terrain_data.is_valid( *this );
-}
-
-/** @relates int_id */
-template<>
-bool int_id<furn_t>::is_valid() const
-{
-    return furniture_data.is_valid( *this );
-}
-
-/** @relates int_id */
-template<>
-const furn_t &int_id<furn_t>::obj() const
-{
-    return furniture_data.obj( *this );
-}
-
-/** @relates int_id */
-template<>
-const string_id<furn_t> &int_id<furn_t>::id() const
-{
-    return furniture_data.convert( *this );
-}
-
-/** @relates string_id */
-template<>
-bool string_id<furn_t>::is_valid() const
-{
-    return furniture_data.is_valid( *this );
-}
-
-/** @relates string_id */
-template<>
-const furn_t &string_id<furn_t>::obj() const
-{
-    return furniture_data.obj( *this );
-}
-
-/** @relates string_id */
-template<>
-int_id<furn_t> string_id<furn_t>::id() const
-{
-    return furniture_data.convert( *this, f_null );
-}
-
-/** @relates int_id */
-template<>
-int_id<furn_t>::int_id( const string_id<furn_t> &id ) : _id( id.id() )
-{
-}
+IMPLEMENT_STRING_AND_INT_IDS( ter_t, terrain_data );
+IMPLEMENT_STRING_AND_INT_IDS( furn_t, furniture_data );
 
 static const std::unordered_map<std::string, ter_bitflags> ter_bitflags_map = { {
         { "DESTROY_ITEM",             TFLAG_DESTROY_ITEM },   // add/spawn_item*()
@@ -158,7 +135,6 @@ static const std::unordered_map<std::string, ter_bitflags> ter_bitflags_map = { 
         { "COLLAPSES",                TFLAG_COLLAPSES },      // This tile includes a ceiling. If the ceiling drops, this tile is destroyed.
         { "FLAMMABLE",                TFLAG_FLAMMABLE },      // fire bad! fire SLOW!
         { "REDUCE_SCENT",             TFLAG_REDUCE_SCENT },   // ...and the other half is update_scent
-        { "INDOORS",                  TFLAG_INDOORS },        // vehicle gain_moves, weather
         { "SHARP",                    TFLAG_SHARP },          // monmove
         { "SUPPORTS_ROOF",            TFLAG_SUPPORTS_ROOF },  // Supports its ceiling and roof above it.
         { "MINEABLE",                 TFLAG_MINEABLE },       // allows mining
@@ -203,6 +179,8 @@ static const std::unordered_map<std::string, ter_bitflags> ter_bitflags_map = { 
         { "FREEZER",                  TFLAG_FREEZER },        // This is an active freezer.
         { "ELEVATOR",                 TFLAG_ELEVATOR },       // This is an elevator.
         { "NO_MEMORY",                TFLAG_NO_MEMORY },      // This should not be added to map memory
+        { "ROAD",                     TFLAG_ROAD },           // Some floors have this flag, as do some passable transformation of otherwise impassible terrain/furniture. Very notably, open doors.
+        { "BASH_TRANSFORM",           TFLAG_BASH_TRANSFORM }, // Bashing this terrain/furniture but failing to destroy it has a chance to transform it, if it's capable of transforming.
     }
 };
 
@@ -237,9 +215,9 @@ static void load_map_bash_tent_centers( const JsonArray &ja, std::vector<furn_st
     }
 }
 
-static void correct_if_magic( std::optional<int> &val )
+static void correct_if_magic( std::optional<units::sound> &val )
 {
-    if( val && *val < 0 ) {
+    if( val && *val < 0_dB ) {
         val.reset();
     }
 }
@@ -247,7 +225,7 @@ static void correct_if_magic( std::optional<int> &val )
 map_bash_info::map_bash_info() : str_min( -1 ), str_max( -1 ),
     str_min_blocked( -1 ), str_max_blocked( -1 ),
     str_min_supported( -1 ), str_max_supported( -1 ),
-    explosive( 0 ), sound_vol( -1 ), sound_fail_vol( -1 ),
+    explosive( 0 ), sound_vol( -1_dB ), sound_fail_vol( -1_dB ),
     collapse_radius( 1 ), destroy_only( false ), bash_below( false ),
     drop_group( "EMPTY_GROUP" ),
     ter_set( ter_str_id::NULL_ID() ), furn_set( furn_str_id::NULL_ID() ) {}
@@ -761,7 +739,9 @@ ter_id t_null,
        t_railroad_track, t_railroad_track_h, t_railroad_track_v, t_railroad_track_d, t_railroad_track_d1,
        t_railroad_track_d2,
        t_railroad_track_on_tie, t_railroad_track_h_on_tie, t_railroad_track_v_on_tie,
-       t_railroad_track_d_on_tie;
+       t_railroad_track_d_on_tie,
+       t_pd_border,
+       t_rock_border;
 
 // TODO: Put this crap into an inclusion, which should be generated automatically using JSON data
 
@@ -1072,6 +1052,8 @@ void set_ter_ids()
     t_railroad_track_h_on_tie = ter_id( "t_railroad_track_h_on_tie" );
     t_railroad_track_v_on_tie = ter_id( "t_railroad_track_v_on_tie" );
     t_railroad_track_d_on_tie = ter_id( "t_railroad_track_d_on_tie" );
+    t_pd_border = ter_id( "t_pd_border" );
+    t_rock_border = ter_id( "t_rock_border" );
 
     for( auto &elem : terrain_data.get_all() ) {
         ter_t &ter = const_cast<ter_t &>( elem );
@@ -1287,8 +1269,14 @@ std::string enum_to_string<season_type>( season_type data )
 
 void map_data_common_t::load( const JsonObject &jo, const std::string &src )
 {
-    if( jo.has_member( "examine_action" ) ) {
-        examine = iexamine_function_from_string( jo.get_string( "examine_action" ) );
+    const auto examine_action = jo.get_string( "examine_action", "" );
+    examine_action_id.clear();
+
+    if( examine_action.rfind( "lua:", 0 ) == 0 ) {
+        examine_action_id = examine_action.substr( 4 );
+        examine = iexamine_function_from_string( "lua_examine" );
+    } else if( !examine_action.empty() ) {
+        examine = iexamine_function_from_string( examine_action );
     } else if( !was_loaded ) {
         examine = iexamine_function_from_string( "none" );
     }
@@ -1322,8 +1310,11 @@ void map_data_common_t::load( const JsonObject &jo, const std::string &src )
     mandatory( jo, was_loaded, "description", description );
     optional( jo, was_loaded, "message", message );
     optional( jo, was_loaded, "prompt", prompt );
+    assign( jo, "light_color", light_color, is_json_check_strict( src ) );
 
     assign( jo, "flags", flags );
+    assign( jo, "default_vars", default_vars );
+
     bitflags.reset();
     transparent = false;
 
@@ -1493,6 +1484,12 @@ void ter_t::check() const
     check_decon_items( deconstruct, id.str(), true );
     check_pry_items( pry, id.str(), true );
 
+    if( examine == iexamine_function_from_string( "locked_object_pickable" ) &&
+        lockpick_result.is_null() ) {
+        throw JsonError(
+            string_format( "Terrain %s has iexamine `locked_object_pickable`, without a non-null `lockpick_result`",
+                           id.str(), lockpick_result.str() ) );
+    }
     if( !transforms_into.is_valid() ) {
         debugmsg( "invalid transforms_into %s for %s", transforms_into.c_str(), id.c_str() );
     }
@@ -1573,6 +1570,74 @@ void furn_t::load( const JsonObject &jo, const std::string &src )
     optional( jo, was_loaded, "provides_liquids", provides_liquids );
     optional( jo, was_loaded, "bonus_fire_warmth_feet", bonus_fire_warmth_feet, 300 );
     optional( jo, was_loaded, "keg_capacity", keg_capacity, legacy_volume_reader, 0_ml );
+    if( jo.has_member( "fluid_grid" ) ) {
+        auto fluid_grid_obj = jo.get_object( "fluid_grid" );
+        auto fluid_grid_entry = fluid_grid_data{};
+        auto role_str = std::string{};
+        mandatory( fluid_grid_obj, was_loaded, "role", role_str );
+        const auto role = parse_fluid_grid_role( role_str );
+        if( !role ) {
+            debugmsg( "invalid fluid grid role %s for furniture %s", role_str.c_str(), id.c_str() );
+        } else {
+            fluid_grid_entry.role = *role;
+            mandatory( fluid_grid_obj, was_loaded, "allow_input", fluid_grid_entry.allow_input );
+            mandatory( fluid_grid_obj, was_loaded, "allow_output", fluid_grid_entry.allow_output );
+            mandatory( fluid_grid_obj, was_loaded, "allowed_liquids", fluid_grid_entry.allowed_liquids );
+            optional( fluid_grid_obj, was_loaded, "use_keg_capacity", fluid_grid_entry.use_keg_capacity,
+                      false );
+            if( fluid_grid_obj.has_member( "capacity" ) ) {
+                const auto raw_capacity = fluid_grid_obj.get_int( "capacity" );
+                fluid_grid_entry.capacity = raw_capacity * units::legacy_volume_factor;
+            }
+            if( fluid_grid_obj.has_member( "connected_variant" ) ) {
+                fluid_grid_entry.connected_variant = furn_str_id(
+                        fluid_grid_obj.get_string( "connected_variant" ) );
+            }
+            if( fluid_grid_obj.has_member( "disconnected_variant" ) ) {
+                fluid_grid_entry.disconnected_variant = furn_str_id(
+                        fluid_grid_obj.get_string( "disconnected_variant" ) );
+            }
+            if( fluid_grid_obj.has_member( "transformer" ) ) {
+                auto transformer_obj = fluid_grid_obj.get_object( "transformer" );
+                auto transformer = fluid_grid_transformer_config{};
+                mandatory( transformer_obj, was_loaded, "tick_interval", transformer.tick_interval );
+                if( fluid_grid_entry.role == fluid_grid_role::rain_collector ) {
+                    optional( transformer_obj, was_loaded, "collector_area_m2", transformer.collector_area_m2, 0.0 );
+                } else {
+                    optional( transformer_obj, was_loaded, "collector_area_m2", transformer.collector_area_m2, 0.0 );
+                    auto transforms = transformer_obj.get_array( "transforms" );
+                    for( JsonObject transform_obj : transforms ) {
+                        auto recipe = fluid_grid_transform_recipe{};
+                        auto parse_io = [&]( const JsonArray & array,
+                        std::vector<fluid_grid_transform_io> &out ) {
+                            for( JsonObject io_obj : array ) {
+                                auto io = fluid_grid_transform_io{};
+                                mandatory( io_obj, was_loaded, "liquid", io.liquid );
+                                if( !assign( io_obj, "amount", io.amount, true ) ) {
+                                    debugmsg( "fluid grid transformer entry missing amount in %s", id.c_str() );
+                                }
+                                out.push_back( io );
+                            }
+                        };
+                        if( transform_obj.has_array( "inputs" ) ) {
+                            parse_io( transform_obj.get_array( "inputs" ), recipe.inputs );
+                        }
+                        if( transform_obj.has_array( "outputs" ) ) {
+                            parse_io( transform_obj.get_array( "outputs" ), recipe.outputs );
+                        }
+                        if( recipe.inputs.empty() && recipe.outputs.empty() ) {
+                            debugmsg( "fluid grid transformer entry missing inputs/outputs in %s", id.c_str() );
+                        }
+                        transformer.transforms.push_back( recipe );
+                    }
+                }
+                fluid_grid_entry.transformer = transformer;
+            } else if( fluid_grid_entry.role == fluid_grid_role::rain_collector ) {
+                debugmsg( "rain collector fluid grid missing transformer config in %s", id.c_str() );
+            }
+            fluid_grid = fluid_grid_entry;
+        }
+    }
     mandatory( jo, was_loaded, "required_str", move_str_req );
     optional( jo, was_loaded, "max_volume", max_volume, volume_reader(), DEFAULT_MAX_VOLUME_IN_SQUARE );
     optional( jo, was_loaded, "deployed_item", deployed_item );
@@ -1661,11 +1726,87 @@ void furn_t::check() const
             }
         }
     }
+    if( fluid_grid ) {
+        const auto &fluid_grid_data = *fluid_grid;
+        if( fluid_grid_data.allowed_liquids.empty() ) {
+            debugmsg( "furn %s has fluid grid but no allowed_liquids set", id.c_str() );
+        }
+        const auto invalid_liquid = std::ranges::find_if(
+                                        fluid_grid_data.allowed_liquids,
+        []( const itype_id & liquid ) {
+            return !liquid.is_valid();
+        } );
+        if( invalid_liquid != fluid_grid_data.allowed_liquids.end() ) {
+            debugmsg( "furn %s has fluid grid with invalid liquid %s", id.c_str(),
+                      invalid_liquid->c_str() );
+        }
+        if( fluid_grid_data.role == fluid_grid_role::tank ) {
+            if( !fluid_grid_data.capacity && !fluid_grid_data.use_keg_capacity ) {
+                debugmsg( "furn %s has fluid grid tank role but no capacity configured", id.c_str() );
+            }
+            if( fluid_grid_data.capacity && *fluid_grid_data.capacity <= 0_ml ) {
+                debugmsg( "furn %s has fluid grid tank role but non-positive capacity", id.c_str() );
+            }
+            if( fluid_grid_data.use_keg_capacity && keg_capacity <= 0_ml ) {
+                debugmsg( "furn %s has fluid grid tank role but no keg_capacity set", id.c_str() );
+            }
+            if( fluid_grid_data.capacity && fluid_grid_data.use_keg_capacity ) {
+                debugmsg( "furn %s has both fluid grid capacity and use_keg_capacity set", id.c_str() );
+            }
+            if( !fluid_grid_data.connected_variant && !fluid_grid_data.disconnected_variant ) {
+                debugmsg( "furn %s has fluid grid tank role but no connected/disconnected variant configured",
+                          id.c_str() );
+            }
+        } else {
+            if( fluid_grid_data.capacity || fluid_grid_data.use_keg_capacity ) {
+                debugmsg( "furn %s has fluid grid non-tank role with capacity configured", id.c_str() );
+            }
+        }
+        if( ( fluid_grid_data.role == fluid_grid_role::transformer ||
+              fluid_grid_data.role == fluid_grid_role::rain_collector ) &&
+            !fluid_grid_data.transformer ) {
+            debugmsg( "furn %s has fluid grid transformer or rain_collector role but no transformer configured",
+                      id.c_str() );
+        }
+        if( fluid_grid_data.role == fluid_grid_role::rain_collector &&
+            fluid_grid_data.transformer &&
+            fluid_grid_data.transformer->collector_area_m2 <= 0.0 ) {
+            debugmsg( "furn %s has rain collector role but no collector_area_m2 set", id.c_str() );
+        }
+        if( fluid_grid_data.connected_variant && !fluid_grid_data.connected_variant->is_valid() ) {
+            debugmsg( "furn %s has invalid fluid grid connected_variant %s", id.c_str(),
+                      fluid_grid_data.connected_variant->c_str() );
+        }
+        if( fluid_grid_data.disconnected_variant && !fluid_grid_data.disconnected_variant->is_valid() ) {
+            debugmsg( "furn %s has invalid fluid grid disconnected_variant %s", id.c_str(),
+                      fluid_grid_data.disconnected_variant->c_str() );
+        }
+    }
 }
 
 const std::vector<furn_t> &furn_t::get_all()
 {
     return furniture_data.get_all();
+}
+
+auto fluid_grid_connected_variant( const furn_id &id ) -> std::optional<furn_id>
+{
+    const auto &connected = fluid_grid_connected_variants();
+    const auto iter = connected.find( id.obj().id );
+    if( iter == connected.end() || !iter->second.is_valid() ) {
+        return std::nullopt;
+    }
+    return furn_id( iter->second );
+}
+
+auto fluid_grid_disconnected_variant( const furn_id &id ) -> std::optional<furn_id>
+{
+    const auto &disconnected = fluid_grid_disconnected_variants();
+    const auto iter = disconnected.find( id.obj().id );
+    if( iter == disconnected.end() || !iter->second.is_valid() ) {
+        return std::nullopt;
+    }
+    return furn_id( iter->second );
 }
 
 void finalize_furn()
@@ -1682,6 +1823,7 @@ void finalize_furn()
             }
         }
     }
+    build_fluid_grid_variant_maps();
 
 }
 

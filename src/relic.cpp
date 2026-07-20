@@ -3,14 +3,16 @@
 #include <algorithm>
 #include <cmath>
 
+#include "action_time_scale.h"
+#include "calendar.h"
 #include "cata_unreachable.h"
 #include "creature.h"
 #include "character.h"
+#include "enchantments/enchantment.h"
 #include "field.h"
 #include "game.h"
 #include "json.h"
-#include "magic.h"
-#include "magic_enchantment.h"
+#include "magic/magic.h"
 #include "map.h"
 #include "map_iterator.h"
 #include "messages.h"
@@ -236,7 +238,7 @@ void relic::serialize( JsonOut &jsout ) const
     jsout.end_object();
 }
 
-int relic::activate( Creature &caster, const tripoint &target ) const
+int relic::activate( Creature &caster, const tripoint_bub_ms &target ) const
 {
     caster.moves -= moves;
     for( const fake_spell &sp : active_effects ) {
@@ -260,6 +262,12 @@ std::string relic::name() const
     return item_name_override.translated();
 }
 
+void relic::finalize()
+{
+    for( enchantment &ench : passive_effects ) {
+        ench.finalize();
+    }
+}
 void relic::check() const
 {
     for( const enchantment &ench : passive_effects ) {
@@ -347,7 +355,7 @@ bool check_recharge_reqs( const item &itm, const relic_recharge &rech, const Cha
             return carrier->has_effect( effect_sleep );
         }
         case relic_recharge_req::rad: {
-            return get_map().get_radiation( itm.position() ) > 0 || ( possess && carrier->get_rad() > 0 );
+            return get_map().get_radiation( itm.bub_pos() ) > 0 || ( possess && carrier->get_rad() > 0 );
         }
         case relic_recharge_req::wet: {
             bool soaked = false;
@@ -362,12 +370,12 @@ bool check_recharge_reqs( const item &itm, const relic_recharge &rech, const Cha
                 if( !wt.rains || wt.acidic || wt.precip == precip_class::none ) {
                     return false;
                 }
-                soaked = get_map().is_outside( itm.position() );
+                soaked = get_map().is_outside( itm.bub_pos() );
             }
             return soaked;
         }
         case relic_recharge_req::sky: {
-            return itm.position().z > 0;
+            return itm.abs_pos().z() > 0;
         }
         default: {
             std::abort();
@@ -378,7 +386,10 @@ bool check_recharge_reqs( const item &itm, const relic_recharge &rech, const Cha
 
 bool process_recharge_entry( item &itm, const relic_recharge &rech, Character *carrier )
 {
-    if( !calendar::once_every( rech.interval ) ) {
+    if( carrier ) {
+        itm.set_var( "relic_was_in_inventory", true );
+    }
+    if( !action_time_scale::once_every_this_tick( rech.interval ) ) {
         return false;
     }
     if( !check_recharge_reqs( itm, rech, carrier ) ) {
@@ -390,7 +401,7 @@ bool process_recharge_entry( item &itm, const relic_recharge &rech, Character *c
             break;
         }
         case relic_recharge_type::solar: {
-            if( !g->is_in_sunlight( itm.position() ) ) {
+            if( !g->is_in_sunlight( itm.bub_pos() ) ) {
                 return false;
             }
             break;
@@ -425,7 +436,7 @@ bool process_recharge_entry( item &itm, const relic_recharge &rech, Character *c
         }
         case relic_recharge_type::field: {
             bool consumed = false;
-            for( const tripoint &dest : here.points_in_radius( itm.position(), 1 ) ) {
+            for( const tripoint_bub_ms &dest : here.points_in_radius( itm.bub_pos(), 1 ) ) {
                 field_entry *field_at = here.field_at( dest ).find_field( rech.field_type );
                 if( !field_at ) {
                     continue;
@@ -444,7 +455,7 @@ bool process_recharge_entry( item &itm, const relic_recharge &rech, Character *c
         }
         case relic_recharge_type::trap: {
             bool consumed = false;
-            for( const tripoint &dest : here.points_in_radius( itm.position(), 1 ) ) {
+            for( const tripoint_bub_ms &dest : here.points_in_radius( itm.bub_pos(), 1 ) ) {
                 if( here.tr_at( dest ).id == rech.trap_type ) {
                     here.remove_trap( dest );
                     consumed = true;
@@ -459,17 +470,35 @@ bool process_recharge_entry( item &itm, const relic_recharge &rech, Character *c
             std::abort();
         }
     }
+    int rate_multiplier = 1; // Not quite sure where to put this
+    int ticks;
+    if( rech.type == relic_recharge_type::time ) {
+        int last_relic_process = itm.get_var( "last_relic_process", 0 );
+        if( last_relic_process == 0 &&
+            itm.get_var( "relic_was_in_inventory",
+                         false ) ) { // We do not want batteries to fully charge after it has been in a player's inventory
+            ticks = 1;
+        } else {
+            time_duration elapsed = calendar::turn - time_point::from_turn( last_relic_process );
+            ticks = elapsed / rech.interval;
+        }
+        if( ticks > 0 ) {
+            rate_multiplier = ticks;
+        }
+        itm.set_var( "last_relic_process", to_turn<int>( calendar::turn ) );
+    }
     // If it already has ammo, increment charges of ammo inside.
     if( itm.ammo_data() ) {
-        int ammo_charge = clamp( itm.ammo_remaining() + rech.rate, 0, itm.ammo_capacity() );
+        int ammo_charge = clamp( itm.ammo_remaining() + rech.rate * rate_multiplier, 0,
+                                 itm.ammo_capacity() );
         itm.ammo_set( itm.ammo_current(), ammo_charge );
     } else {
         // If not, either give it default ammo, or increment charges directly.
         if( !itm.ammo_types().empty() ) {
-            itm.ammo_set( itm.ammo_default(), clamp( itm.ammo_remaining() + rech.rate, 0,
+            itm.ammo_set( itm.ammo_default(), clamp( itm.ammo_remaining() + rech.rate * rate_multiplier, 0,
                           itm.ammo_capacity() ) );
         } else {
-            itm.charges = clamp( itm.charges + rech.rate, 0, itm.ammo_capacity() );
+            itm.charges = clamp( itm.charges + rech.rate * rate_multiplier, 0, itm.ammo_capacity() );
         }
     }
     if( rech.message ) {

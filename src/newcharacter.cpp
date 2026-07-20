@@ -30,6 +30,7 @@
 #include "character_martial_arts.h"
 #include "color.h"
 #include "cursesdef.h"
+#include "enchantments/enchantment.h"
 #include "filesystem.h"
 #include "fstream_utils.h"
 #include "game.h"
@@ -41,8 +42,7 @@
 #include "json.h"
 #include "lightmap.h"
 #include "npc_class.h"
-#include "magic.h"
-#include "magic_enchantment.h"
+#include "magic/magic.h"
 #include "make_static.h"
 #include "mapsharing.h"
 #include "martialarts.h"
@@ -80,15 +80,69 @@ static const std::string flag_CITY_START( "CITY_START" );
 static const std::string flag_SECRET( "SECRET" );
 
 static const std::string type_hair_style( "hair_style" );
-static const std::string type_skin_tone( "skin_tone" );
-static const std::string type_facial_hair( "facial_hair" );
-static const std::string type_eye_color( "eye_color" );
+static const std::string type_hair_color( "hair_color" );
 
 static const flag_id json_flag_no_auto_equip( "no_auto_equip" );
 static const flag_id json_flag_auto_wield( "auto_wield" );
 
 static const trait_id trait_XS( "XS" );
 static const trait_id trait_XXXL( "XXXL" );
+
+static const trait_flag_str_id flag_MALE_EXCLUSIVE( "MALE_EXCLUSIVE" );
+static const trait_flag_str_id flag_FEMALE_EXCLUSIVE( "FEMALE_EXCLUSIVE" );
+static const trait_flag_str_id flag_MALE_PREFERRED( "MALE_PREFERRED" );
+static const trait_flag_str_id flag_FEMALE_PREFERRED( "FEMALE_PREFERRED" );
+
+static auto profession_age_limits_enabled() -> bool
+{
+    if( world_generator && world_generator->active_world ) {
+        return world_generator->active_world->info->WORLD_OPTIONS["ENFORCE_PROFESSION_AGE_RANGE"]
+               .value_as<bool>();
+    }
+    return false;
+}
+
+static auto profession_age_bounds( const profession &prof ) -> std::pair<int, int>
+{
+    if( profession_age_limits_enabled() ) {
+        if( const auto range = prof.starting_age_range() ) {
+            return { range->min, range->max };
+        }
+    }
+    return { profession::min_age, profession::max_age };
+}
+
+static auto random_age_for_profession( const profession &prof ) -> int
+{
+    const auto [min_age, max_age] = profession_age_bounds( prof );
+    if( min_age == max_age ) {
+        return min_age;
+    }
+    return rng( min_age, max_age );
+}
+
+static auto scenario_is_selectable( const scenario &scen, const bool cities_enabled ) -> bool
+{
+    return !scen.scen_is_blacklisted() && ( !scen.has_flag( flag_CITY_START ) || cities_enabled );
+}
+
+static auto first_selectable_scenario( const bool cities_enabled ) -> const scenario * // *NOPAD*
+{
+    const auto &scenarios = scenario::get_all();
+    const auto iter = std::ranges::find_if( scenarios, [cities_enabled]( const scenario & scen ) {
+        return scenario_is_selectable( scen, cities_enabled );
+    } );
+    return iter != scenarios.end() ? &( *iter ) : scenario::generic();
+}
+
+static auto first_selectable_scenario( const std::vector<const scenario *> &scenarios,
+                                       const bool cities_enabled ) -> const scenario * // *NOPAD*
+{
+    const auto iter = std::ranges::find_if( scenarios, [cities_enabled]( const scenario * scen ) {
+        return scenario_is_selectable( *scen, cities_enabled );
+    } );
+    return iter != scenarios.end() ? *iter : scenarios.front();
+}
 
 // Colors used in this file: (Most else defaults to c_light_gray)
 #define COL_STAT_ACT        c_white   // Selected stat
@@ -228,28 +282,31 @@ void avatar::randomize( const bool random_scenario, points_left &points, bool pl
     } else {
         name = MAP_SHARING::getUsername();
     }
-    // if adjusting min and max age from 16 and 55, make sure to see set_description()
-    init_age = rng( 16, 55 );
     // if adjusting min and max height from 145 and 200, make sure to see set_description()
     init_height = rng( 145, 200 );
-    bool cities_enabled = world_generator->active_world->info->WORLD_OPTIONS["CITY_SIZE"].getValue() !=
-                          "0";
+    const auto cities_enabled =
+        world_generator->active_world->info->WORLD_OPTIONS["CITY_SIZE"].getValue() !=
+        "0";
     if( random_scenario ) {
         std::vector<const scenario *> scenarios;
         for( const auto &scen : scenario::get_all() ) {
-            if( !scen.has_flag( flag_CHALLENGE ) &&
-                ( !scen.has_flag( flag_CITY_START ) || cities_enabled ) ) {
+            if( !scen.has_flag( flag_CHALLENGE ) && scenario_is_selectable( scen, cities_enabled ) ) {
                 scenarios.emplace_back( &scen );
             }
         }
-        g->scen = random_entry( scenarios );
-    } else if( !cities_enabled ) {
-        static const string_id<scenario> wilderness_only_scenario( "wilderness" );
-        g->scen = &wilderness_only_scenario.obj();
+        if( scenarios.empty() ) {
+            g->scen = first_selectable_scenario( cities_enabled );
+        } else {
+            g->scen = random_entry( scenarios );
+        }
+    } else if( !scenario_is_selectable( *g->scen, cities_enabled ) ) {
+        g->scen = first_selectable_scenario( cities_enabled );
     }
 
     prof = g->scen->weighted_random_profession();
     random_start_location = true;
+    // if adjusting min and max age from 16 and 55, make sure to see set_description()
+    set_base_age( random_age_for_profession( *prof ) );
 
     str_max = rng( 6, HIGH_STAT - 2 );
     dex_max = rng( 6, HIGH_STAT - 2 );
@@ -401,7 +458,7 @@ void avatar::randomize( const bool random_scenario, points_left &points, bool pl
             case 8:
             case 9:
                 const skill_id aSkill = Skill::random_skill();
-                const int level = get_skill_level( aSkill );
+                const int level = get_skill_level( aSkill, true );
 
                 if( level < points.skill_points_left() && level < MAX_SKILL && loops > 10000 ) {
                     points.skill_points -= skill_increment_cost( *this, aSkill );
@@ -413,6 +470,7 @@ void avatar::randomize( const bool random_scenario, points_left &points, bool pl
         loops++;
     }
 
+    randomize_cosmetics();
     set_body();
 }
 
@@ -430,7 +488,7 @@ void Character::clear_cosmetic_traits( std::string mutation_type, trait_id new_t
 namespace
 {
 
-void set_cosmetic_trait( Character &c, std::string mutation_type, const trait_id &trait )
+auto set_cosmetic_trait( Character &c, std::string mutation_type, const trait_id &trait ) -> void
 {
     if( trait.is_valid() ) {
         c.clear_cosmetic_traits( mutation_type, trait );
@@ -441,17 +499,54 @@ void set_cosmetic_trait( Character &c, std::string mutation_type, const trait_id
     }
 }
 
+auto selected_cosmetic_trait( const Character &c,
+                              const std::string &mutation_type ) -> std::optional<trait_id>
+{
+    const auto mutations = get_mutations_in_type( mutation_type );
+    const auto has_trait = std::bind_front( &Character::has_trait, &c );
+    const auto selected = std::ranges::find_if( mutations, has_trait );
+    return selected != mutations.end() ? std::optional<trait_id>( *selected ) : std::nullopt;
+}
+
+auto restore_cosmetic_trait( Character &c, const std::string &mutation_type,
+                             const std::optional<trait_id> &trait ) -> void
+{
+    if( trait && g->scen->traitquery( *trait ) ) {
+        set_cosmetic_trait( c, mutation_type, *trait );
+    }
+}
+
+auto default_hair_style_for( const avatar &u ) -> trait_id
+{
+    static const auto male_default_hair_style = trait_id( "hair_medium" );
+    static const auto female_default_hair_style = trait_id( "hair_long" );
+    return u.male ? male_default_hair_style : female_default_hair_style;
+}
+
+auto set_default_hair_style( avatar &u ) -> void
+{
+    set_cosmetic_trait( u, type_hair_style, default_hair_style_for( u ) );
+}
+
+auto restore_or_default_hair_style( avatar &u, const std::optional<trait_id> &hair_style ) -> void
+{
+    restore_cosmetic_trait( u, type_hair_style, hair_style );
+    if( !selected_cosmetic_trait( u, type_hair_style ) ) {
+        set_default_hair_style( u );
+    }
+}
+
 } // namespace
 
 void avatar::randomize_cosmetics()
 {
-    randomize_cosmetic_trait( type_hair_style );
-    randomize_cosmetic_trait( type_skin_tone );
-    randomize_cosmetic_trait( type_eye_color );
-    //arbitrary 50% chance to add beard to male characters
-    if( male && one_in( 2 ) ) {
-        randomize_cosmetic_trait( type_facial_hair );
-    }
+    std::ranges::for_each( get_all_mutation_type_ids(), [this]( const std::string & type_id ) {
+        const bool mandatory = mutation_type_is_mandatory( type_id );
+        const int chance = mutation_type_random_chance( type_id );
+        if( mandatory || ( chance > 0 && x_in_y( chance, 100 ) ) ) {
+            randomize_cosmetic_trait( type_id );
+        }
+    } );
 }
 
 bool avatar::create( character_type type, const std::string &tempname )
@@ -471,18 +566,16 @@ bool avatar::create( character_type type, const std::string &tempname )
     int tab = 0;
     points_left points = points_left();
 
-    static auto male_default_hair = trait_id( "hair_black_medium" );
-    static auto female_default_hair = trait_id( "hair_blond_long" );
-
     switch( type ) {
         case character_type::CUSTOM:
+            // We can randomize cosmetics for a custom character, it's fine. Not sure I like the idea of a "default" appearance
+            randomize_cosmetics();
             // don't make them bald!
-            set_cosmetic_trait( *this, type_hair_style, male ? male_default_hair : female_default_hair );
+            set_default_hair_style( *this );
             break;
         case character_type::RANDOM:
             //random scenario, default name if exist
             randomize( true, points );
-            randomize_cosmetics();
             tab = NEWCHAR_TAB_MAX;
             break;
         case character_type::NOW:
@@ -527,7 +620,7 @@ bool avatar::create( character_type type, const std::string &tempname )
         }
 
         if( points.limit == points_left::TRANSFER ) {
-            tab = 6;
+            tab = NEWCHAR_TAB_MAX;
         }
 
         switch( tab ) {
@@ -886,11 +979,14 @@ tab_direction set_stats( avatar &u, points_left &points )
     // Setting the position to -1 ensures that the INBOUNDS check in
     // map.cpp is triggered. This check prevents access to invalid position
     // on the map (like -1,0) and instead returns a dummy default value.
-    u.setx( -1 );
+    auto old_pos = u.bub_pos();
+    old_pos.x() = -1;
+    u.Character::setpos( old_pos );
     u.reset();
     // set position back to 0 to prevent out-of-bound access to lightmap
     // array in map::build_seen_cache()
-    u.setx( 0 );
+    old_pos.x() = 0;
+    u.Character::setpos( old_pos );
 
     ui.on_redraw( [&]( const ui_adaptor & ) {
         werase( w );
@@ -1122,6 +1218,17 @@ tab_direction set_traits( avatar &u, points_left &points )
         // Don't list blacklisted traits
         if( mutation_branch::trait_is_blacklisted( traits_iter.id ) ) {
             continue;
+        }
+
+        // Hide exclusive traits for the wrong gender
+        if( u.male ) {
+            if( traits_iter.flags.contains( flag_FEMALE_EXCLUSIVE ) ) {
+                continue;
+            }
+        } else {
+            if( traits_iter.flags.contains( flag_MALE_EXCLUSIVE ) ) {
+                continue;
+            }
         }
 
         // Always show profession locked traits, regardless of if they are forbidden
@@ -1435,9 +1542,33 @@ tab_direction set_traits( avatar &u, points_left &points )
                     inc_type = 0;
                     popup( _( "Your profession of %s prevents you from removing this trait." ),
                            u.prof->gender_appropriate_name( u.male ) );
+                } else {
+                    const auto mandatory_type = std::ranges::find_if( cur_trait.obj().types,
+                    []( const auto & t ) { return mutation_type_is_mandatory( t ); } );
+                    if( mandatory_type != cur_trait.obj().types.end() ) {
+                        inc_type = 0;
+                        popup( _( "You need to select 1 %s." ), mutation_type_display_name( *mandatory_type ) );
+                    }
                 }
             } else if( newcharacter::has_conflicting_trait( u, cur_trait ) ) {
-                popup( _( "You already picked a conflicting trait!" ) );
+                const auto &new_types = cur_trait.obj().types;
+                const bool do_swap = std::ranges::any_of( new_types,
+                []( const auto & t ) { return mutation_type_swaps_on_conflict( t ); } );
+                if( do_swap ) {
+                    const auto base_traits = u.get_base_traits();
+                    auto it = std::ranges::find_if( base_traits, [&]( const trait_id & tr ) {
+                        return tr != cur_trait && std::ranges::any_of( tr.obj().types,
+                        [&]( const auto & t ) { return new_types.contains( t ); } );
+                    } );
+                    if( it != base_traits.end() ) {
+                        inc_type = 1;
+                        u.toggle_trait( *it );
+                    } else {
+                        popup( _( "You already picked a conflicting trait!" ) );
+                    }
+                } else {
+                    popup( _( "You already picked a conflicting trait!" ) );
+                }
             } else if( g->scen->is_forbidden_trait( cur_trait ) ) {
                 popup( _( "The scenario you picked prevents you from taking this trait!" ) );
             } else if( u.prof->is_forbidden_trait( cur_trait ) ) {
@@ -2436,6 +2567,7 @@ tab_direction set_profession( avatar &u, points_left &points,
             }
             const int netPointCost = sorted_profs[cur_id]->point_cost() - u.prof->point_cost();
             u.prof = sorted_profs[cur_id];
+            u.set_base_age( random_age_for_profession( *u.prof ) );
             // Add traits for the new profession (and perhaps scenario, if, for example,
             // both the scenario and old profession require the same trait)
             newcharacter::add_traits( u, points );
@@ -2477,7 +2609,7 @@ tab_direction set_profession( avatar &u, points_left &points,
  */
 static int skill_increment_cost( const Character &u, const skill_id &skill )
 {
-    return std::max( 1, ( u.get_skill_level( skill ) + 1 ) / 2 );
+    return std::max( 1, ( u.get_skill_level( skill, true ) + 1 ) / 2 );
 }
 
 tab_direction set_skills( avatar &u, points_left &points )
@@ -2548,7 +2680,7 @@ tab_direction set_skills( avatar &u, points_left &points )
 
         // Write the hint as to upgrade costs
         const int cost = skill_increment_cost( u, currentSkill->ident() );
-        const int level = u.get_skill_level( currentSkill->ident() );
+        const int level = u.get_skill_level( currentSkill->ident(), true );
         const int upgrade_levels = level == 0 ? 2 : 1;
         // We have two different strings to pluralize, so we have to use two
         // translation calls.
@@ -2656,7 +2788,7 @@ tab_direction set_skills( avatar &u, points_left &points )
             if( y < iContentHeight + 5 ) {
                 // Clear the line. 2 for x-coord because category names will be scrolled over.
                 mvwprintz( w, point( 2, y ), c_light_gray, std::string( getmaxx( w ) - 3, ' ' ) );
-                if( u.get_skill_level( thisSkill->ident() ) == 0 ) {
+                if( u.get_skill_level( thisSkill->ident(), true ) == 0 ) {
                     mvwprintz( w, point( 4, y ),
                                ( i == cur_pos ? h_light_gray : c_light_gray ), thisSkill->name() );
                 } else {
@@ -2665,7 +2797,7 @@ tab_direction set_skills( avatar &u, points_left &points )
                                thisSkill->name() );
                     mvwprintz( w, point( 20, y ),
                                ( i == cur_pos ? hilite( COL_SKILL_USED ) : COL_SKILL_USED ),
-                               " (%d)", u.get_skill_level( thisSkill->ident() ) );
+                               " (%d)", u.get_skill_level( thisSkill->ident(), true ) );
                 }
             }
             for( auto &prof_skill : u.prof->skills() ) {
@@ -2696,7 +2828,7 @@ tab_direction set_skills( avatar &u, points_left &points )
         } else if( action == "RANDOMIZE" ) {
             cur_pos = modulo( rng( 0, num_skills - 1 ), num_skills );
         } else if( action == "LEFT" ) {
-            const int level = u.get_skill_level( currentSkill->ident() );
+            const int level = u.get_skill_level( currentSkill->ident(), true );
             if( level > 0 ) {
                 // For balance reasons, increasing a skill from level 0 gives 1 extra level for free, but
                 // decreasing it from level 2 forfeits the free extra level (thus changes it to 0)
@@ -2705,7 +2837,7 @@ tab_direction set_skills( avatar &u, points_left &points )
                 points.skill_points += skill_increment_cost( u, currentSkill->ident() );
             }
         } else if( action == "RIGHT" ) {
-            const int level = u.get_skill_level( currentSkill->ident() );
+            const int level = u.get_skill_level( currentSkill->ident(), true );
             if( level < MAX_SKILL ) {
                 points.skill_points -= skill_increment_cost( u, currentSkill->ident() );
                 // For balance reasons, increasing a skill from level 0 gives 1 extra level for free
@@ -3028,11 +3160,13 @@ tab_direction set_scenario( avatar &u, points_left &points,
             scenario_sorter.cities_enabled = wopts["CITY_SIZE"].getValue() != "0";
             std::stable_sort( sorted_scens.begin(), sorted_scens.end(), scenario_sorter );
 
-            // If city size is 0 but the current scenario requires cities reset the scenario
-            if( !scenario_sorter.cities_enabled && g->scen->has_flag( "CITY_START" ) ) {
-                reset_scenario( u, sorted_scens[0] );
+            // Reset if the current scenario is no longer selectable, such as when a mod whitelist hides it.
+            if( !scenario_is_selectable( *g->scen, scenario_sorter.cities_enabled ) ) {
+                const auto *fallback_scenario = first_selectable_scenario( sorted_scens,
+                                                scenario_sorter.cities_enabled );
+                reset_scenario( u, fallback_scenario );
                 points.init_from_options();
-                points.skill_points -= sorted_scens[cur_id]->point_cost();
+                points.skill_points -= g->scen->point_cost();
             }
 
             // Select the current scenario, if possible.
@@ -3372,7 +3506,8 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
         profession::StartingSkillList list_skills = you.prof->skills();
         skill_displayType_id last_category = skill_displayType_id::NULL_ID();
         for( auto &elem : skillslist ) {
-            int level = you.get_skill_level( elem->ident() );
+            // Here we can display the actual level because it is not editing it
+            int level = you.get_skill_level( elem->ident(), false );
 
             if( points.limit != points_left::TRANSFER ) {
                 for( auto &prof_skill : you.prof->skills() ) {
@@ -3655,13 +3790,17 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
     // do not switch IME mode now, but restore previous mode on return
     ime_sentry sentry( ime_sentry::keep );
 
-    int min_allowed_age = 16;
-    int max_allowed_age = 55;
+    int min_allowed_age = profession::min_age;
+    int max_allowed_age = profession::max_age;
     // in centimeters. 2 std. deviations below average female height
     int min_allowed_height = 145;
     int max_allowed_height = 200;
 
     do {
+        const auto [new_min_age, new_max_age] = profession_age_bounds( *you.prof );
+        min_allowed_age = new_min_age;
+        max_allowed_age = new_max_age;
+        you.set_base_age( clamp( you.base_age(), min_allowed_age, max_allowed_age ) );
         ui_manager::redraw();
         const std::string action = ctxt.handle_input();
 #if defined(TILES)
@@ -3821,12 +3960,14 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
                     break;
                 }
                 case char_creation::AGE: {
-                    popup.title( _( "Enter age in years.  Minimum 16, maximum 55" ) )
+                    const std::string title = string_format( _( "Enter age in years.  Minimum %d, maximum %d" ),
+                                              min_allowed_age, max_allowed_age );
+                    popup.title( title )
                     .text( string_format( "%d", you.base_age() ) )
                     .only_digits( true );
                     const int result = popup.query_int();
                     if( result != 0 ) {
-                        you.set_base_age( clamp( result, 16, 55 ) );
+                        you.set_base_age( clamp( result, min_allowed_age, max_allowed_age ) );
                     }
                     break;
                 }
@@ -3926,7 +4067,8 @@ trait_id newcharacter::random_good_trait()
     std::vector<trait_id> vTraitsGood;
 
     for( auto &traits_iter : mutation_branch::get_all() ) {
-        if( traits_iter.points > 0 && g->scen->traitquery( traits_iter.id ) ) {
+        if( traits_iter.points > 0 && g->scen->traitquery( traits_iter.id ) &&
+            traits_iter.randomstartingtrait ) {
             vTraitsGood.push_back( traits_iter.id );
         }
     }
@@ -3939,7 +4081,8 @@ trait_id newcharacter::random_bad_trait()
     std::vector<trait_id> vTraitsBad;
 
     for( auto &traits_iter : mutation_branch::get_all() ) {
-        if( traits_iter.points < 0 && g->scen->traitquery( traits_iter.id ) ) {
+        if( traits_iter.points < 0 && g->scen->traitquery( traits_iter.id ) &&
+            traits_iter.randomstartingtrait ) {
             vTraitsBad.push_back( traits_iter.id );
         }
     }
@@ -3961,13 +4104,39 @@ trait_id Character::get_random_trait( const std::function<bool( const mutation_b
 }
 
 
+auto newcharacter::add_default_mutation_type_traits( Character &ch ) -> void
+{
+    for( const auto &default_mutation : get_default_mutations_for_types() ) {
+        const auto mutations = get_mutations_in_type( default_mutation.type_id );
+        const auto has_mutation_type = std::ranges::any_of( mutations, [&]( const auto & trait ) {
+            return ch.has_trait( trait );
+        } );
+        if( !has_mutation_type && default_mutation.trait.is_valid() ) {
+            if( ch.has_base_trait( default_mutation.trait ) ) {
+                ch.set_mutation( default_mutation.trait );
+            } else {
+                ch.toggle_trait( default_mutation.trait );
+            }
+        }
+    }
+}
+
 void Character::randomize_cosmetic_trait( std::string mutation_type )
 {
-    trait_id trait = get_random_trait( [mutation_type]( const mutation_branch & mb ) {
-        return mb.points == 0 && mb.types.contains( mutation_type );
+    trait_id trait = get_random_trait( [&]( const mutation_branch & mb ) {
+        if( mb.points != 0 || !mb.types.contains( mutation_type ) ) {
+            return false;
+        }
+        if( male ) {
+            return !mb.flags.contains( flag_FEMALE_EXCLUSIVE ) &&
+                   !mb.flags.contains( flag_FEMALE_PREFERRED );
+        } else {
+            return !mb.flags.contains( flag_MALE_EXCLUSIVE ) &&
+                   !mb.flags.contains( flag_MALE_PREFERRED );
+        }
     } );
 
-    if( trait.is_valid() ) { // <-- IMPORTANT
+    if( trait.is_valid() ) {
         clear_cosmetic_traits( mutation_type, trait );
 
         if( !has_trait( trait ) ) {
@@ -4109,6 +4278,9 @@ void reset_scenario( avatar &u, const scenario *scen )
     const profession_id &default_prof = *std::min_element( permitted.begin(), permitted.end(),
                                         psorter );
 
+    const auto previous_hair_style = selected_cosmetic_trait( u, type_hair_style );
+    const auto previous_hair_color = selected_cosmetic_trait( u, type_hair_color );
+
     u.random_start_location = true;
     u.str_max = 8;
     u.dex_max = 8;
@@ -4116,6 +4288,7 @@ void reset_scenario( avatar &u, const scenario *scen )
     u.per_max = 8;
     g->scen = scen;
     u.prof = default_prof;
+    u.set_base_age( random_age_for_profession( *u.prof ) );
     for( auto &t : u.get_mutations() ) {
         if( t.obj().hp_modifier != 0 ) {
             u.toggle_trait( t );
@@ -4126,6 +4299,8 @@ void reset_scenario( avatar &u, const scenario *scen )
     u.clear_skills();
     u.clear_bionics();
     newcharacter::add_traits( u );
+    restore_cosmetic_trait( u, type_hair_color, previous_hair_color );
+    restore_or_default_hair_style( u, previous_hair_style );
 }
 
 points_left::points_left()

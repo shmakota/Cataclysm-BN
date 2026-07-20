@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "all_enum_values.h"
 #include "consistency_report.h"
 #include "debug.h"
 #include "enum_conversions.h"
@@ -35,6 +36,170 @@ void read_and_set_or_throw( const JsonObject &jo, const std::string &member, T &
         target = tmp;
     }
 }
+
+namespace
+{
+
+auto load_isolated_city_special_settings( const JsonObject &jo )
+-> isolated_city_special_settings
+{
+    auto settings = isolated_city_special_settings();
+    jo.read( "special", settings.special );
+    jo.read( "placement", settings.placement );
+    jo.read( "min_city_size", settings.min_city_size );
+    jo.read( "max_city_size", settings.max_city_size );
+    jo.read( "min_island_radius", settings.min_island_radius );
+    jo.read( "max_island_radius", settings.max_island_radius );
+    jo.read( "chance", settings.chance );
+    return settings;
+}
+
+auto load_isolated_city_special_settings_array(
+    const JsonObject &jo, const std::string &member,
+    std::vector<isolated_city_special_settings> &settings ) -> void
+{
+    if( !jo.has_array( member ) ) {
+        return;
+    }
+    settings.clear();
+    for( const JsonObject entry : jo.get_array( member ) ) {
+        settings.push_back( load_isolated_city_special_settings( entry ) );
+    }
+}
+
+auto load_isolated_city_settings( const JsonObject &jo, isolated_city_settings &settings ) -> void
+{
+    jo.read( "enabled", settings.enabled );
+    jo.read( "city_size", settings.city_size );
+    jo.read( "min_city_size", settings.min_city_size );
+    jo.read( "max_city_size", settings.max_city_size );
+    jo.read( "city_spacing", settings.city_spacing );
+    jo.read( "island_radius", settings.island_radius );
+    jo.read( "shore_width", settings.shore_width );
+    jo.read( "land_padding", settings.land_padding );
+    jo.read( "road_padding", settings.road_padding );
+    jo.read( "coastline_variance", settings.coastline_variance );
+    jo.read( "register_city", settings.register_city );
+    jo.read( "base_oter", settings.base_oter );
+    jo.read( "land_oter", settings.land_oter );
+    jo.read( "shore_oter", settings.shore_oter );
+    jo.read( "center_oter", settings.center_oter );
+    jo.read( "road_connection", settings.road_connection );
+    load_isolated_city_special_settings_array( jo, "required_specials",
+            settings.required_specials );
+    load_isolated_city_special_settings_array( jo, "optional_specials",
+            settings.optional_specials );
+}
+
+auto check_isolated_city_settings( consistency_report &rep,
+                                   const regional_settings &region ) -> void
+{
+    const auto &config = region.isolated_city;
+    if( !config.enabled ) {
+        return;
+    }
+
+    const auto check_required_oter = [&rep]( const char *member, const oter_str_id & id ) {
+        if( !id.is_valid() ) {
+            rep.warn( "isolated_city.%s references unknown overmap terrain \"%s\"", member,
+                      id.str() );
+        }
+    };
+    const auto check_optional_oter = [&rep]( const char *member, const oter_str_id & id ) {
+        if( !id.str().empty() && !id.is_valid() ) {
+            rep.warn( "isolated_city.%s references unknown overmap terrain \"%s\"", member,
+                      id.str() );
+        }
+    };
+
+    const auto base_oter = config.base_oter.str().empty() ? region.default_oter : config.base_oter;
+    check_required_oter( "base_oter", base_oter );
+    check_required_oter( "land_oter", config.land_oter );
+    check_required_oter( "center_oter", config.center_oter );
+    check_optional_oter( "shore_oter", config.shore_oter );
+
+    if( !config.road_connection.is_valid() ) {
+        rep.warn( "isolated_city.road_connection references unknown overmap connection \"%s\"",
+                  config.road_connection.str() );
+    }
+
+    const auto check_anchor = [&rep]( const char *member,
+    const isolated_city_special_settings & anchor ) {
+        if( !anchor.special.is_valid() ) {
+            rep.warn( "isolated_city.%s references unknown overmap special \"%s\"",
+                      member, anchor.special.str() );
+        }
+        if( anchor.placement != "center" && anchor.placement != "land" &&
+            anchor.placement != "shore" ) {
+            rep.warn( "isolated_city.%s uses invalid placement \"%s\"",
+                      member, anchor.placement );
+        }
+        if( anchor.min_city_size < 0 ) {
+            rep.warn( "isolated_city.%s min_city_size must be 0 or greater", member );
+        }
+        if( anchor.max_city_size < -1 ) {
+            rep.warn( "isolated_city.%s max_city_size must be -1 or greater", member );
+        }
+        if( anchor.max_city_size >= 0 && anchor.max_city_size < anchor.min_city_size ) {
+            rep.warn( "isolated_city.%s max_city_size must be greater than or equal to "
+                      "min_city_size", member );
+        }
+        if( anchor.min_island_radius < 0 ) {
+            rep.warn( "isolated_city.%s min_island_radius must be 0 or greater", member );
+        }
+        if( anchor.max_island_radius < -1 ) {
+            rep.warn( "isolated_city.%s max_island_radius must be -1 or greater", member );
+        }
+        if( anchor.max_island_radius >= 0 &&
+            anchor.max_island_radius < anchor.min_island_radius ) {
+            rep.warn( "isolated_city.%s max_island_radius must be greater than or equal to "
+                      "min_island_radius", member );
+        }
+        if( anchor.chance < 0 || anchor.chance > 100 ) {
+            rep.warn( "isolated_city.%s chance must be between 0 and 100", member );
+        }
+    };
+    for( const auto &anchor : config.required_specials ) {
+        check_anchor( "required_specials", anchor );
+    }
+    for( const auto &anchor : config.optional_specials ) {
+        check_anchor( "optional_specials", anchor );
+    }
+
+    if( config.city_size < -1 ) {
+        rep.warn( "isolated_city.city_size must be -1 or greater" );
+    }
+    if( config.min_city_size < 1 ) {
+        rep.warn( "isolated_city.min_city_size must be 1 or greater" );
+    }
+    if( config.max_city_size < -1 ) {
+        rep.warn( "isolated_city.max_city_size must be -1 or greater" );
+    }
+    if( config.max_city_size >= 0 && config.max_city_size < config.min_city_size ) {
+        rep.warn( "isolated_city.max_city_size must be greater than or equal to "
+                  "min_city_size" );
+    }
+    if( config.city_spacing < -1 ) {
+        rep.warn( "isolated_city.city_spacing must be -1 or greater" );
+    }
+    if( config.island_radius < -1 ) {
+        rep.warn( "isolated_city.island_radius must be -1 or greater" );
+    }
+    if( config.shore_width < 0 ) {
+        rep.warn( "isolated_city.shore_width must be 0 or greater" );
+    }
+    if( config.land_padding < -1 ) {
+        rep.warn( "isolated_city.land_padding must be -1 or greater" );
+    }
+    if( config.road_padding < -1 ) {
+        rep.warn( "isolated_city.road_padding must be -1 or greater" );
+    }
+    if( config.coastline_variance < -1 ) {
+        rep.warn( "isolated_city.coastline_variance must be -1 or greater" );
+    }
+}
+
+} // namespace
 
 static void load_forest_biome_component(
     const JsonObject &jo, forest_biome_component &forest_biome_component, const bool overlay )
@@ -328,6 +493,10 @@ static void load_overmap_lake_settings( const JsonObject &jo,
                                     overmap_lake_settings.lake_size_min, !overlay );
         read_and_set_or_throw<int>( overmap_lake_settings_jo, "lake_depth",
                                     overmap_lake_settings.lake_depth, !overlay );
+        overmap_lake_settings_jo.read( "lake_surface_column_oters",
+                                       overmap_lake_settings.lake_surface_column_oters );
+        overmap_lake_settings_jo.read( "lake_shore_column_oters",
+                                       overmap_lake_settings.lake_shore_column_oters );
 
         if( !overmap_lake_settings_jo.has_array( "shore_extendable_overmap_terrain" ) ) {
             if( !overlay ) {
@@ -526,10 +695,18 @@ void load_region_settings( const JsonObject &jo )
         }
     } else {
         JsonObject cjo = jo.get_object( "city" );
+        cjo.read( "city_size", new_region.city_spec.city_size );
+        cjo.read( "city_spacing", new_region.city_spec.city_spacing );
         if( !cjo.read( "shop_radius", new_region.city_spec.shop_radius ) && strict ) {
             jo.throw_error( "city: shop_radius required for default" );
         }
         if( !cjo.read( "shop_sigma", new_region.city_spec.shop_sigma ) && strict ) {
+            jo.throw_error( "city: shop_sigma required for default" );
+        }
+        if( !cjo.read( "apartment_radius", new_region.city_spec.apartment_radius ) && strict ) {
+            jo.throw_error( "city: shop_radius required for default" );
+        }
+        if( !cjo.read( "apartment_sigma", new_region.city_spec.apartment_sigma ) && strict ) {
             jo.throw_error( "city: shop_sigma required for default" );
         }
         if( !cjo.read( "park_radius", new_region.city_spec.park_radius ) && strict ) {
@@ -552,11 +729,17 @@ void load_region_settings( const JsonObject &jo )
             }
         };
         load_building_types( "houses", new_region.city_spec.houses );
+        load_building_types( "urban_houses", new_region.city_spec.urban_houses );
         load_building_types( "shops", new_region.city_spec.shops );
+        load_building_types( "urban_shops", new_region.city_spec.urban_shops );
         load_building_types( "parks", new_region.city_spec.parks );
         if( cjo.has_member( "finales" ) ) {
             load_building_types( "finales", new_region.city_spec.finales );
         }
+    }
+
+    if( jo.has_object( "isolated_city" ) ) {
+        load_isolated_city_settings( jo.get_object( "isolated_city" ), new_region.isolated_city );
     }
 
     if( !jo.has_object( "weather" ) ) {
@@ -568,6 +751,45 @@ void load_region_settings( const JsonObject &jo )
         new_region.weather = weather_generator::load( wjo );
     }
 
+    // Unclear if required. C++ uninitialized values now concern me.
+    new_region.region_effects = {};
+    for( const auto effect_type : all_enum_values<region_effect_type>() ) {
+        new_region.region_effects[effect_type] = {};
+    }
+
+    if( jo.has_array( "effects" ) ) {
+        JsonArray effects = jo.get_array( "effects" );
+        for( JsonObject effect_object : effects ) {
+            auto effect_type = region_effect_type::generic;
+            efftype_id effect_id( effect_object.get_string( "effect_id" ) );
+            int one_in = 0;
+            if( effect_object.has_int( "one_in" ) ) {
+                one_in = effect_object.get_int( "one_in" );
+            }
+            if( effect_object.has_string( "effect_type" ) ) {
+                if( effect_object.get_string( "effect_type" ) == "generic" ) {
+                    effect_type = region_effect_type::generic;
+                } else if( effect_object.get_string( "effect_type" ) == "night_time" ) {
+                    effect_type = region_effect_type::night_time;
+                } else if( effect_object.get_string( "effect_type" ) == "sunlight" ) {
+                    effect_type = region_effect_type::sunlight;
+                } else if( effect_object.get_string( "effect_type" ) == "surface" ) {
+                    effect_type = region_effect_type::surface;
+                } else if( effect_object.get_string( "effect_type" ) == "underground" ) {
+                    effect_type = region_effect_type::underground;
+                } else if( effect_object.get_string( "effect_type" ) == "underwater" ) {
+                    effect_type = region_effect_type::underwater;
+                } else if( effect_object.get_string( "effect_type" ) == "sleep" ) {
+                    effect_type = region_effect_type::sleep;
+                } else {
+                    debugmsg( "Unknown effect type: %s", effect_object.get_string( "effect_type" ) );
+                }
+            }
+            std::pair<efftype_id, int> effect( effect_id, one_in );
+            new_region.region_effects[effect_type].emplace_back( effect );
+        }
+    }
+
     load_overmap_feature_flag_settings( jo, new_region.overmap_feature_flag, strict, false );
 
     load_overmap_forest_settings( jo, new_region.overmap_forest, strict, false );
@@ -576,6 +798,8 @@ void load_region_settings( const JsonObject &jo )
 
     load_region_terrain_and_furniture_settings( jo, new_region.region_terrain_and_furniture, strict,
             false );
+
+    jo.read( "display_oter", new_region.display_oter );
 
     region_settings_map[new_region.id] = new_region;
 }
@@ -701,8 +925,12 @@ void apply_region_overlay( const JsonObject &jo, regional_settings &region )
 
     JsonObject cityjo = jo.get_object( "city" );
 
+    cityjo.read( "city_size", region.city_spec.city_size );
+    cityjo.read( "city_spacing", region.city_spec.city_spacing );
     cityjo.read( "shop_radius", region.city_spec.shop_radius );
     cityjo.read( "shop_sigma", region.city_spec.shop_sigma );
+    cityjo.read( "apartment_radius", region.city_spec.shop_radius );
+    cityjo.read( "apartment_sigma", region.city_spec.shop_sigma );
     cityjo.read( "park_radius", region.city_spec.park_radius );
     cityjo.read( "park_sigma", region.city_spec.park_sigma );
 
@@ -715,10 +943,16 @@ void apply_region_overlay( const JsonObject &jo, regional_settings &region )
         }
     };
     load_building_types( "houses", region.city_spec.houses );
+    load_building_types( "urban_houses", region.city_spec.urban_houses );
     load_building_types( "shops", region.city_spec.shops );
+    load_building_types( "urban_shops", region.city_spec.urban_shops );
     load_building_types( "parks", region.city_spec.parks );
     if( cityjo.has_member( "finales" ) ) {
         load_building_types( "finales", region.city_spec.finales );
+    }
+
+    if( jo.has_object( "isolated_city" ) ) {
+        load_isolated_city_settings( jo.get_object( "isolated_city" ), region.isolated_city );
     }
 
     load_overmap_feature_flag_settings( jo, region.overmap_feature_flag, false, true );
@@ -728,6 +962,8 @@ void apply_region_overlay( const JsonObject &jo, regional_settings &region )
     load_overmap_lake_settings( jo, region.overmap_lake, false, true );
 
     load_region_terrain_and_furniture_settings( jo, region.region_terrain_and_furniture, false, true );
+
+    jo.read( "display_oter", region.display_oter );
 }
 
 void groundcover_extra::finalize()   // FIXME: return bool for failure
@@ -922,6 +1158,19 @@ void forest_trail_settings::finalize()
 
 void overmap_lake_settings::finalize()
 {
+    const auto check_column_oters = []( const std::vector<oter_str_id> &oters,
+    const std::string & member ) {
+        for( const auto &oter : oters ) {
+            if( !oter.is_valid() ) {
+                debugmsg( "Tried to add invalid overmap terrain %s to overmap_lake_settings %s.",
+                          oter.c_str(), member.c_str() );
+            }
+        }
+    };
+
+    check_column_oters( lake_surface_column_oters, "lake_surface_column_oters" );
+    check_column_oters( lake_shore_column_oters, "lake_shore_column_oters" );
+
     for( const std::string &oid : unfinalized_shore_extendable_overmap_terrain ) {
         const oter_str_id ot( oid );
         if( !ot.is_valid() ) {
@@ -1026,9 +1275,19 @@ overmap_special_id city_settings::pick_house() const
     return houses.pick()->id;
 }
 
+overmap_special_id city_settings::pick_urban_house() const
+{
+    return urban_houses.pick()->id;
+}
+
 overmap_special_id city_settings::pick_shop() const
 {
     return shops.pick()->id;
+}
+
+overmap_special_id city_settings::pick_urban_shop() const
+{
+    return urban_shops.pick()->id;
 }
 
 overmap_special_id city_settings::pick_park() const
@@ -1044,7 +1303,9 @@ overmap_special_id city_settings::pick_finale() const
 void city_settings::finalize()
 {
     houses.finalize();
+    urban_houses.finalize();
     shops.finalize();
+    urban_shops.finalize();
     parks.finalize();
     if( !finales.unfinalized_buildings.empty() ) {
         finales.finalize();
@@ -1065,11 +1326,14 @@ overmap_special_id building_bin::pick() const
 {
     if( !finalized ) {
         debugmsg( "Tried to pick a special out of a non-finalized bin" );
-        overmap_special_id null_special( "null" );
-        return null_special;
+        return overmap_special_id( "null" );
     }
 
-    return *buildings.pick();
+    const auto *result = buildings.pick();
+    if( !result ) {
+        return overmap_special_id( "null" );
+    }
+    return *result;
 }
 
 void building_bin::clear()
@@ -1086,10 +1350,7 @@ void building_bin::finalize()
         debugmsg( "Tried to finalize a finalized bin (that's a code-side error which can't be fixed with jsons)" );
         return;
     }
-    if( unfinalized_buildings.empty() ) {
-        debugmsg( "There must be at least one entry in this building bin." );
-        return;
-    }
+    // Empty bins are valid — pick() returns null_special, causing no building to be placed.
 
     for( const std::pair<const overmap_special_id, int> &pr : unfinalized_buildings ) {
         overmap_special_id current_id = pr.first;
@@ -1124,6 +1385,8 @@ void check_regional_settings()
                 }
             }
         }
+
+        check_isolated_city_settings( rep, region );
 
         if( !rep.is_empty() ) {
             debugmsg( rep.format( "region_settings", region_id ) );

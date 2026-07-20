@@ -21,7 +21,7 @@
 #include "rot.h"
 #include "ui_manager.h"
 //#include "handle_action.cpp"
-#include "url_utility.h"
+#include "utils/url.h"
 #include "options.h"
 #include "ui.h"
 
@@ -62,7 +62,7 @@ bool run(
 
     int info_area_scroll_pos = 0;
     constexpr int info_area_scroll_step = 3;
-    temperature_flag temperature = rot::temperature_flag_for_location( get_map(), itm );
+    temperature_flag temperature = rot::temp::for_location( get_map(), itm );
     std::vector<iteminfo> item_info_vals = itm.info( temperature );
     std::vector<iteminfo> dummy_compare;
     item_info_data data( itm.tname(), itm.type_name(), item_info_vals, dummy_compare,
@@ -182,7 +182,7 @@ bool run(
     } );
 
     add_entry( "DROP", rate_drop_item, [&]() {
-        you.drop( itm, you.pos() );
+        you.drop( itm, you.bub_pos() );
         return true;
     } );
 

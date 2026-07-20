@@ -159,7 +159,8 @@
     "encumbrance": 30,
     "warmth": 10,
     "material_thickness": 4,
-    "flags": [ "VARSIZE", "OUTER", "STURDY" ]
+    "flags": [ "VARSIZE", "OUTER", "STURDY" ],
+    "valid_mods": [ "steel_padded", "hard_steel_padded", "alloy_padded" ]
   },
   {
     "id": "cuirass_lightplate_superalloy",
@@ -310,29 +311,6 @@
     "warmth": 10,
     "material_thickness": 6,
     "flags": [ "BELTED" ]
-  },
-  {
-    "id": "kevlar",
-    "repairs_like": "survivor_suit",
-    "type": "ARMOR",
-    "name": { "str": "Kevlar vest" },
-    "description": "A lightweight, bullet resistant vest.  Suitable for wearing under clothing.",
-    "weight": "2860 g",
-    "volume": "6 L",
-    "price": "800 USD",
-    "price_postapoc": "1250 cent",
-    "to_hit": -3,
-    "bashing": 6,
-    "material": [ "kevlar" ],
-    "symbol": "[",
-    "looks_like": "vest_leather",
-    "color": "light_gray",
-    "covers": [ "torso" ],
-    "coverage": 85,
-    "encumbrance": 5,
-    "warmth": 15,
-    "material_thickness": 4,
-    "flags": [ "STURDY", "SKINTIGHT" ]
   },
   {
     "id": "lsurvivor_armor",

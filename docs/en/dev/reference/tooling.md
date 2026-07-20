@@ -1,44 +1,40 @@
 # Developer Tooling
 
-## Code style (astyle)
+## Code style (C++)
 
-Automatic formatting of the source code is performed by
-[Artistic Style](http://astyle.sourceforge.net/), or `astyle` for short.
+C++ formatting uses [Artistic Style](http://astyle.sourceforge.net/) only for top-level
+`src/*.cpp` and `src/*.h`. Most other C++ files use
+[clang-format](https://clang.llvm.org/docs/ClangFormat.html). Formatter-sensitive fixtures such as
+`tools/clang-tidy-plugin/test/` are left unchanged. Use the repository helpers so each file goes
+through the right formatter.
 
-There are multiple ways to invoke it on the codebase, depending on your system or personal
-preferences.
-
-### Invoking astyle directly
-
-If you only have `astyle` installed, use:
+### Invoking C++ formatting
 
 ```sh
-astyle --options=.astylerc --recursive src/*.cpp,*.h tests/*.cpp,*.h tools/*.cpp,*.h
+just fmt
+# or, for C++ only
+just fmt-cpp
 ```
 
-### Invoking astyle through make
+### Invoking C++ formatting through CMake
 
-If you have both `make` and `astyle` installed, use:
+If you have configured a CMake build tree with `bash` available, this target calls the same C++ helper:
 
 ```sh
-make astyle
+cmake --build <build-dir> --target format
 ```
 
-### Invoking astyle via pre-commit hook
+### Invoking formatting via pre-commit hook
 
-If you have all the relevant tools installed, you can have git automatically check the style of code
-and json by adding these commands to your git pre-commit hook (typically at
-`.git/hooks/pre-commit`):
+Install the optional hook with:
 
 ```sh
-git diff --cached --name-only -z HEAD | grep -z 'data/.*\.json' | \
-    xargs -r -0 -L 1 ./tools/format/json_formatter.[ce]* || exit 1
-
-make astyle-check || exit 1
+just hooks-setup
 ```
 
 ### Astyle extensions for Visual Studio
 
+Use these only for top-level `src/*.cpp` and `src/*.h`; use `just fmt-cpp` for repository style.
 There are astyle extensions in the Visual Studio Marketplace, but none of them have been confirmed
 (yet) to correctly work for our purposes on VS2019 or VS2022.
 
@@ -109,15 +105,14 @@ In addition to the usual means of creating a `tags` file via e.g.
 [`ctags`](http://ctags.sourceforge.net/), we provide `tools/json_tools/cddatags.py` to augment a
 `tags` file with locations of definitions taken from CDDA JSON data. `cddatags.py` is designed to
 safely update a tags file containing source code tags, so if you want both types of tag in your
-`tags` file then you can run `ctags -R . && tools/json_tools/cddatags.py`. Alternatively, there is a
-rule in the `Makefile` to do this for you; just run `make ctags` or `make etags`.
+`tags` file then you can run `ctags -R . && tools/json_tools/cddatags.py`.
 
 ## clang-tidy
 
 Cataclysm has a
 [clang-tidy configuration file](https://github.com/cataclysmbn/Cataclysm-BN/blob/main/.clang-tidy)
 and if you have `clang-tidy` available you can run it to perform static analysis of the codebase. We
-test with `clang-tidy` from LLVM 18 with CI, so for the most consistent results, you might want to
+test with `clang-tidy` from LLVM 22 with CI, so for the most consistent results, you might want to
 use that version.
 
 To run it, you have a few options.
@@ -153,7 +148,7 @@ Also install these additional dependencies:
 
 ```sh
 sudo apt-get install \
-  clang-18 libclang-18-dev llvm-18 llvm-18-dev clang-tidy-18
+  clang-22 libclang-22-dev llvm-22 llvm-22-dev clang-tidy-22
 ```
 
 add `CATA_CLANG_TIDY_PLUGIN=ON` to cmake flags when configuring the build.

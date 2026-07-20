@@ -43,6 +43,7 @@
     "react_cost": "1 J",
     "trigger_cost": "25 kJ",
     "time": 1,
+    "starting_bionic": true,
     "points": 1
   },
   {
@@ -53,7 +54,8 @@
     "occupied_bodyparts": [ [ "leg_l", 3 ], [ "leg_r", 3 ] ],
     "flags": [ "BIONIC_FAULTY" ],
     "starting_bionic": true,
-    "points": -1
+    "points": -1,
+    "bio_enchantments": [ { "values": [ { "value": "NOISE", "add": 30 } ] } ]
   },
   {
     "id": "bio_armor_arms",
@@ -77,12 +79,13 @@
     "bash_protec": [ [ "eyes", 3 ] ],
     "cut_protec": [ [ "eyes", 3 ] ],
     "points": 1,
-    "flags": [ "BIONIC_NPC_USABLE", "BIONIC_SHOCKPROOF" ]
+    "flags": [ "BIONIC_NPC_USABLE", "BIONIC_SHOCKPROOF" ],
+    "bio_enchantments": [ { "values": [ { "value": "INTIMIDATE", "add": 10 } ] } ]
   },
   {
     "id": "bio_armor_head",
     "type": "bionic",
-    "name": { "str": "Alloy Plating - head" },
+    "name": { "str": "Alloy Plating - Head" },
     "description": "The flesh on your head has been surgically replaced by alloy plating, protecting both your head and jaw regions.  Provides 6 bash and cut protection, and 5 ballistic protection.",
     "occupied_bodyparts": [ [ "head", 5 ], [ "mouth", 1 ] ],
     "bash_protec": [ [ "head", 6 ], [ "mouth", 6 ] ],
@@ -168,7 +171,8 @@
     "name": { "str": "Optical Dampers" },
     "description": "The lenses surgically installed over your eyes can be tinted to block out incoming light.",
     "included": true,
-    "flags": [ "BIONIC_TOGGLED" ]
+    "flags": [ "BIONIC_TOGGLED" ],
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "ench_effects": [ { "effect": "blind", "intensity": 1 } ] } ]
   },
   {
     "id": "bio_blood_anal",
@@ -278,7 +282,8 @@
     "react_cost": "100 J",
     "time": 1,
     "points": 3,
-    "flags": [ "BIONIC_TOGGLED" ]
+    "flags": [ "BIONIC_TOGGLED" ],
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "values": [ { "value": "CLIMATE_CONTROL", "add": 750 } ] } ]
   },
   {
     "id": "bio_cloak",
@@ -324,7 +329,8 @@
     "occupied_bodyparts": [ [ "head", 4 ], [ "mouth", 1 ] ],
     "starting_bionic": true,
     "points": -1,
-    "flags": [ "BIONIC_FAULTY" ]
+    "flags": [ "BIONIC_FAULTY" ],
+    "bio_enchantments": [ { "values": [ { "value": "PERSUADE", "add": -50 }, { "value": "INTIMIDATE", "add": 20 } ] } ]
   },
   {
     "id": "bio_dex_enhancer",
@@ -343,7 +349,8 @@
     "description": "You have been outfitted with a synthetic stomach and industrial-grade intestines.  Not only can you extract much more nutrition from food, but you are immune to foodborne illness, parasites, and can even eat rotten food.",
     "occupied_bodyparts": [ [ "torso", 5 ] ],
     "points": 3,
-    "flags": [ "BIONIC_NPC_USABLE", "BIONIC_SHOCKPROOF" ]
+    "flags": [ "BIONIC_NPC_USABLE", "BIONIC_SHOCKPROOF" ],
+    "bio_enchantments": [ { "flags": [ "EAT_ROTTEN", "CONSUME_UNCLEAN", "FOOD_PARASITE_IMMUNE", "FOOD_POISON_IMMUNE" ] } ]
   },
   {
     "id": "bio_dis_acid",
@@ -418,6 +425,7 @@
     "fuel_efficiency": 0.5,
     "exothermic_power_gen": true,
     "time": 1,
+    "starting_bionic": true,
     "points": 2,
     "flags": [ "BIONIC_POWER_SOURCE", "BIONIC_NPC_USABLE", "BIONIC_SHOCKPROOF", "BIONIC_TOGGLED" ]
   },
@@ -436,7 +444,7 @@
     "id": "bio_eye_enhancer",
     "type": "bionic",
     "name": { "str": "Diamond Cornea" },
-    "description": "Your vision is greatly enhanced, giving you a +2 bonus to perception and fixing any vision problems.",
+    "description": "Your vision is greatly enhanced, giving you a +2 bonus to perception and fixing any vision problems short of total blindness.",
     "occupied_bodyparts": [ [ "eyes", 1 ] ],
     "stat_bonus": [ [ "PER", 2 ] ],
     "canceled_mutations": [ "HYPEROPIC", "MYOPIC" ],
@@ -447,12 +455,13 @@
     "id": "bio_eye_optic",
     "type": "bionic",
     "name": { "str": "Telescopic Lenses" },
-    "description": "The lenses in your eyes have been surgically removed and replaced with an array of high-powered, auto-focusing lenses.  They function as integrated binoculars, letting you see much farther than before, and any mundane vision problems you might have had are now gone.",
+    "description": "The lenses in your eyes have been surgically removed and replaced with an array of high-powered, auto-focusing lenses.  They function as integrated binoculars, letting you see much farther than before, and any mundane vision problems you might have had are now gone, including blindness.",
     "occupied_bodyparts": [ [ "eyes", 2 ] ],
-    "canceled_mutations": [ "HYPEROPIC", "MYOPIC" ],
+    "canceled_mutations": [ "HYPEROPIC", "MYOPIC", "BLIND" ],
     "can_uninstall": false,
     "points": 1,
-    "no_uninstall_reason": "The telescopic lenses are part of the patient's eyes now, remove them and the patient would become blind"
+    "no_uninstall_reason": "The telescopic lenses are part of the patient's eyes now, remove them and the patient would become blind",
+    "bio_enchantments": [ { "values": [ { "value": "OVERMAP_SIGHT", "add": 1 } ], "flags": [ "UNDERWATER_SIGHT", "FIX_NEARSIGHTED" ] } ]
   },
   {
     "id": "bio_face_mask",
@@ -460,7 +469,12 @@
     "name": { "str": "Facial Distortion" },
     "description": "Through controlled application of electrochemical impulses, you are capable of altering your facial structure so as to subtly affect the reactions of others.  This grants a bonus to all social interactions.",
     "points": 1,
-    "occupied_bodyparts": [ [ "head", 3 ], [ "mouth", 1 ] ]
+    "occupied_bodyparts": [ [ "head", 3 ], [ "mouth", 1 ] ],
+    "bio_enchantments": [
+      {
+        "values": [ { "value": "LIE", "add": 20 }, { "value": "PERSUADE", "add": 10 }, { "value": "INTIMIDATE", "add": 10 } ]
+      }
+    ]
   },
   {
     "id": "bio_faraday",
@@ -503,6 +517,16 @@
     "act_cost": "10 kJ"
   },
   {
+    "id": "bio_minirose",
+    "type": "bionic",
+    "name": { "str": "Minirose" },
+    "description": "A dead man's switch and literal mininuke wired through the torso and major blood vessels.  It can be armed or disabled, and detonates upon death while armed or manual trigger.  You wouldn't want to use it, unless you'd like to demonstrate the bottomless malice within the human heart to a certain ant.",
+    "occupied_bodyparts": [ [ "torso", 20 ] ],
+    "act_cost": "1 J",
+    "points": 1,
+    "flags": [ "BIONIC_NPC_USABLE", "BIONIC_TOGGLED" ]
+  },
+  {
     "id": "bio_flashlight",
     "type": "bionic",
     "name": { "str": "Cranial Flashlight" },
@@ -514,7 +538,8 @@
     "time": 1,
     "starting_bionic": true,
     "points": 1,
-    "flags": [ "BIONIC_TOGGLED" ]
+    "flags": [ "BIONIC_TOGGLED" ],
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "values": [ { "value": "LUMINATION", "max": 300 } ] } ]
   },
   {
     "id": "bio_tattoo_led",
@@ -526,7 +551,8 @@
     "time": 1,
     "starting_bionic": true,
     "points": 1,
-    "flags": [ "BIONIC_TOGGLED" ]
+    "flags": [ "BIONIC_TOGGLED" ],
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "values": [ { "value": "LUMINATION", "max": 5 } ] } ]
   },
   {
     "id": "bio_glowy",
@@ -556,6 +582,17 @@
     "flags": [ "BIONIC_TOGGLED" ],
     "trigger_cost": "25 kJ",
     "points": 2
+  },
+  {
+    "id": "bio_grossfood",
+    "type": "bionic",
+    "name": { "str": "Taste Fouler" },
+    "occupied_bodyparts": [ [ "head", 1 ], [ "mouth", 1 ] ],
+    "description": "A malfunctioning processor haphazardly interfaced with your taste receptors has given everything you consume a horrid bitter taste.  Food and drink will severely harm your morale.",
+    "flags": [ "BIONIC_FAULTY" ],
+    "points": -1,
+    "starting_bionic": true,
+    "bio_enchantments": [ { "condition": "ALWAYS", "values": [ { "value": "FOOD_FUN", "add": -4 } ] } ]
   },
   {
     "id": "bio_ground_sonar",
@@ -600,7 +637,10 @@
     "act_cost": "1 kJ",
     "react_cost": "1 kJ",
     "time": 1,
-    "points": 2
+    "points": 2,
+    "bio_enchantments": [
+      { "conditions": [ "ACTIVE" ], "values": [ { "value": "BLISTER_COUNT", "add": -20 } ], "flags": [ "FIRE_FIELD_IMMUNE" ] }
+    ]
   },
   {
     "id": "bio_hydraulics",
@@ -613,7 +653,8 @@
     "react_cost": "10 kJ",
     "time": 1,
     "required_bionics": [ "bio_weight" ],
-    "points": 4
+    "points": 4,
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "values": [ { "value": "STRENGTH", "add": 20 } ] } ]
   },
   {
     "id": "bio_infolink",
@@ -624,7 +665,8 @@
     "flags": [ "BIONIC_NPC_USABLE" ],
     "act_cost": "10 J",
     "starting_bionic": true,
-    "points": 1
+    "points": 1,
+    "bio_enchantments": [ { "flags": [ "INTERNAL_ALARMCLOCK", "WATCH", "RADIO", "THERMOMETER", "VIEW_DRONE_CAM" ] } ]
   },
   {
     "id": "bio_infrared",
@@ -636,7 +678,8 @@
     "act_cost": "5 J",
     "react_cost": "5 J",
     "time": 1,
-    "points": 1
+    "points": 1,
+    "bio_enchantments": [ { "flags": [ "INFRARED_VISION" ] } ]
   },
   {
     "id": "bio_int_enhancer",
@@ -721,6 +764,7 @@
     "description": "Surgically embedded in your right hand is a powerful electromagnet, allowing you to use your own strength to pull all nearby magnetic objects towards you.  Unlucky bystanders might be injured or killed by flying objects.",
     "occupied_bodyparts": [ [ "hand_r", 3 ] ],
     "act_cost": "10 kJ",
+    "starting_bionic": true,
     "points": 2
   },
   {
@@ -730,7 +774,8 @@
     "description": "Your eyes have a thin membrane that closes over your eyes while underwater, negating any vision penalties.",
     "occupied_bodyparts": [ [ "eyes", 1 ] ],
     "points": 1,
-    "flags": [ "BIONIC_NPC_USABLE" ]
+    "flags": [ "BIONIC_NPC_USABLE" ],
+    "bio_enchantments": [ { "flags": [ "UNDERWATER_SIGHT" ] } ]
   },
   {
     "id": "bio_memory",
@@ -743,7 +788,8 @@
     "react_cost": "2 J",
     "trigger_cost": "25 J",
     "time": 1,
-    "points": 1
+    "points": 1,
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "values": [ { "value": "EFFECTIVE_FOCUS", "add": 10 } ] } ]
   },
   {
     "id": "bio_metabolics",
@@ -754,6 +800,7 @@
     "fuel_options": [ "metabolism" ],
     "fuel_efficiency": 0.25,
     "time": 1,
+    "starting_bionic": true,
     "points": 2,
     "flags": [ "BIONIC_POWER_SOURCE", "BIONIC_TOGGLED", "BIONIC_NPC_USABLE" ]
   },
@@ -792,7 +839,8 @@
     "flags": [ "BIONIC_TOGGLED" ],
     "act_cost": "10 J",
     "react_cost": "10 J",
-    "time": 1
+    "time": 1,
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "values": [ { "value": "NIGHT_VISION", "max": 10 } ] } ]
   },
   {
     "id": "bio_noise",
@@ -1060,6 +1108,26 @@
     "points": -1
   },
   {
+    "id": "bio_sleep_shutdown",
+    "type": "bionic",
+    "name": { "str": "Sleep Mode Shutdown" },
+    "description": "For better or worse, this CBM suppresses most stimuli while asleep, preventing you from waking up from those causes.",
+    "occupied_bodyparts": [ [ "head", 1 ] ],
+    "flags": [ "BIONIC_FAULTY", "BIONIC_SHOCKPROOF" ],
+    "points": -2,
+    "starting_bionic": true,
+    "bio_enchantments": [
+      {
+        "condition": "ALWAYS",
+        "values": [
+          { "value": "SLEEP_PAIN_THRESH", "add": 1000, "//": "If you are that in pain props to you" },
+          { "value": "SLEEP_DB_RESIST", "add": 1000, "//": "Sounds can't exceed 191" }
+        ],
+        "flags": [ "NO_THERMAL_WAKE", "NO_DAMAGE_WAKE", "NO_LIGHT_WAKE" ]
+      }
+    ]
+  },
+  {
     "id": "bio_spasm",
     "type": "bionic",
     "name": { "str": "Motor Control Overstimulator" },
@@ -1086,7 +1154,8 @@
       [ "foot_r", 2 ]
     ],
     "points": 2,
-    "flags": [ "BIONIC_NPC_USABLE" ]
+    "flags": [ "BIONIC_NPC_USABLE" ],
+    "bio_enchantments": [ { "values": [ { "value": "SPEED", "multiply": 0.1 } ] } ]
   },
   {
     "id": "bio_stiff",
@@ -1146,7 +1215,8 @@
     "description": "Your eyes are surgically equipped with range finders, and their movement is synced with that of your arms, to a degree.  Shots you fire will be much more accurate, particularly at long range.",
     "occupied_bodyparts": [ [ "eyes", 1 ], [ "arm_l", 3 ], [ "arm_r", 3 ], [ "hand_l", 1 ], [ "hand_r", 1 ] ],
     "points": 2,
-    "flags": [ "BIONIC_NPC_USABLE" ]
+    "flags": [ "BIONIC_NPC_USABLE" ],
+    "bio_enchantments": [ { "condition": "ALWAYS", "values": [ { "value": "RANGED_DISPERSION", "multiply": -0.25 } ] } ]
   },
   {
     "id": "bio_teleport",
@@ -1195,6 +1265,7 @@
     "description": "Surgically implanted in your hands and fingers is a set of tools - screwdriver, hammer, wrench, hacksaw, drill, welder, and heating elements.  You can use this in place of many tools when crafting.",
     "occupied_bodyparts": [ [ "hand_l", 3 ], [ "hand_r", 3 ] ],
     "fake_item": "toolset",
+    "starting_bionic": true,
     "points": 4,
     "flags": [ "BIONIC_TOGGLED", "BIONIC_NPC_USABLE", "BIONIC_TOOLS", "INITIALLY_ACTIVATE" ]
   },
@@ -1207,6 +1278,7 @@
     "fuel_options": [ "muscle" ],
     "fuel_efficiency": 0.125,
     "passive_fuel_efficiency": 0.00625,
+    "starting_bionic": true,
     "points": 2,
     "flags": [ "BIONIC_POWER_SOURCE", "BIONIC_NPC_USABLE", "BIONIC_TOGGLED" ]
   },
@@ -1256,7 +1328,7 @@
     "react_cost": "6 J",
     "time": 1,
     "points": 2,
-    "enchantments": [ "ENCH_BIO_UNDERWATER_PROPELLERS" ]
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "values": [ { "value": "SWIM_MOVE_COST", "multiply": -0.25 } ] } ]
   },
   {
     "id": "bio_ups",
@@ -1276,7 +1348,12 @@
     "occupied_bodyparts": [ [ "torso", 2 ], [ "mouth", 1 ] ],
     "flags": [ "BIONIC_FAULTY" ],
     "starting_bionic": true,
-    "points": -1
+    "points": -1,
+    "bio_enchantments": [
+      {
+        "values": [ { "value": "LIE", "add": 10 }, { "value": "PERSUADE", "add": -20 }, { "value": "INTIMIDATE", "add": 20 } ]
+      }
+    ]
   },
   {
     "id": "bio_water_extractor",
@@ -1320,11 +1397,12 @@
     "id": "bio_reactor",
     "type": "bionic",
     "name": { "str": "Micro Reactor" },
-    "description": "This stripped down mini-reactor generates impressive amounts of bionic power but slowly irradiates the user when in use.  1 plutonium fuel cell provides 1000 charges producing 10kW of power a turn.",
+    "description": "This stripped down mini-reactor generates impressive amounts of bionic power but slowly irradiates the user when in use.  1 plutonium fuel cell provides 1000 charges producing 10kW of power.  Produces 50W of power while inactive.",
     "occupied_bodyparts": [ [ "torso", 10 ] ],
-    "fuel_options": [ "plut_cell" ],
+    "fuel_options": [ "plut_cell", "c_atomic_battery_power" ],
     "fuel_capacity": 10000,
     "fuel_efficiency": 1,
+    "passive_fuel_efficiency": 0.05,
     "fuel_multiplier": 1000,
     "time": 1,
     "points": 3,
@@ -1336,11 +1414,12 @@
     "id": "bio_advreactor",
     "type": "bionic",
     "name": { "str": "Advanced Micro Reactor" },
-    "description": "This stripped down mini-reactor has been heavily modified and is more efficient and safer than the base model.  1 plutonium fuel cell provides 1500 charges producing 10kW of power.",
+    "description": "This stripped down mini-reactor has been heavily modified and is more efficient and safer than the base model.  1 plutonium fuel cell provides 1500 charges producing 10kW of power.  Produces 75W of power while inactive.",
     "occupied_bodyparts": [ [ "torso", 12 ] ],
-    "fuel_options": [ "plut_cell" ],
+    "fuel_options": [ "plut_cell", "c_atomic_battery_power" ],
     "fuel_capacity": 12000,
     "fuel_efficiency": 1,
+    "passive_fuel_efficiency": 0.075,
     "fuel_multiplier": 1500,
     "time": 1,
     "points": 5,
@@ -1362,7 +1441,7 @@
     "id": "bio_atomic_battery",
     "type": "bionic",
     "name": { "str": "Atomic Battery" },
-    "description": "A compact alphavoltaic power source, producing a steady source of limitless bionic power at the cost of minimal radiation while in use.  Produces 50W of power while active.",
+    "description": "A compact alphavoltaic power source, producing a steady source of limitless bionic power.  Produces 50W of power while active.",
     "fuel_options": [ "c_atomic_battery_power" ],
     "fuel_efficiency": 0.05,
     "time": 1,
@@ -1389,6 +1468,15 @@
     "canceled_mutations": [ "BADBACK" ],
     "points": 3,
     "flags": [ "BIONIC_NPC_USABLE", "BIONIC_SHOCKPROOF" ]
+  },
+  {
+    "id": "bio_storage",
+    "type": "bionic",
+    "name": { "str": "Internal Storage" },
+    "description": "Space inside your chest cavity has been surgically converted into a storage area.  You may carry an extra 2 liters of volume.",
+    "occupied_bodyparts": [ [ "torso", 8 ] ],
+    "flags": [ "BIONIC_NPC_USABLE", "BIONIC_SHOCKPROOF" ],
+    "bio_enchantments": [ { "values": [ { "value": "CARRY_STORAGE", "add": 2000 } ] } ]
   },
   {
     "id": "bio_shock_absorber",
@@ -1427,6 +1515,7 @@
     "fuel_options": [ "sunlight" ],
     "fuel_efficiency": 1,
     "time": 1,
+    "starting_bionic": true,
     "points": 1,
     "flags": [ "BIONIC_POWER_SOURCE", "BIONIC_TOGGLED", "BIONIC_NPC_USABLE" ]
   },
@@ -1448,7 +1537,9 @@
     "name": { "str": "Linguistic Coprocessor" },
     "description": "The left hemisphere of your brain has been augmented with a microcomputer that moderately increases the speed that language and written words are processed, granting a 25% increase to reading speed.",
     "occupied_bodyparts": [ [ "head", 1 ] ],
-    "points": 1
+    "starting_bionic": true,
+    "points": 1,
+    "bio_enchantments": [ { "values": [ { "value": "READING_SPEED", "multiply": -0.25 } ] } ]
   },
   {
     "id": "afs_bio_dopamine_stimulators",
@@ -1484,7 +1575,8 @@
     "act_cost": "20 J",
     "react_cost": "20 J",
     "time": 1,
-    "included_bionics": [ "bio_electrosense_voltmeter", "bio_electrosense_bscanner" ]
+    "included_bionics": [ "bio_electrosense_voltmeter", "bio_electrosense_bscanner" ],
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "flags": [ "ELECTROSENSE" ] } ]
   },
   {
     "id": "bio_electrosense_voltmeter",
@@ -1526,5 +1618,14 @@
     "fuel_efficiency": 20000,
     "time": 1,
     "flags": [ "BIONIC_POWER_SOURCE", "BIONIC_TOGGLED" ]
+  },
+  {
+    "id": "bio_portal_tap",
+    "type": "bionic",
+    "name": { "str": "Dimensional Portal Tap" },
+    "description": "An implanted interface for siphoning power from a linked dimensional portal.  Must be linked to a specific portal by examining it.  While the linked portal's grid has power, this bionic passively draws energy into your reserves each turn.",
+    "occupied_bodyparts": [ [ "torso", 8 ] ],
+    "flags": [ "BIONIC_NPC_USABLE" ],
+    "points": 3
   }
 ]

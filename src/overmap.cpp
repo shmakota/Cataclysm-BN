@@ -17,6 +17,7 @@
 #include <optional>
 #include <ostream>
 #include <point.h>
+#include <ranges>
 #include <set>
 #include <submap.h>
 #include <tuple>
@@ -28,9 +29,12 @@
 #include "assign.h"
 #include "cata_utility.h"
 #include "catacharset.h"
+#include "catalua.h"
+#include "catalua_impl.h"
+#include "catalua_sol.h"
 #include "character_id.h"
-#include "coordinate_conversions.h"
 #include "debug.h"
+#include "init.h"
 #include "distribution.h"
 #include "flood_fill.h"
 #include "fstream_utils.h"
@@ -41,7 +45,9 @@
 #include "map.h"
 #include "map_iterator.h"
 #include "mapbuffer.h"
+#include "mapbuffer_registry.h"
 #include "mapgen.h"
+#include "mapgen_constructor.h"
 #include "mapgen_functions.h"
 #include "math_defines.h"
 #include "messages.h"
@@ -58,6 +64,8 @@
 #include "overmap_noise.h"
 #include "overmap_types.h"
 #include "overmapbuffer.h"
+#include "overmapbuffer_registry.h"
+#include "fluid_grid.h"
 #include "regional_settings.h"
 #include "rng.h"
 #include "rotatable_symbols.h"
@@ -68,8 +76,10 @@
 #include "text_snippets.h"
 #include "translations.h"
 #include "type_id.h"
+#include "type_id_implement.h"
 #include "weighted_list.h"
 #include "world.h"
+#include "world_type.h"
 
 static const efftype_id effect_pet( "pet" );
 
@@ -89,6 +99,211 @@ class map_extra;
 enum {
     BUILDINGCHANCE = 4
 };
+
+namespace
+{
+
+struct city_generation_profile {
+    int size = 1;
+    int finale_distance = 1;
+    bool attempt_finale = false;
+};
+
+struct isolated_city_tile {
+    tripoint_om_omt pos;
+    float distance = 0.0f;
+};
+
+struct isolated_city_special_placement {
+    tripoint_om_omt pos;
+    om_direction::type dir = om_direction::type::invalid;
+};
+
+struct isolated_city_special_placement_options {
+    const overmap_special &special;
+    const std::vector<isolated_city_tile> &island_tiles;
+    tripoint_om_omt center;
+    std::string placement;
+    int land_radius = 0;
+};
+
+struct isolated_city_trim_options {
+    const std::vector<isolated_city_tile> &island_tiles;
+    const std::unordered_set<tripoint_om_omt> &shore_anchor_tiles;
+    tripoint_om_omt center;
+    int island_radius = 0;
+    int shore_width = 0;
+    int land_padding = 0;
+    int road_padding = 0;
+    int coastline_variance = 0;
+};
+
+auto random_city_generation_profile( const int base_city_size, const bool finales_enabled )
+-> city_generation_profile
+{
+    auto size = rng( base_city_size - 1, base_city_size + 1 );
+    auto finale_distance = 1;
+    auto attempt_finale = false;
+
+    if( one_in( 3 ) ) {
+        size = 1;
+    } else if( one_in( 2 ) ) {
+        size = size * 2 / 3;
+    } else if( one_in( 2 ) ) {
+        attempt_finale = true;
+        size = size * 3 / 2;
+        finale_distance = 5;
+    } else {
+        attempt_finale = true;
+        size = size * 2;
+        finale_distance = 15;
+    }
+
+    return {
+        .size = std::max( size, 1 ),
+        .finale_distance = finale_distance,
+        .attempt_finale = attempt_finale && finales_enabled
+    };
+}
+
+auto isolated_city_tiles_in_radius( const tripoint_om_omt &center, const int radius )
+-> std::vector<isolated_city_tile>
+{
+    using namespace std::views;
+
+    auto result = std::vector<isolated_city_tile>();
+    result.reserve( ( radius * 2 + 1 ) * ( radius * 2 + 1 ) );
+
+    for( const auto x : iota( center.x() - radius, center.x() + radius + 1 ) ) {
+        for( const auto y : iota( center.y() - radius, center.y() + radius + 1 ) ) {
+            const auto candidate = tripoint_om_omt( x, y, 0 );
+            const auto distance = trig_dist( candidate.xy(), center.xy() );
+            if( distance <= radius ) {
+                result.push_back( { .pos = candidate, .distance = distance } );
+            }
+        }
+    }
+
+    return result;
+}
+
+auto isolated_city_special_candidate_allowed( const isolated_city_tile &tile,
+        const isolated_city_special_placement_options &opts ) -> bool
+{
+    if( opts.placement == "center" ) {
+        return tile.pos == opts.center;
+    }
+    if( opts.placement == "shore" ) {
+        const auto inner_edge = std::max( 0, opts.land_radius - opts.special.longest_side() );
+        const auto outer_edge = opts.land_radius + opts.special.longest_side();
+        return tile.distance >= inner_edge && tile.distance <= outer_edge;
+    }
+    return tile.distance <= opts.land_radius;
+}
+
+auto isolated_city_temporary_terrain( const oter_id &oter, const oter_id &land_oter,
+                                      const std::optional<oter_id> &shore_oter ) -> bool
+{
+    return oter == land_oter || ( shore_oter.has_value() && oter == *shore_oter );
+}
+
+auto isolated_city_lake_column_terrain( const oter_id &oter ) -> bool
+{
+    static const oter_id lake_underwater_shore( "lake_underwater_shore" );
+    static const oter_id lake_water_cube( "lake_water_cube" );
+    static const oter_id lake_bed( "lake_bed" );
+
+    return oter == lake_underwater_shore || oter == lake_water_cube || oter == lake_bed;
+}
+
+auto isolated_city_lake_column_or_default_terrain( const oter_id &oter,
+        const oter_id &default_oter ) -> bool
+{
+    return isolated_city_lake_column_terrain( oter ) || oter == default_oter;
+}
+
+auto isolated_city_shape_buffer( const int city_size ) -> int
+{
+    return std::clamp( city_size / 4 + 3, 4, 5 );
+}
+
+auto isolated_city_road_buffer( const int city_size ) -> int
+{
+    return std::clamp( city_size / 6 + 1, 1, 2 );
+}
+
+auto isolated_city_default_land_padding( const int city_size ) -> int
+{
+    return std::clamp( isolated_city_shape_buffer( city_size ) + 1, 5, 8 );
+}
+
+auto isolated_city_default_road_padding( const int city_size ) -> int
+{
+    return std::clamp( isolated_city_road_buffer( city_size ) + 1, 2, 4 );
+}
+
+auto isolated_city_default_coastline_variance( const int island_radius ) -> int
+{
+    return std::clamp( island_radius / 5, 2, 6 );
+}
+
+auto isolated_city_coastline_adjustment( const tripoint_om_omt &center,
+        const tripoint_om_omt &pos, const int variance ) -> int
+{
+    if( variance <= 0 ) {
+        return 0;
+    }
+
+    const auto dx = static_cast<double>( pos.x() - center.x() );
+    const auto dy = static_cast<double>( pos.y() - center.y() );
+    const auto angle = std::atan2( static_cast<double>( dy ), static_cast<double>( dx ) );
+    const auto phase_a = center.x() * 0.173 + center.y() * 0.071;
+    const auto phase_b = center.x() * 0.047 - center.y() * 0.139;
+    const auto phase_c = center.x() * 0.031 + center.y() * 0.211;
+    const auto local = pos.x() * 0.37 + pos.y() * 0.23 + phase_c;
+    const auto wobble = std::sin( angle * 2.0 + phase_a ) * 0.55 +
+                        std::sin( angle * 5.0 + phase_b ) * 0.35 +
+                        std::sin( local ) * 0.10;
+    return std::clamp( static_cast<int>( std::lround( wobble * variance ) ),
+                       -variance, variance );
+}
+
+auto isolated_city_near_development( const tripoint_om_omt &pos,
+                                     const std::vector<tripoint_om_omt> &developed,
+                                     const int distance ) -> bool
+{
+    namespace ranges = std::ranges;
+
+    return ranges::any_of( developed, [&pos, distance]( const tripoint_om_omt & dev ) {
+        return trig_dist( pos.xy(), dev.xy() ) <= distance;
+    } );
+}
+
+auto isolated_city_nearest_development_distance( const tripoint_om_omt &pos,
+        const std::vector<tripoint_om_omt> &developed ) -> std::optional<float>
+{
+    auto nearest = std::optional<float>();
+    for( const auto &dev : developed ) {
+        const auto distance = trig_dist( pos.xy(), dev.xy() );
+        if( !nearest.has_value() || distance < *nearest ) {
+            nearest = distance;
+        }
+    }
+    return nearest;
+}
+
+auto isolated_city_direction_toward( const tripoint_om_omt &from, const tripoint_om_omt &to )
+-> om_direction::type
+{
+    const auto dx = to.x() - from.x();
+    const auto dy = to.y() - from.y();
+    if( std::abs( dx ) > std::abs( dy ) ) {
+        return dx > 0 ? om_direction::type::east : om_direction::type::west;
+    }
+    return dy > 0 ? om_direction::type::south : om_direction::type::north;
+}
+
+} // namespace
 
 ////////////////
 oter_id  ot_null,
@@ -264,30 +479,10 @@ generic_factory<oter_t> terrains( "overmap terrain" );
 generic_factory<overmap_special> specials( "overmap special" );
 
 } // namespace
-
-template<>
-const overmap_land_use_code &overmap_land_use_code_id::obj() const
-{
-    return land_use_codes.obj( *this );
-}
-
-template<>
-bool overmap_land_use_code_id::is_valid() const
-{
-    return land_use_codes.is_valid( *this );
-}
-
-template<>
-const overmap_special &overmap_special_id::obj() const
-{
-    return specials.obj( *this );
-}
-
-template<>
-bool overmap_special_id::is_valid() const
-{
-    return specials.is_valid( *this );
-}
+IMPLEMENT_STRING_AND_INT_IDS( overmap_land_use_code, land_use_codes );
+IMPLEMENT_STRING_AND_INT_IDS( oter_type_t, terrain_types );
+IMPLEMENT_STRING_AND_INT_IDS( oter_t, terrains );
+IMPLEMENT_STRING_AND_INT_IDS( overmap_special, specials );
 
 city::city( const point_om_omt &P, int const S )
     : pos( P )
@@ -298,7 +493,7 @@ city::city( const point_om_omt &P, int const S )
 
 int city::get_distance_from( const tripoint_om_omt &p ) const
 {
-    return std::max( trig_dist( p, tripoint_om_omt{ pos, 0 } ) - size, 0 );
+    return std::max( static_cast<int>( trig_dist( p, tripoint_om_omt{ pos, 0 } ) ) - size, 0 );
 }
 
 std::map<enum radio_type, std::string> radio_type_names =
@@ -308,90 +503,6 @@ radio_tower::radio_tower( const point_om_sm &p, int S, const std::string &M, rad
     pos( p ), strength( S ), type( T ), message( M )
 {
     frequency = rng( 0, std::numeric_limits<int32_t>::max() );
-}
-
-/** @relates string_id */
-template<>
-bool string_id<oter_type_t>::is_valid() const
-{
-    return terrain_types.is_valid( *this );
-}
-
-/** @relates int_id */
-template<>
-const string_id<oter_type_t> &int_id<oter_type_t>::id() const
-{
-    return terrain_types.convert( *this );
-}
-
-/** @relates string_id */
-template<>
-int_id<oter_type_t> string_id<oter_type_t>::id() const
-{
-    return terrain_types.convert( *this, int_id<oter_type_t>( 0 ) );
-}
-
-/** @relates int_id */
-template<>
-int_id<oter_type_t>::int_id( const string_id<oter_type_t> &id ) : _id( id.id() ) {}
-
-template<>
-const oter_type_t &int_id<oter_type_t>::obj() const
-{
-    return terrain_types.obj( *this );
-}
-
-/** @relates string_id */
-template<>
-const oter_type_t &string_id<oter_type_t>::obj() const
-{
-    return terrain_types.obj( *this );
-}
-
-/** @relates string_id */
-template<>
-bool string_id<oter_t>::is_valid() const
-{
-    return terrains.is_valid( *this );
-}
-
-/** @relates string_id */
-template<>
-const oter_t &string_id<oter_t>::obj() const
-{
-    return terrains.obj( *this );
-}
-
-/** @relates string_id */
-template<>
-int_id<oter_t> string_id<oter_t>::id() const
-{
-    return terrains.convert( *this, ot_null );
-}
-
-/** @relates int_id */
-template<>
-int_id<oter_t>::int_id( const string_id<oter_t> &id ) : _id( id.id() ) {}
-
-/** @relates int_id */
-template<>
-bool int_id<oter_t>::is_valid() const
-{
-    return terrains.is_valid( *this );
-}
-
-/** @relates int_id */
-template<>
-const oter_t &int_id<oter_t>::obj() const
-{
-    return terrains.obj( *this );
-}
-
-/** @relates int_id */
-template<>
-const string_id<oter_t> &int_id<oter_t>::id() const
-{
-    return terrains.convert( *this );
 }
 
 bool operator==( const int_id<oter_t> &lhs, const char *rhs )
@@ -691,7 +802,7 @@ static void load_overmap_terrain_mapgens( const JsonObject &jo, const std::strin
     if( jo.has_array( jsonkey ) ) {
         for( JsonObject jio : jo.get_array( jsonkey ) ) {
             // NOLINTNEXTLINE(cata-use-named-point-constants)
-            load_and_add_mapgen_function( jio, fmapkey, point_zero, point( 1, 1 ) );
+            load_and_add_mapgen_function( jio, fmapkey, point_rel_omt::zero(), point_rel_omt( 1, 1 ) );
         }
     }
 }
@@ -934,23 +1045,6 @@ bool oter_t::is_hardcoded() const
 {
     // TODO: This set only exists because so does the monstrous 'if-else' statement in @ref map::draw_map(). Get rid of both.
     static const std::set<std::string> hardcoded_mapgen = {
-        "ants_lab",
-        "ants_lab_stairs",
-        "ice_lab",
-        "ice_lab_stairs",
-        "ice_lab_core",
-        "ice_lab_finale",
-        "central_lab",
-        "central_lab_stairs",
-        "central_lab_core",
-        "central_lab_finale",
-        "tower_lab",
-        "tower_lab_stairs",
-        "tower_lab_finale",
-        "lab",
-        "lab_core",
-        "lab_stairs",
-        "lab_finale",
         "looted_building",  // pseudo-terrain
         "mine",
         "mine_down",
@@ -959,8 +1053,6 @@ bool oter_t::is_hardcoded() const
         "office_tower_1_entrance",
         "office_tower_b",
         "office_tower_b_entrance",
-        "slimepit",
-        "slimepit_down",
         "temple",
         "temple_finale",
         "temple_stairs"
@@ -1155,7 +1247,7 @@ struct overmap_special_data {
         const std::string &context,
         const cata::flat_set<overmap_location_id> &default_locations ) = 0;
     virtual void check( const std::string &context ) const = 0;
-    virtual const oter_str_id &get_terrain_at( const tripoint &p ) const = 0;
+    virtual const oter_str_id &get_terrain_at( const tripoint_rel_omt &p ) const = 0;
     virtual std::vector<oter_str_id> all_terrains() const = 0;
     virtual std::vector<overmap_special_terrain> preview_terrains() const = 0;
     virtual std::vector<overmap_special_locations> required_locations() const = 0;
@@ -1186,7 +1278,7 @@ struct fixed_overmap_special_data : overmap_special_data {
 
     void check( const std::string &context ) const override {
         std::set<oter_str_id> invalid_terrains;
-        std::set<tripoint> points;
+        std::set<tripoint_rel_omt> points;
 
         for( const overmap_special_terrain &elem : terrains ) {
             const oter_str_id &oter = elem.terrain;
@@ -1228,7 +1320,7 @@ struct fixed_overmap_special_data : overmap_special_data {
         }
     }
 
-    const oter_str_id &get_terrain_at( const tripoint &p ) const override {
+    const oter_str_id &get_terrain_at( const tripoint_rel_omt &p ) const override {
         const auto iter = std::find_if( terrains.begin(), terrains.end(),
         [ &p ]( const overmap_special_terrain & elem ) {
             return elem.p == p;
@@ -1251,7 +1343,7 @@ struct fixed_overmap_special_data : overmap_special_data {
         std::vector<overmap_special_terrain> result;
         std::copy_if( terrains.begin(), terrains.end(), std::back_inserter( result ),
         []( const overmap_special_terrain & terrain ) {
-            return terrain.p.z == 0;
+            return terrain.p.z() == 0;
         } );
         return result;
     }
@@ -2424,9 +2516,9 @@ struct mutable_overmap_special_data : overmap_special_data {
         }
     }
 
-    const oter_str_id &get_terrain_at( const tripoint &p ) const override {
+    const oter_str_id &get_terrain_at( const tripoint_rel_omt &p ) const override {
         auto it = overmaps.find( root );
-        if( p != tripoint_zero || it == overmaps.end() ) {
+        if( p != tripoint_rel_omt::zero() || it == overmaps.end() ) {
             return oter_str_id::NULL_ID();
         }
         return it->second.terrain;
@@ -2439,7 +2531,7 @@ struct mutable_overmap_special_data : overmap_special_data {
             return {};
         }
         const mutable_overmap_terrain &root_om = it->second;
-        return { tripoint_zero, root_om.terrain, root_om.locations };
+        return { tripoint_rel_omt::zero(), root_om.terrain, root_om.locations };
     }
 
     std::vector<oter_str_id> all_terrains() const override {
@@ -2609,20 +2701,20 @@ int overmap_special::longest_side() const
     std::vector<overmap_special_locations> req_locations = required_locations();
     auto min_max_x = std::minmax_element( req_locations.begin(), req_locations.end(),
     []( const overmap_special_locations & lhs, const overmap_special_locations & rhs ) {
-        return lhs.p.x < rhs.p.x;
+        return lhs.p.x() < rhs.p.x();
     } );
 
     auto min_max_y = std::minmax_element( req_locations.begin(), req_locations.end(),
     []( const overmap_special_locations & lhs, const overmap_special_locations & rhs ) {
-        return lhs.p.y < rhs.p.y;
+        return lhs.p.y() < rhs.p.y();
     } );
 
-    const int width = min_max_x.second->p.x - min_max_x.first->p.x;
-    const int height = min_max_y.second->p.y - min_max_y.first->p.y;
+    const int width = min_max_x.second->p.x() - min_max_x.first->p.x();
+    const int height = min_max_y.second->p.y() - min_max_y.first->p.y();
     return std::max( width, height ) + 1;
 }
 
-const oter_str_id &overmap_special::get_terrain_at( const tripoint &p ) const
+const oter_str_id &overmap_special::get_terrain_at( const tripoint_rel_omt &p ) const
 {
     return data_->get_terrain_at( p );
 }
@@ -2647,7 +2739,7 @@ std::vector<overmap_special_terrain> overmap_special::preview_terrains() const
         for( const auto &ter : nested.second->preview_terrains() ) {
             overmap_special_terrain rel_ter = ter;
             rel_ter.p += nested.first.raw();
-            if( rel_ter.p.z == 0 ) {
+            if( rel_ter.p.z() == 0 ) {
                 result.push_back( rel_ter );
             }
         }
@@ -2722,25 +2814,25 @@ void overmap_special::load( const JsonObject &jo, const std::string &src )
             optional( jo, was_loaded, "check_for_locations", mutable_data->check_for_locations );
             for( JsonObject joc : jo.get_array( "check_for_locations_area" ) ) {
                 cata::flat_set<overmap_location_id> type;
-                tripoint from;
-                tripoint to;
+                tripoint_rel_omt from;
+                tripoint_rel_omt to;
                 mandatory( joc, false, "type", type );
                 mandatory( joc, false, "from", from );
                 mandatory( joc, false, "to", to );
-                if( from.x > to.x ) {
-                    std::swap( from.x, to.x );
+                if( from.x() > to.x() ) {
+                    std::swap( from.x(), to.x() );
                 }
-                if( from.y > to.y ) {
-                    std::swap( from.y, to.y );
+                if( from.y() > to.y() ) {
+                    std::swap( from.y(), to.y() );
                 }
-                if( from.z > to.z ) {
-                    std::swap( from.z, to.z );
+                if( from.z() > to.z() ) {
+                    std::swap( from.z(), to.z() );
                 }
-                for( int x = from.x; x <= to.x; x++ ) {
-                    for( int y = from.y; y <= to.y; y++ ) {
-                        for( int z = from.z; z <= to.z; z++ ) {
+                for( int x = from.x(); x <= to.x(); x++ ) {
+                    for( int y = from.y(); y <= to.y(); y++ ) {
+                        for( int z = from.z(); z <= to.z(); z++ ) {
                             overmap_special_locations loc;
-                            loc.p = tripoint( x, y, z );
+                            loc.p = tripoint_rel_omt( x, y, z );
                             loc.locations = type;
                             mutable_data->check_for_locations.push_back( loc );
                         }
@@ -2785,10 +2877,27 @@ void overmap_special::load( const JsonObject &jo, const std::string &src )
     assign( jo, "rotate", rotatable_, strict );
     assign( jo, "flags", flags_, strict );
 
+    if( jo.has_array( "dimensions" ) ) {
+        dimensions_.clear();
+        for( const std::string &dim : jo.get_array( "dimensions" ) ) {
+            dimensions_.push_back( dim );
+        }
+    }
+
     // Another hack
     if( !is_special ) {
         flags_.insert( "ELECTRIC_GRID" );
     }
+}
+
+auto overmap_special::can_spawn_in_dimension( const dimension_id &dim_id,
+        bool dim_inherits_base ) const -> bool
+{
+    if( dimensions_.empty() ) {
+        // No filter: allowed in primary ("") and in dims with inherit_base_mapgen.
+        return dim_id.is_empty() || dim_inherits_base;
+    }
+    return std::ranges::find( dimensions_, dim_id.str() ) != dimensions_.end();
 }
 
 void overmap_special::finalize()
@@ -2875,15 +2984,32 @@ void overmap_special::check() const
 }
 
 // *** BEGIN overmap FUNCTIONS ***
-overmap::overmap( const point_abs_om &p ) : loc( p )
+overmap::overmap( const point_abs_om &p, const dimension_id &dim_id )
+    : loc( p )
+    , dimension_id_( dim_id )
 {
-    const std::string rsettings_id = get_option<std::string>( "DEFAULT_REGION" );
+    // Try to use current_region_type if set, otherwise fall back to DEFAULT_REGION option
+    std::string rsettings_id = get_overmapbuffer( dimension_id_ ).current_region_type;
+
+    // If current_region_type is empty or "default", use the DEFAULT_REGION option
+    if( rsettings_id.empty() || rsettings_id == "default" ) {
+        rsettings_id = get_option<std::string>( "DEFAULT_REGION" );
+    }
+
+    // Look up the regional settings by ID
     t_regional_settings_map_citr rsit = region_settings_map.find( rsettings_id );
 
     if( rsit == region_settings_map.end() ) {
-        // gonna die now =[
-        debugmsg( "overmap %s: can't find region '%s'", loc.to_string(), rsettings_id.c_str() );
+        // Fallback to "default" if the specified region doesn't exist
+        rsit = region_settings_map.find( "default" );
+        if( rsit == region_settings_map.end() ) {
+            debugmsg( "overmap %s: can't find region '%s' or 'default'",
+                      loc.to_string(), rsettings_id.c_str() );
+            // Use first available region as last resort
+            rsit = region_settings_map.begin();
+        }
     }
+
     settings = &rsit->second;
 
     init_layers();
@@ -2892,22 +3018,24 @@ overmap::overmap( const point_abs_om &p ) : loc( p )
 overmap::overmap( overmap && )  noexcept = default;
 overmap::~overmap() = default;
 
-void overmap::populate( overmap_special_batch &enabled_specials )
+auto overmap::populate( const dimension_id &dim_id,
+                        overmap_special_batch &enabled_specials ) -> void
 {
     try {
-        open( enabled_specials );
+        open( dim_id, enabled_specials );
     } catch( const std::exception &err ) {
         debugmsg( "overmap %s failed to load: %s", loc.to_string(), err.what() );
     }
 }
 
-void overmap::populate()
+auto overmap::populate( const dimension_id &dim_id ) -> void
 {
     overmap_special_batch enabled_specials = overmap_specials::get_default_batch( loc );
     const overmap_feature_flag_settings &overmap_feature_flag = settings->overmap_feature_flag;
 
     const bool should_blacklist = !overmap_feature_flag.blacklist.empty();
-    const bool should_whitelist = !overmap_feature_flag.whitelist.empty();
+    const bool should_whitelist = !overmap_feature_flag.whitelist.empty() ||
+                                  overmap_feature_flag.clear_whitelist;
 
     // If this region's settings has blacklisted or whitelisted overmap feature flags, let's
     // filter our default batch.
@@ -2936,7 +3064,7 @@ void overmap::populate()
         }
     }
 
-    populate( enabled_specials );
+    populate( dim_id, enabled_specials );
 }
 
 oter_id overmap::get_default_terrain( int z ) const
@@ -3006,6 +3134,26 @@ std::optional<mapgen_arguments> *overmap::mapgen_args( const tripoint_om_omt &p 
     return &mapgen_arg_storage[it->second];
 }
 
+overmap::mapgen_args_slot overmap::get_mapgen_args_slot( const tripoint_om_omt &p )
+{
+    auto it = mapgen_args_index.find( p );
+    if( it == mapgen_args_index.end() ) {
+        return {};
+    }
+    const int idx = it->second;
+    return { &mapgen_arg_storage[idx], &mapgen_args_init_flags_[idx] };
+}
+
+void overmap::sync_mapgen_args_init_flags()
+{
+    mapgen_args_init_flags_.assign( mapgen_arg_storage.size(), 0 );
+    for( size_t i = 0; i < mapgen_arg_storage.size(); ++i ) {
+        if( mapgen_arg_storage[i].has_value() ) {
+            mapgen_args_init_flags_[i] = 1;
+        }
+    }
+}
+
 bool &overmap::seen( const tripoint_om_omt &p )
 {
     if( !inbounds( p ) ) {
@@ -3059,11 +3207,12 @@ bool overmap::is_path( const tripoint_om_omt &p ) const
 
 bool overmap::mongroup_check( const mongroup &candidate ) const
 {
-    const auto matching_range = zg.equal_range( candidate.pos );
+    const auto matching_range = zg.equal_range( project_remain<coords::om>
+                                ( candidate.abs_pos ).remainder_tripoint );
     return std::find_if( matching_range.first, matching_range.second,
     [candidate]( const std::pair<tripoint_om_sm, mongroup> &match ) {
         // This is extra strict since we're using it to test serialization.
-        return candidate.type == match.second.type && candidate.pos == match.second.pos &&
+        return candidate.type == match.second.type && candidate.abs_pos == match.second.abs_pos &&
                candidate.radius == match.second.radius &&
                candidate.population == match.second.population &&
                candidate.target == match.second.target &&
@@ -3079,7 +3228,7 @@ bool overmap::monster_check( const std::pair<tripoint_om_sm, monster> &candidate
     const auto matching_range = monster_map->equal_range( candidate.first );
     return std::find_if( matching_range.first, matching_range.second,
     [candidate]( const std::pair<tripoint_om_sm, monster> &match ) {
-        return candidate.second.pos() == match.second.pos() &&
+        return candidate.second.bub_pos() == match.second.bub_pos() &&
                candidate.second.type == match.second.type;
     } ) != matching_range.second;
 }
@@ -3355,20 +3504,48 @@ void overmap::generate( const overmap *north, const overmap *east,
         return;
     }
 
+    if( const dimension_info *dim = g->get_current_dimension_info() ) {
+        // Bounded pocket dimensions never use full overmap generation — they
+        // have pre-placed terrain via overmap specials.  Also skip if the
+        // world_type explicitly disables generation.
+        if( dim->pocket_info.has_value() ) {
+            dbg( DL::Info ) << "overmap::generate skipped for bounded dimension '"
+                            << dim->id.str() << "'";
+            return;
+        }
+        if( dim->world_type.is_valid() && !dim->world_type.obj().generate_overmap ) {
+            dbg( DL::Info ) << "overmap::generate skipped for world_type '"
+                            << dim->world_type.str() << "' (generate_overmap=false)";
+            return;
+        }
+    }
+
     dbg( DL::Info ) << "overmap::generate start";
 
     connection_cache = overmap_connection_cache{};
     populate_connections_out_from_neighbors( north, east, south, west );
 
     place_rivers( north, east, south, west );
-    place_lakes();
-    place_forests();
-    place_swamps();
+    if( settings->overmap_lake.noise_threshold_lake > 0.0 ) {
+        place_lakes();
+    }
+    if( settings->overmap_forest.noise_threshold_forest > 0.0 ) {
+        place_forests();
+        place_swamps();
+    }
     place_cities();
-    place_forest_trails();
+    if( settings->forest_trail.chance > 0 ) {
+        place_forest_trails();
+    }
     place_roads( north, east, south, west );
+    // Isolated cities reuse normal city generation but stay disconnected from external roads.
+    place_isolated_cities();
     place_specials( enabled_specials );
-    place_forest_trailheads();
+    // Optional regional lake columns fill untouched underground default terrain below lakes.
+    place_lake_columns();
+    if( settings->forest_trail.chance > 0 ) {
+        place_forest_trailheads();
+    }
 
     polish_rivers( north, east, south, west );
 
@@ -3599,13 +3776,14 @@ void mongroup::wander( const overmap &om )
 {
     const city *target_city = nullptr;
     int target_distance = 0;
+    const auto local_pos = project_remain<coords::om>( abs_pos ).remainder_tripoint;
 
     if( horde_behaviour == "city" ) {
         // Find a nearby city to return to..
         for( const city &check_city : om.cities ) {
             // Check if this is the nearest city so far.
             int distance = rl_dist( project_to<coords::sm>( check_city.pos ),
-                                    pos.xy() );
+                                    local_pos.xy() );
             if( !target_city || distance < target_distance ) {
                 target_distance = distance;
                 target_city = &check_city;
@@ -3617,12 +3795,17 @@ void mongroup::wander( const overmap &om )
         // TODO: somehow use the same algorithm that distributes zombie
         // density at world gen to spread the hordes over the actual
         // city, rather than the center city tile
-        target.x() = target_city->pos.x() * 2 + rng( -target_city->size * 2, target_city->size * 2 );
-        target.y() = target_city->pos.y() * 2 + rng( -target_city->size * 2, target_city->size * 2 );
+        const auto city_sm = project_to<coords::sm>( target_city->pos );
+        const auto local_target = tripoint_om_sm(
+                                      city_sm.x() + rng( -target_city->size * 2, target_city->size * 2 ),
+                                      city_sm.y() + rng( -target_city->size * 2, target_city->size * 2 ),
+                                      local_pos.z() );
+        target = project_combine( om.pos(), local_target );
         interest = 100;
     } else {
-        target.x() = pos.x() + rng( -10, 10 );
-        target.y() = pos.y() + rng( -10, 10 );
+        const auto local_target = tripoint_om_sm( local_pos.x() + rng( -10, 10 ),
+                                  local_pos.y() + rng( -10, 10 ), local_pos.z() );
+        target = project_combine( om.pos(), local_target );
         interest = 30;
     }
 }
@@ -3647,12 +3830,50 @@ void overmap::move_hordes()
         // Gradually decrease interest.
         mg.dec_interest( 1 );
 
-        if( ( mg.pos.xy() == mg.target.xy() ) || mg.interest <= 15 ) {
-            mg.wander( *this );
+        if( ( mg.abs_pos.xy() == mg.target.xy() ) || mg.interest <= 15 ) {
+            auto used_hook_target = false;
+
+            if( auto *state = DynamicDataLoader::get_instance().lua.get() ) {
+                auto &lua = state->lua;
+                auto game = lua.globals()["game"];
+                auto behaviours_obj = game["horde_behaviours"].get<sol::object>();
+                if( behaviours_obj.is<sol::table>() ) {
+                    auto behaviours = behaviours_obj.as<sol::table>();
+                    const auto fn_obj = behaviours.get_or<sol::object>( mg.horde_behaviour, sol::lua_nil );
+                    if( fn_obj.is<sol::protected_function>() || fn_obj.is<sol::function>() ) {
+                        auto func = fn_obj.as<sol::protected_function>();
+                        auto params = lua.create_table();
+                        auto results = lua.create_table();
+                        params["results"] = results;
+                        params["group"] = &mg;
+                        params["pos_abs_sm"] = mg.abs_pos;
+                        params["target_abs_sm"] = mg.target;
+                        params["behaviour"] = mg.horde_behaviour;
+
+                        auto res = func( params );
+                        check_func_result( res );
+
+                        const auto hook_target = results.get<sol::optional<tripoint_abs_sm>>( "target" );
+                        const auto hook_interest = results.get<sol::optional<int>>( "interest" );
+                        if( hook_target.has_value() ) {
+                            mg.set_target( *hook_target );
+                            used_hook_target = true;
+                        }
+                        if( hook_interest.has_value() ) {
+                            mg.set_interest( *hook_interest );
+                        }
+                    }
+                }
+            }
+
+            if( !used_hook_target ) {
+                mg.wander( *this );
+            }
         }
 
         // Decrease movement chance according to the terrain we're currently on.
-        const oter_id &walked_into = ter( project_to<coords::omt>( mg.pos ) );
+        auto local_pos = project_remain<coords::om>( mg.abs_pos ).remainder_tripoint;
+        const oter_id &walked_into = ter( project_to<coords::omt>( local_pos ) );
         int movement_chance = 1;
         if( walked_into == ot_forest || walked_into == ot_forest_water ) {
             movement_chance = 3;
@@ -3671,22 +3892,22 @@ void overmap::move_hordes()
         // frequently. The average horde speed for regular Z's is around 100,
         // or one space per 5 minutes.
         if( one_in( movement_chance ) && rng( 0, 100 ) < mg.interest && rng( 0, 200 ) < mg.avg_speed() ) {
-            // TODO: Handle moving to adjacent overmaps.
-            if( mg.pos.x() > mg.target.x() ) {
-                mg.pos.x()--;
+            if( mg.abs_pos.x() > mg.target.x() ) {
+                mg.abs_pos.x()--;
             }
-            if( mg.pos.x() < mg.target.x() ) {
-                mg.pos.x()++;
+            if( mg.abs_pos.x() < mg.target.x() ) {
+                mg.abs_pos.x()++;
             }
-            if( mg.pos.y() > mg.target.y() ) {
-                mg.pos.y()--;
+            if( mg.abs_pos.y() > mg.target.y() ) {
+                mg.abs_pos.y()--;
             }
-            if( mg.pos.y() < mg.target.y() ) {
-                mg.pos.y()++;
+            if( mg.abs_pos.y() < mg.target.y() ) {
+                mg.abs_pos.y()++;
             }
 
             // Erase the group at it's old location, add the group with the new location
-            tmpzg.insert( std::pair<tripoint_om_sm, mongroup>( mg.pos, mg ) );
+            const auto new_local_pos = project_remain<coords::om>( mg.abs_pos ).remainder_tripoint;
+            tmpzg.insert( std::pair<tripoint_om_sm, mongroup>( new_local_pos, mg ) );
             zg.erase( it++ );
         } else {
             ++it;
@@ -3717,6 +3938,7 @@ void overmap::move_hordes()
                 type.id == mtype_id( "mon_jabberwock" ) || // Jabberwockies are an exception.
                 this_monster.get_speed() <= 30 || // So are very slow zombies, like crawling zombies.
                 this_monster.has_flag( MF_IMMOBILE ) || // Also exempt anything stationary.
+                this_monster.has_flag( MF_STATIONARY ) || // Also exempt anything stationary.
                 this_monster.has_effect( effect_pet ) || // "Zombie pet" zlaves are, too.
                 !this_monster.will_join_horde( INT_MAX ) || // So are zombies who won't join a horde of any size.
                 this_monster.mission_id != -1 // We mustn't delete monsters that are related to missions.
@@ -3746,7 +3968,7 @@ void overmap::move_hordes()
             if( this_monster.will_join_horde( add_to_horde_size ) ) {
                 // If there is no horde to add the monster to, create one.
                 if( add_to_group == nullptr ) {
-                    mongroup m( GROUP_ZOMBIE, p, 1, 0 );
+                    mongroup m( GROUP_ZOMBIE, project_combine( pos(), p ), 1, 0 );
                     m.horde = true;
                     m.monsters.push_back( this_monster );
                     m.interest = 0; // Ensures that we will select a new target.
@@ -3778,7 +4000,8 @@ void overmap::move_nemesis()
         }
 
         // Decrease movement chance according to the terrain we're currently on.
-        const oter_id &walked_into = ter( project_to<coords::omt>( mg.pos ) );
+        auto local_pos = project_remain<coords::om>( mg.abs_pos ).remainder_tripoint;
+        const oter_id &walked_into = ter( project_to<coords::omt>( local_pos ) );
         int movement_chance = 1;
         if( walked_into == ot_forest || walked_into == ot_forest_water ) {
             movement_chance = 3;
@@ -3807,11 +4030,11 @@ void overmap::move_nemesis()
                 tripoint_om_sm local_sm;
                 std::tie( omp, local_sm ) = project_remain<coords::om>( mg.abs_pos );
 
-                mg.pos.y() = local_sm.y();
-                mg.pos.x() = local_sm.x();
+                local_pos.y() = local_sm.y();
+                local_pos.x() = local_sm.x();
 
                 // Erase the group at its old location, add the group with the new location
-                tmpzg.insert( std::pair<tripoint_om_sm, mongroup>( mg.pos, mg ) );
+                tmpzg.insert( std::pair<tripoint_om_sm, mongroup>( local_pos, mg ) );
                 zg.erase( it++ );
                 break;
             }
@@ -3841,9 +4064,8 @@ bool overmap::remove_nemesis()
 * @param p location of signal relative to this overmap origin
 * @param sig_power - power of signal or max distance for reaction of zombies
 */
-void overmap::signal_hordes( const tripoint_rel_sm &p_rel, const int sig_power )
+void overmap::signal_hordes( const tripoint_abs_sm &p, const int sig_power )
 {
-    tripoint_om_sm p( p_rel.raw() );
     for( auto &elem : zg ) {
         mongroup &mg = elem.second;
         if( !mg.horde ) {
@@ -3853,7 +4075,7 @@ void overmap::signal_hordes( const tripoint_rel_sm &p_rel, const int sig_power )
             // Nemesis hordes are signaled to the player by their own function.
             continue;
         }
-        const int dist = rl_dist( p, mg.pos );
+        const int dist = rl_dist( p, mg.abs_pos );
         if( sig_power < dist ) {
             continue;
         }
@@ -3869,13 +4091,14 @@ void overmap::signal_hordes( const tripoint_rel_sm &p_rel, const int sig_power )
             const int targ_dist = rl_dist( p, mg.target );
             // TODO: Base this on targ_dist:dist ratio.
             if( targ_dist < 5 ) {  // If signal source already pursued by horde
-                mg.set_target( midpoint( mg.target.xy(), p.xy() ) );
+                auto new_target = midpoint( mg.target, p );
+                mg.set_target( new_target );
                 const int min_inc_inter = 3; // Min interest increase to already targeted source
                 const int inc_roll = rng( min_inc_inter, calculated_inter );
                 mg.inc_interest( inc_roll );
                 add_msg( m_debug, "horde inc interest %d dist %d", inc_roll, dist );
             } else { // New signal source
-                mg.set_target( p.xy() );
+                mg.set_target( p );
                 mg.set_interest( min_capped_inter );
                 add_msg( m_debug, "horde set interest %d dist %d", min_capped_inter, dist );
             }
@@ -3883,19 +4106,14 @@ void overmap::signal_hordes( const tripoint_rel_sm &p_rel, const int sig_power )
     }
 }
 
-void overmap::signal_nemesis( const tripoint_abs_sm p_abs_sm )
+void overmap::signal_nemesis( const tripoint_abs_sm &p_abs_sm )
 {
-    point_abs_om omp;
-    tripoint_om_sm local_sm;
-    std::tie( omp, local_sm ) = project_remain<coords::om>( p_abs_sm );
-    const point_om_sm pos_om = local_sm.xy();
-
     for( std::pair<const tripoint_om_sm, mongroup> &elem : zg ) {
         mongroup &mg = elem.second;
 
         if( mg.horde_behaviour == "nemesis" ) {
             // If the horde is a nemesis, we set its target directly on the player.
-            mg.set_target( pos_om );
+            mg.set_target( p_abs_sm );
             mg.set_nemesis_target( p_abs_sm );
         }
     }
@@ -4449,6 +4667,46 @@ void overmap::place_rivers( const overmap *north, const overmap *east, const ove
     }
 }
 
+auto overmap::place_lake_columns() -> void
+{
+    const auto &surface_column = settings->overmap_lake.lake_surface_column_oters;
+    const auto &shore_column = settings->overmap_lake.lake_shore_column_oters;
+    if( surface_column.empty() && shore_column.empty() ) {
+        return;
+    }
+
+    const auto place_column = [this]( const tripoint_om_omt & surface,
+    const std::vector < oter_str_id > &column ) {
+        using namespace std::views;
+
+        for( const auto offset : iota( 0, static_cast < int >( column.size() ) ) ) {
+            const auto z = -offset - 1;
+            if( z < -OVERMAP_DEPTH ) {
+                break;
+            }
+
+            const auto column_pos = tripoint_om_omt( surface.xy(), z );
+            const auto target = oter_id( column[offset] );
+            if( target.is_valid() && ter( column_pos ) == get_default_terrain( z ) ) {
+                ter_set( column_pos, target );
+            }
+        }
+    };
+
+    using namespace std::views;
+    for( const auto x : iota( 0, OMAPX ) ) {
+        for( const auto y : iota( 0, OMAPY ) ) {
+            const auto surface = tripoint_om_omt( x, y, 0 );
+            const auto &surface_oter = ter( surface );
+            if( surface_oter->is_lake() ) {
+                place_column( surface, surface_column );
+            } else if( surface_oter->is_lake_shore() ) {
+                place_column( surface, shore_column );
+            }
+        }
+    }
+}
+
 void overmap::place_swamps()
 {
     // Buffer our river terrains by a variable radius and increment a counter for the location each
@@ -4671,12 +4929,14 @@ void overmap::place_river( point_om_omt pa, point_om_omt pb )
 
 void overmap::place_cities()
 {
-    int op_city_size = get_option<int>( "CITY_SIZE" );
+    const city_settings &city_spec = settings->city_spec;
+    int op_city_size = city_spec.city_size >= 0 ? city_spec.city_size
+                       : get_option<int>( "CITY_SIZE" );
     if( op_city_size <= 0 ) {
         return;
     }
-    int op_city_spacing = get_option<int>( "CITY_SPACING" );
-    const city_settings &city_spec = settings->city_spec;
+    int op_city_spacing = city_spec.city_spacing >= 0 ? city_spec.city_spacing
+                          : get_option<int>( "CITY_SPACING" );
     // spacing dictates how much of the map is covered in cities
     //   city  |  cities  |   size N cities per overmap
     // spacing | % of map |  2  |  4  |  8  |  12 |  16
@@ -4783,14 +5043,621 @@ void overmap::place_cities()
     }
 }
 
-overmap_special_id overmap::pick_random_building_to_place( int town_dist,
+auto overmap::place_isolated_cities() -> void
+{
+    namespace ranges = std::ranges;
+
+    const auto &config = settings->isolated_city;
+    if( !config.enabled ) {
+        return;
+    }
+
+    const auto configured_city_size = config.city_size >= 0 ? config.city_size :
+                                      get_option < int > ( "CITY_SIZE" );
+    const auto maximum_city_size = config.max_city_size >= 0 ? config.max_city_size :
+                                   std::numeric_limits < int >::max();
+    const auto city_size = std::min( configured_city_size, maximum_city_size );
+    if( city_size <= 0 || maximum_city_size < config.min_city_size ) {
+        return;
+    }
+
+    const auto city_spacing = std::max( config.city_spacing >= 0 ? config.city_spacing :
+                                        get_option < int > ( "CITY_SPACING" ), 0 );
+
+    const auto base_oter_str = config.base_oter.str().empty() ? settings->default_oter :
+                               config.base_oter;
+    const auto has_shore_oter = !config.shore_oter.str().empty();
+    if( !base_oter_str.is_valid() || !config.land_oter.is_valid() ||
+        ( has_shore_oter && !config.shore_oter.is_valid() ) ||
+        !config.center_oter.is_valid() || !config.road_connection.is_valid() ||
+    !ranges::all_of( config.required_specials, []( const auto & anchor ) {
+    return anchor.special.is_valid();
+    } ) ||
+    !ranges::all_of( config.optional_specials, []( const auto & anchor ) {
+        return anchor.special.is_valid();
+    } ) ) {
+        debugmsg( "Invalid isolated_city settings for region %s: base_oter=%s land_oter=%s "
+                  "shore_oter=%s center_oter=%s road_connection=%s",
+                  settings->id.c_str(), base_oter_str.c_str(), config.land_oter.c_str(),
+                  config.shore_oter.c_str(), config.center_oter.c_str(),
+                  config.road_connection.c_str() );
+        return;
+    }
+
+    const auto base_oter = oter_id( base_oter_str );
+    const auto land_oter = oter_id( config.land_oter );
+    const auto center_oter = oter_id( config.center_oter );
+    const auto shore_oter = has_shore_oter ?
+                            std::optional < oter_id > ( oter_id( config.shore_oter ) ) : std::nullopt;
+    const auto &road_connection = *config.road_connection;
+    const auto sewer_tunnel_id = overmap_connection_id( "sewer_tunnel" );
+    const auto &sewer_tunnel = *sewer_tunnel_id;
+    const auto road_manhole = oter_id( "road_nesw_manhole" );
+    const auto sewer_isolated = oter_id( "sewer_isolated" );
+
+    const auto omts_per_overmap = static_cast < double >( OMAPX * OMAPY );
+    const auto city_map_coverage_ratio = 1.0 / std::pow( 2.0, city_spacing );
+    const auto omts_per_city = ( city_size * 2 + 1 ) * ( city_size * 2 + 1 ) * 3 / 4.0;
+    const auto num_cities = roll_remainder( omts_per_overmap * city_map_coverage_ratio /
+                                            omts_per_city );
+
+    const auto max_radius = std::min( OMAPX, OMAPY ) / 2 - 2;
+    if( max_radius <= 0 ) {
+        return;
+    }
+
+    const auto find_special_placement =
+        [this]( const isolated_city_special_placement_options & opts )
+    -> std::optional < isolated_city_special_placement > {
+        auto candidates = std::vector < tripoint_om_omt > ();
+        const auto special_radius = opts.special.longest_side();
+
+        if( opts.placement == "shore" )
+        {
+            const auto outer_edge = opts.land_radius + special_radius;
+            candidates.reserve( ( outer_edge * 2 + 1 ) * ( outer_edge * 2 + 1 ) );
+            using namespace std::views;
+            for( const auto x : iota( opts.center.x() - outer_edge,
+                                      opts.center.x() + outer_edge + 1 ) ) {
+                for( const auto y : iota( opts.center.y() - outer_edge,
+                                          opts.center.y() + outer_edge + 1 ) ) {
+                    const auto candidate = tripoint_om_omt( x, y, 0 );
+                    const auto distance = trig_dist( candidate.xy(), opts.center.xy() );
+                    if( distance <= outer_edge ) {
+                        candidates.push_back( candidate );
+                    }
+                }
+            }
+        } else
+        {
+            candidates.reserve( opts.island_tiles.size() );
+            for( const auto &tile : opts.island_tiles ) {
+                if( isolated_city_special_candidate_allowed( tile, opts ) ) {
+                    candidates.push_back( tile.pos );
+                }
+            }
+        }
+
+        std::shuffle( candidates.begin(), candidates.end(), rng_get_engine() );
+        for( const auto &candidate : candidates )
+        {
+            if( opts.placement == "shore" ) {
+                const auto inward = isolated_city_direction_toward( candidate, opts.center );
+                const auto dir = om_direction::opposite( inward );
+                if( can_place_special( opts.special, candidate, dir, false ) ) {
+                    return isolated_city_special_placement{ .pos = candidate, .dir = dir };
+                }
+                const auto fallback_dir = random_special_rotation( opts.special, candidate, false );
+                if( fallback_dir != om_direction::type::invalid ) {
+                    return isolated_city_special_placement{ .pos = candidate, .dir = fallback_dir };
+                }
+                continue;
+            }
+            const auto dir = random_special_rotation( opts.special, candidate, false );
+            if( dir != om_direction::type::invalid ) {
+                return isolated_city_special_placement{ .pos = candidate, .dir = dir };
+            }
+        }
+        return std::nullopt;
+    };
+
+    const auto anchor_applies = []( const isolated_city_special_settings & anchor,
+    const int size, const int island_radius ) {
+        return size >= anchor.min_city_size && island_radius >= anchor.min_island_radius &&
+               ( anchor.max_city_size < 0 || size <= anchor.max_city_size ) &&
+               ( anchor.max_island_radius < 0 || island_radius <= anchor.max_island_radius );
+    };
+
+    const auto trim_island_to_city_shape =
+        [this, &base_oter, &land_oter, &shore_oter, &road_connection](
+    const isolated_city_trim_options & opts ) {
+        auto structure_tiles = std::vector < tripoint_om_omt > ();
+        auto road_tiles = std::vector < tripoint_om_omt > ();
+        structure_tiles.reserve( opts.island_tiles.size() );
+        road_tiles.reserve( opts.island_tiles.size() );
+        for( const auto &tile : opts.island_tiles ) {
+            if( opts.shore_anchor_tiles.contains( tile.pos ) ) {
+                continue;
+            }
+            const auto &current_oter = ter( tile.pos );
+            if( current_oter != base_oter &&
+                !isolated_city_temporary_terrain( current_oter, land_oter, shore_oter ) ) {
+                if( road_connection.can_start_at( current_oter ) ) {
+                    road_tiles.push_back( tile.pos );
+                } else {
+                    structure_tiles.push_back( tile.pos );
+                }
+            }
+        }
+
+        if( structure_tiles.empty() && road_tiles.empty() ) {
+            return;
+        }
+
+        if( structure_tiles.empty() ) {
+            structure_tiles = road_tiles;
+        }
+
+        const auto land_buffer = opts.land_padding;
+        const auto road_buffer = opts.road_padding;
+        const auto protected_structure_distance = land_buffer > 0 ? std::max( 1,
+                land_buffer - std::max( 2, opts.coastline_variance / 3 ) ) : 0;
+        const auto protected_road_distance = road_buffer > 0 ? std::max( 1,
+                                             road_buffer - 1 ) : 0;
+        auto retained_land_tiles = std::unordered_set < tripoint_om_omt > ();
+        for( const auto &tile : opts.island_tiles ) {
+            const auto &current_oter = ter( tile.pos );
+            if( !isolated_city_temporary_terrain( current_oter, land_oter, shore_oter ) ) {
+                continue;
+            }
+            const auto structure_distance = isolated_city_nearest_development_distance(
+                                                tile.pos, structure_tiles );
+            const auto road_distance = isolated_city_nearest_development_distance( tile.pos,
+                                       road_tiles );
+            const auto coastline_adjustment = isolated_city_coastline_adjustment( opts.center,
+                                              tile.pos, opts.coastline_variance );
+            const auto near_structure = structure_distance.has_value() &&
+                                        *structure_distance <= std::max(
+                                            protected_structure_distance,
+                                            land_buffer + coastline_adjustment );
+            const auto protected_structure = structure_distance.has_value() &&
+                                             *structure_distance <= protected_structure_distance;
+            const auto protected_road = road_distance.has_value() &&
+                                        *road_distance <= protected_road_distance;
+            const auto road_adjustment = coastline_adjustment / 2;
+            const auto near_adjusted_road = road_distance.has_value() &&
+                                            *road_distance <= std::max(
+                                                protected_road_distance, road_buffer + road_adjustment );
+            if( protected_structure || protected_road || near_structure || near_adjusted_road ) {
+                ter_set( tile.pos, land_oter );
+                retained_land_tiles.insert( tile.pos );
+            } else {
+                ter_set( tile.pos, base_oter );
+            }
+        }
+
+        const auto retained_land_neighbor_count =
+        [&retained_land_tiles]( const tripoint_om_omt & pos ) {
+            using namespace std::views;
+
+            auto result = 0;
+            for( const auto dx : iota( -1, 2 ) ) {
+                for( const auto dy : iota( -1, 2 ) ) {
+                    if( dx == 0 && dy == 0 ) {
+                        continue;
+                    }
+                    if( retained_land_tiles.contains( pos + point_rel_omt( dx, dy ) ) ) {
+                        result += 1;
+                    }
+                }
+            }
+            return result;
+        };
+
+        const auto protected_retained_land =
+            [&structure_tiles, &road_tiles, protected_structure_distance,
+                          protected_road_distance]( const tripoint_om_omt & pos ) {
+            const auto structure_distance = isolated_city_nearest_development_distance( pos,
+                                            structure_tiles );
+            const auto road_distance = isolated_city_nearest_development_distance( pos,
+                                       road_tiles );
+            return ( structure_distance.has_value() &&
+                     *structure_distance <= protected_structure_distance ) ||
+                   ( road_distance.has_value() && *road_distance <= protected_road_distance );
+        };
+
+        using namespace std::views;
+        for( const auto pass : iota( 0, 2 ) ) {
+            auto carved_tiles = std::vector < tripoint_om_omt > ();
+            for( const auto &tile : opts.island_tiles ) {
+                if( ter( tile.pos ) != land_oter || !retained_land_tiles.contains( tile.pos ) ) {
+                    continue;
+                }
+                const auto neighbor_count = retained_land_neighbor_count( tile.pos );
+                if( neighbor_count >= 8 || protected_retained_land( tile.pos ) ) {
+                    continue;
+                }
+
+                auto carve_chance = 0;
+                if( neighbor_count <= 2 ) {
+                    carve_chance = 1;
+                } else if( neighbor_count <= 3 ) {
+                    carve_chance = 3;
+                } else if( pass > 0 && neighbor_count <= 4 ) {
+                    carve_chance = 5;
+                }
+                if( carve_chance > 0 && one_in( carve_chance ) ) {
+                    carved_tiles.push_back( tile.pos );
+                }
+            }
+            for( const auto &tile : carved_tiles ) {
+                ter_set( tile, base_oter );
+                retained_land_tiles.erase( tile );
+            }
+        }
+
+        auto solid_tiles = std::vector < tripoint_om_omt > ();
+        solid_tiles.reserve( opts.island_tiles.size() );
+        const auto is_shore_oter = [&shore_oter]( const oter_id & oter ) {
+            return shore_oter.has_value() && oter == *shore_oter;
+        };
+        for( const auto &tile : opts.island_tiles ) {
+            if( opts.shore_anchor_tiles.contains( tile.pos ) ) {
+                continue;
+            }
+            const auto &current_oter = ter( tile.pos );
+            if( current_oter != base_oter && !is_shore_oter( current_oter ) ) {
+                solid_tiles.push_back( tile.pos );
+            }
+        }
+
+        const auto clear_submerged_lake_column = [this]( const tripoint_om_omt & surface ) {
+            using namespace std::views;
+
+            for( const auto z : iota( -OVERMAP_DEPTH, 0 ) ) {
+                const auto column_pos = tripoint_om_omt( surface.xy(), z );
+                if( isolated_city_lake_column_terrain( ter( column_pos ) ) ) {
+                    ter_set( column_pos, get_default_terrain( z ) );
+                }
+            }
+        };
+        for( const auto &tile : solid_tiles ) {
+            clear_submerged_lake_column( tile );
+        }
+
+        if( !shore_oter.has_value() || opts.shore_width <= 0 ) {
+            return;
+        }
+
+        const auto set_submerged_lake_shore_column =
+        [this]( const tripoint_om_omt & surface ) {
+            using namespace std::views;
+
+            static const oter_id lake_underwater_shore( "lake_underwater_shore" );
+            const auto shore_depth = std::max( -OVERMAP_DEPTH,
+                                               settings->overmap_lake.lake_depth );
+            for( const auto z : iota( shore_depth, 0 ) ) {
+                const auto column_pos = tripoint_om_omt( surface.xy(), z );
+                const auto &current_oter = ter( column_pos );
+                if( isolated_city_lake_column_or_default_terrain( current_oter,
+                        get_default_terrain( z ) ) ) {
+                    ter_set( column_pos, lake_underwater_shore );
+                }
+            }
+        };
+
+        auto shore_scan_radius = opts.island_radius + opts.shore_width;
+        for( const auto &tile : solid_tiles ) {
+            shore_scan_radius = std::max( shore_scan_radius,
+                                          static_cast < int >( std::ceil( trig_dist( tile.xy(), opts.center.xy() ) ) ) +
+                                          opts.shore_width );
+        }
+        const auto shore_scan_tiles = isolated_city_tiles_in_radius( opts.center,
+                                      shore_scan_radius );
+
+        for( const auto &tile : shore_scan_tiles ) {
+            if( !inbounds( tile.pos ) ) {
+                continue;
+            }
+            const auto is_shore_anchor_tile = opts.shore_anchor_tiles.contains( tile.pos );
+            if( ter( tile.pos ) != base_oter ||
+                ( overmap_special_placements.contains( tile.pos ) && !is_shore_anchor_tile ) ) {
+                continue;
+            }
+            if( isolated_city_near_development( tile.pos, solid_tiles, opts.shore_width ) ) {
+                ter_set( tile.pos, *shore_oter );
+                set_submerged_lake_shore_column( tile.pos );
+            }
+        }
+    };
+
+    const auto connect_anchor_to_city_roads =
+        [this, &road_connection]( const city & town,
+    const std::vector < tripoint_om_omt > &anchor_tiles ) {
+        auto anchor_footprint = std::unordered_set < tripoint_om_omt > ();
+        auto candidates = std::vector < tripoint_om_omt > ();
+        auto candidate_set = std::unordered_set < tripoint_om_omt > ();
+        for( const auto &tile : anchor_tiles ) {
+            if( tile.z() == 0 ) {
+                anchor_footprint.insert( tile );
+            }
+        }
+        for( const auto &tile : anchor_footprint ) {
+            for( const auto dir : om_direction::all ) {
+                const auto candidate = tile + om_direction::displace( dir );
+                if( !inbounds( candidate ) || candidate.z() != 0 ||
+                    anchor_footprint.contains( candidate ) ||
+                    overmap_special_placements.contains( candidate ) ||
+                    !road_connection.can_start_at( ter( candidate ) ) ) {
+                    continue;
+                }
+                if( candidate_set.insert( candidate ).second ) {
+                    candidates.push_back( candidate );
+                }
+            }
+        }
+
+        namespace ranges = std::ranges;
+        ranges::sort( candidates, [&town]( const auto & lhs, const auto & rhs ) {
+            return trig_dist( lhs.xy(), town.pos ) < trig_dist( rhs.xy(), town.pos );
+        } );
+        return ranges::any_of( candidates, [this, &town, &road_connection]( const auto & candidate ) {
+            return build_connection( town.pos, candidate.xy(), candidate.z(), road_connection, false );
+        } );
+    };
+
+    auto layer_backup_p = std::make_unique < std::array < map_layer, OVERMAP_LAYERS>>();
+    auto &layer_backup = *layer_backup_p;
+
+    const auto max_placement_attempts = std::max( OMAPX + OMAPY, num_cities * 200 );
+    auto placed = 0;
+    auto placement_attempts = 0;
+    auto skipped_small = 0;
+    auto skipped_center = 0;
+    auto skipped_occupied = 0;
+    auto failed_required_anchor = 0;
+    auto failed_anchor_connection = 0;
+
+    while( placed < num_cities && placement_attempts < max_placement_attempts ) {
+        placement_attempts += 1;
+
+        auto town = city();
+        const auto profile = random_city_generation_profile( city_size,
+                             settings->city_spec.finales.finalized );
+        const auto size = std::min( profile.size, maximum_city_size );
+        if( size < config.min_city_size ) {
+            skipped_small += 1;
+            continue;
+        }
+        town.attempt_finale = profile.attempt_finale;
+
+        const auto land_padding = config.land_padding >= 0 ? config.land_padding :
+                                  isolated_city_default_land_padding( size );
+        const auto road_padding = config.road_padding >= 0 ? config.road_padding :
+                                  isolated_city_default_road_padding( size );
+        const auto wanted_radius = config.island_radius >= 0 ? config.island_radius : size * 2 + 5;
+        const auto min_radius = std::min( size + 3, max_radius );
+        const auto island_radius = std::clamp( wanted_radius, min_radius, max_radius );
+        const auto shore_width = shore_oter.has_value() ? std::clamp( config.shore_width, 0,
+                                 island_radius ) : 0;
+        const auto land_radius = island_radius - shore_width;
+        const auto coastline_variance = config.coastline_variance >= 0 ?
+                                        config.coastline_variance :
+                                        isolated_city_default_coastline_variance( island_radius );
+        const auto city_generation_radius = std::clamp(
+                                                std::max( island_radius,
+                                                        size * 2 + land_padding + shore_width +
+                                                        std::max( 2, coastline_variance / 2 ) ),
+                                                min_radius, max_radius );
+        const auto city_shape_outer_radius = size + land_padding;
+        const auto city_shape_radius = std::min( land_radius, city_shape_outer_radius );
+        const auto center = tripoint_om_omt( rng( city_generation_radius + 1,
+                                             OMAPX - city_generation_radius - 2 ),
+                                             rng( city_generation_radius + 1,
+                                                     OMAPY - city_generation_radius - 2 ), 0 );
+
+        if( ter( center ) != base_oter ) {
+            skipped_center += 1;
+            continue;
+        }
+
+        const auto island_tiles = isolated_city_tiles_in_radius( center, city_generation_radius );
+        if( !ranges::all_of( island_tiles, [this, &base_oter]( const isolated_city_tile & tile ) {
+        return ter( tile.pos ) == base_oter;
+        } ) ) {
+            skipped_occupied += 1;
+            continue;
+        }
+
+        layer_backup = layer;
+        const auto overmap_special_placements_backup = overmap_special_placements;
+        const auto joins_used_backup = joins_used;
+        const auto mapgen_arg_storage_backup = mapgen_arg_storage;
+        const auto mapgen_args_index_backup = mapgen_args_index;
+        const auto mapgen_args_init_flags_backup = mapgen_args_init_flags_;
+        const auto connections_out_backup = connections_out;
+        const auto connection_cache_backup = connection_cache;
+        const auto restore_placement_state = [&]() {
+            layer = layer_backup;
+            overmap_special_placements = overmap_special_placements_backup;
+            joins_used = joins_used_backup;
+            mapgen_arg_storage = mapgen_arg_storage_backup;
+            mapgen_args_index = mapgen_args_index_backup;
+            mapgen_args_init_flags_ = mapgen_args_init_flags_backup;
+            connections_out = connections_out_backup;
+            connection_cache = connection_cache_backup;
+        };
+
+        const auto placement_land_radius = shore_oter.has_value() ? city_generation_radius - 1 :
+                                           city_generation_radius;
+        for( const auto &tile : island_tiles ) {
+            const auto tile_oter = shore_oter.has_value() && tile.distance > placement_land_radius ?
+                                   *shore_oter : land_oter;
+            ter_set( tile.pos, tile_oter );
+        }
+
+        town.pos = center.xy();
+        town.size = size;
+        town.finale_placed = false;
+        town.finale_counter = rng( 0, profile.finale_distance );
+
+        ter_set( center, center_oter );
+        if( center_oter == road_manhole ) {
+            ter_set( center + tripoint_below, sewer_isolated );
+        }
+
+        auto shore_anchor_tiles = std::unordered_set < tripoint_om_omt > ();
+        auto anchor_placements = std::vector < std::vector < tripoint_om_omt>>();
+        auto delayed_required_anchors = std::vector < isolated_city_special_settings > ();
+        auto delayed_optional_anchors = std::vector < isolated_city_special_settings > ();
+
+        const auto place_anchor = [&]( const isolated_city_special_settings & anchor ) {
+            if( !anchor_applies( anchor, size, island_radius ) ) {
+                return true;
+            }
+            const auto &special = *anchor.special;
+            const auto placement_radius = anchor.placement == "shore" ? island_radius :
+                                          city_shape_radius;
+            const auto placement = find_special_placement( {
+                .special = special,
+                .island_tiles = island_tiles,
+                .center = center,
+                .placement = anchor.placement,
+                .land_radius = placement_radius
+            } );
+            if( !placement.has_value() ) {
+                return false;
+            }
+            const auto placed_tiles = place_special( special, placement->pos, placement->dir, town,
+                                      false, false );
+            anchor_placements.push_back( placed_tiles );
+            if( anchor.placement == "shore" ) {
+                for( const auto &placed_tile : placed_tiles ) {
+                    if( placed_tile.z() == 0 ) {
+                        shore_anchor_tiles.insert( placed_tile );
+                    }
+                }
+            }
+            return true;
+        };
+
+        auto required_specials_placed = true;
+        for( const auto &anchor : config.required_specials ) {
+            if( anchor.placement == "shore" ) {
+                delayed_required_anchors.push_back( anchor );
+                continue;
+            }
+            if( !place_anchor( anchor ) ) {
+                required_specials_placed = false;
+                failed_required_anchor += 1;
+                break;
+            }
+        }
+        if( !required_specials_placed ) {
+            restore_placement_state();
+            continue;
+        }
+
+        for( const auto &anchor : config.optional_specials ) {
+            if( !anchor_applies( anchor, size, island_radius ) || anchor.chance <= 0 ) {
+                continue;
+            }
+            if( anchor.placement == "shore" ) {
+                delayed_optional_anchors.push_back( anchor );
+                continue;
+            }
+            if( anchor.chance >= 100 || x_in_y( anchor.chance, 100 ) ) {
+                place_anchor( anchor );
+            }
+        }
+
+        auto sewers = std::vector < tripoint_om_omt > ();
+        const auto start_dir = om_direction::random();
+        auto cur_dir = start_dir;
+        do {
+            build_city_street( road_connection, town.pos, size, cur_dir, town, sewers );
+        } while( ( cur_dir = om_direction::turn_right( cur_dir ) ) != start_dir );
+
+        for( const auto &sewer : sewers ) {
+            build_connection( town.pos, sewer.xy(), sewer.z(), sewer_tunnel, false );
+        }
+
+        const auto anchor_shore_width = std::min( shore_width, 1 );
+        trim_island_to_city_shape( {
+            .island_tiles = island_tiles,
+            .shore_anchor_tiles = shore_anchor_tiles,
+            .center = center,
+            .island_radius = city_generation_radius,
+            .shore_width = anchor_shore_width,
+            .land_padding = land_padding,
+            .road_padding = road_padding,
+            .coastline_variance = coastline_variance
+        } );
+
+        for( const auto &anchor : delayed_required_anchors ) {
+            if( !place_anchor( anchor ) ) {
+                required_specials_placed = false;
+                failed_required_anchor += 1;
+                break;
+            }
+        }
+        if( !required_specials_placed ) {
+            restore_placement_state();
+            continue;
+        }
+
+        for( const auto &anchor : delayed_optional_anchors ) {
+            if( anchor.chance >= 100 || x_in_y( anchor.chance, 100 ) ) {
+                place_anchor( anchor );
+            }
+        }
+
+        for( const auto &anchor_tiles : anchor_placements ) {
+            if( !connect_anchor_to_city_roads( town, anchor_tiles ) ) {
+                failed_anchor_connection += 1;
+            }
+        }
+
+        trim_island_to_city_shape( {
+            .island_tiles = island_tiles,
+            .shore_anchor_tiles = shore_anchor_tiles,
+            .center = center,
+            .island_radius = city_generation_radius,
+            .shore_width = shore_width,
+            .land_padding = land_padding,
+            .road_padding = road_padding,
+            .coastline_variance = coastline_variance
+        } );
+
+        if( config.register_city ) {
+            cities.push_back( town );
+        }
+        placed += 1;
+        placement_attempts = 0;
+    }
+
+    if( num_cities > 0 && placed == 0 ) {
+        dbg( DL::Info ) << "isolated city placement failed for region " << settings->id
+                        << ": wanted=" << num_cities
+                        << " attempts=" << placement_attempts
+                        << " skipped_small=" << skipped_small
+                        << " skipped_center=" << skipped_center
+                        << " skipped_occupied=" << skipped_occupied
+                        << " failed_required_anchor=" << failed_required_anchor
+                        << " failed_anchor_connection=" << failed_anchor_connection;
+    }
+}
+
+overmap_special_id overmap::pick_random_building_to_place( int town_dist, int town_size,
         bool attempt_finale_place ) const
 {
     const city_settings &city_spec = settings->city_spec;
     int shop_radius = city_spec.shop_radius;
+    int apartment_radius = city_spec.apartment_radius;
     int park_radius = city_spec.park_radius;
 
     int shop_sigma = city_spec.shop_sigma;
+    int apartment_sigma = city_spec.apartment_sigma;
     int park_sigma = city_spec.park_sigma;
 
     //Normally distribute shops and parks
@@ -4798,6 +5665,9 @@ overmap_special_id overmap::pick_random_building_to_place( int town_dist,
     //Parks are nearly guaranteed to have a non-zero chance of spawning anywhere in the city.
     int shop_normal = std::max( static_cast<int>( normal_roll( shop_radius, shop_sigma ) ),
                                 shop_radius );
+    int apartment_normal = std::max( static_cast<int>( normal_roll( apartment_radius,
+                                     apartment_sigma ) ),
+                                     apartment_radius );
     int park_normal = std::max( static_cast<int>( normal_roll( park_radius, park_sigma ) ),
                                 park_radius );
 
@@ -4806,11 +5676,23 @@ overmap_special_id overmap::pick_random_building_to_place( int town_dist,
         //return overmap_special_id( "megastore" );
         return city_spec.pick_finale();
     } else if( shop_normal > town_dist ) {
-        return city_spec.pick_shop();
+        if( town_size > 10 ) {
+            return city_spec.pick_urban_shop();
+        } else {
+            return city_spec.pick_shop();
+        }
     } else if( park_normal > town_dist ) {
         return city_spec.pick_park();
     } else {
-        return city_spec.pick_house();
+        if( town_size > 10 ) {
+            if( apartment_normal > town_dist ) {
+                return city_spec.pick_urban_house();
+            } else {
+                return city_spec.pick_house();
+            }
+        } else {
+            return city_spec.pick_house();
+        }
     }
 }
 
@@ -4823,8 +5705,12 @@ bool overmap::place_building( const tripoint_om_omt &p, om_direction::type dir, 
     const int town_dist = ( trig_dist( building_pos.xy(), town.pos ) * 100 ) / std::max( town.size, 1 );
 
     for( size_t retries = 10; retries > 0; --retries ) {
-        const overmap_special_id building_tid = pick_random_building_to_place( town_dist,
+        const overmap_special_id building_tid = pick_random_building_to_place( town_dist, town.size,
                                                 attempt_finale_place );
+
+        if( !building_tid.is_valid() ) {
+            return false;
+        }
 
         if( can_place_special( *building_tid, building_pos, building_dir, false ) ) {
             place_special( *building_tid, building_pos, building_dir, town, false, false );
@@ -5634,7 +6520,7 @@ bool overmap::can_place_special( const overmap_special &special, const tripoint_
     }
 
     if( special.has_flag( "GLOBALLY_UNIQUE" ) &&
-        overmap_buffer.contains_unique_special( special.id ) ) {
+        get_overmapbuffer( dimension_id_ ).contains_unique_special( special.id ) ) {
         return false;
     }
 
@@ -5676,10 +6562,13 @@ std::vector<tripoint_om_omt> overmap::place_special(
     }
 
     if( special.has_flag( "GLOBALLY_UNIQUE" ) ) {
-        overmap_buffer.add_unique_special( special.id );
+        get_overmapbuffer( dimension_id_ ).add_unique_special( special.id );
     }
 
     const bool grid = special.has_flag( "ELECTRIC_GRID" );
+    const auto fluid_grid_enabled = special.has_flag( "FLUID_GRID" );
+    auto *fluid_connections = fluid_grid_enabled ? &fluid_grid::connections_for(
+                                  *this ) : nullptr;
 
     special_placement_result result = special.place( *this, p, dir );
 
@@ -5751,15 +6640,21 @@ std::vector<tripoint_om_omt> overmap::place_special(
     // Link grid and mapgens
     const int args_index = mapgen_arg_storage.size();
     mapgen_arg_storage.emplace_back();
+    mapgen_args_init_flags_.push_back( 0 );
     for( const tripoint_om_omt &location : result.omts_used ) {
         mapgen_args_index[location] = args_index;
         overmap_special_placements[location] = special.id;
-        if( grid ) {
+        if( grid || fluid_connections ) {
             for( size_t i = 0; i < six_cardinal_directions.size(); i++ ) {
                 const tripoint_om_omt other = location + six_cardinal_directions[i];
                 if( std::find( result.omts_used.begin(), result.omts_used.end(),
                                other ) != result.omts_used.end() ) {
-                    electric_grid_connections[location].set( i, true );
+                    if( grid ) {
+                        electric_grid_connections[location].set( i, true );
+                    }
+                    if( fluid_connections ) {
+                        ( *fluid_connections )[location].set( i, true );
+                    }
                 }
             }
         }
@@ -5770,7 +6665,8 @@ std::vector<tripoint_om_omt> overmap::place_special(
     if( spawns.group ) {
         const int pop = rng( spawns.population.min, spawns.population.max );
         const int rad = rng( spawns.radius.min, spawns.radius.max );
-        add_mon_group( mongroup( spawns.group, project_to<coords::sm>( p ), rad, pop ) );
+        add_mon_group( mongroup( spawns.group, project_combine( pos(), project_to<coords::sm>( p ) ), rad,
+                                 pop ) );
     }
 
     // Place nested specials
@@ -5824,12 +6720,13 @@ void overmap::spawn_ores( const tripoint_abs_omt &p )
         }
         std::string chosen = ores.pick()->c_str();
         std::vector<std::string> directions{"_north", "_east", "_south", "_west"};
-        tripoint_om_omt local_pos = overmap_buffer.get_om_global( p ).local;
-        const tripoint target_sub( omt_to_sm_copy( p.raw() ) );
+        auto &owning_omb = get_overmapbuffer( dimension_id_ );
+        tripoint_om_omt local_pos = owning_omb.get_om_global( p ).local;
+        const auto target_sub( project_to<coords::sm>( p ) );
         std::string note_text( chosen );
         std::ranges::replace( note_text, '_', ' ' );
         add_note( local_pos, string_format( "Signs of %s ore nearby.", note_text ) );
-        if( !( MAPBUFFER.lookup_submap( target_sub ) ) ) {
+        if( !( MAPBUFFER_REGISTRY.get( dimension_id_ ).lookup_submap( target_sub ) ) ) {
             // No overmap to replace, set the terrain and bail.
             ter_set( local_pos, oter_id( "omt_ore_vein_" + chosen +
                                          directions[rand() % 4] ) );
@@ -5839,47 +6736,49 @@ void overmap::spawn_ores( const tripoint_abs_omt &p )
         * begin edited editmap code TODO: Should probably just make this a
         * function, if there is one, I couldnt find it. Bascially "regenerates" an OM tile.
         */
-        tinymap tmp;
         map &here = get_map();
-        overmap_buffer.ter_set( p, oter_id( "omt_ore_vein_" + chosen + directions[rand() % 4] ) );
-        tmp.generate( target_sub, calendar::turn );
+        owning_omb.ter_set( p, oter_id( "omt_ore_vein_" + chosen + directions[rand() % 4] ) );
+        mapbuffer generated_buffer;
+        generated_buffer.set_dimension_id( dimension_id_ );
+        mapgen_constructor generated_map( generated_buffer );
+        generated_map.generate( p, calendar::turn );
 
         here.set_transparency_cache_dirty( p.z() );
         here.set_outside_cache_dirty( p.z() );
         here.set_floor_cache_dirty( p.z() );
+        here.set_absorption_cache_dirty( p.z() );
         here.set_pathfinding_cache_dirty( p.z() );
         here.set_suspension_cache_dirty( p.z() );
 
         here.clear_vehicle_cache();
         here.clear_vehicle_list( p.z() );
 
-        for( int x = 0; x < 2; x++ ) {
-            for( int y = 0; y < 2; y++ ) {
-                // Apply previewed mapgen to map. Since this is a function for testing, we try avoid triggering
-                // functions that would alter the results
-                const tripoint dest_pos = target_sub + point( x, y );
-                const tripoint src_pos = tripoint{ x, y, p.z() };
+        for( const auto offset : point_range<point_omt_sm>( point_omt_sm::zero(), point_omt_sm( 1, 1 ) ) ) {
+            const auto dest_pos = target_sub + offset.raw();
 
-                submap *destsm = MAPBUFFER.lookup_submap( dest_pos );
-                submap *srcsm = tmp.get_submap_at_grid( src_pos );
+            submap *destsm = MAPBUFFER_REGISTRY.get( dimension_id_ ).lookup_submap( dest_pos );
+            submap *srcsm = generated_buffer.lookup_submap_in_memory( dest_pos );
+            if( destsm == nullptr || srcsm == nullptr ) {
+                continue;
+            }
 
-                submap::swap( *destsm,  *srcsm );
+            submap::swap( *destsm,  *srcsm );
 
-                for( auto &veh : destsm->vehicles ) {
-                    veh->sm_pos = dest_pos;
-                }
+            for( auto &veh : destsm->vehicles ) {
+                veh->abs_sm_pos = dest_pos;
+            }
 
-                if( !destsm->spawns.empty() ) {                              // trigger spawnpoints
-                    here.spawn_monsters( true );
-                }
+            if( !destsm->spawns.empty() ) {                              // trigger spawnpoints
+                here.spawn_monsters( true );
             }
         }
 
         // Since we cleared the vehicle cache of the whole z-level (not just the generate map), we add it back here
-        for( int x = 0; x < here.getmapsize(); x++ ) {
-            for( int y = 0; y < here.getmapsize(); y++ ) {
-                const tripoint dest_pos = tripoint( x, y, p.z() );
-                const submap *destsm = here.get_submap_at_grid( dest_pos );
+        for( const auto x : std::views::iota( 0, here.getmapsize() ) ) {
+            for( const auto y : std::views::iota( 0, here.getmapsize() ) ) {
+                const auto dest_pos = tripoint_bub_sm( x, y, p.z() );
+                const submap *destsm = here.get_mapbuffer().lookup_submap_in_memory(
+                                           map_local_to_abs( here, dest_pos ) );
                 here.update_vehicle_list( destsm, p.z() ); // update real map's vcaches
             }
         }
@@ -6079,7 +6978,7 @@ void overmap::place_specials( overmap_special_batch &enabled_specials )
         cata::flat_set<overmap_location_id> this_locs;
         area this_area;
         for( const overmap_special_locations &loc : locs ) {
-            if( loc.p.z == 0 ) {
+            if( loc.p.z() == 0 ) {
                 this_area.surface++;
                 // Only z0 locations are actually matched, other ones are ignored
                 this_locs.insert( loc.locations.begin(), loc.locations.end() );
@@ -6120,6 +7019,10 @@ void overmap::place_specials( overmap_special_batch &enabled_specials )
         int weight = special_area[s->id];
         if( is_true_center && s->has_flag( "ENDGAME" ) ) {
             weight *= 1000;
+        }
+        // Make certain global unique specials flagged as specific to endgame don't spawn elsewhere.
+        if( !is_true_center && s->has_flag( "ENDGAME" ) && s->has_flag( "GLOBALLY_UNIQUE" ) ) {
+            weight = 0;
         }
         return weight;
     };
@@ -6185,14 +7088,23 @@ void overmap::place_specials( overmap_special_batch &enabled_specials )
 
         const bool unique = iter.special_details->has_flag( "UNIQUE" );
         const bool globally_unique = iter.special_details->has_flag( "GLOBALLY_UNIQUE" );
+        const auto already_placed = [&special]( const auto & placement ) {
+            return placement.second == special.id;
+        };
 
         int amount_to_place;
-        if( unique || globally_unique ) {
+        if( ( unique || globally_unique ) &&
+            std::ranges::any_of( overmap_special_placements, already_placed ) ) {
+            amount_to_place = 0;
+        } else if( unique || globally_unique ) {
             const overmap_special_id &id = iter.special_details->id;
-
-            //FINGERS CROSSED EMOGI
-            amount_to_place = x_in_y( min, max ) && ( !globally_unique ||
-                              !overmap_buffer.contains_unique_special( id ) ) ? 1 : 0;
+            if( special.has_flag( "ENDGAME" ) && globally_unique ) {
+                amount_to_place = is_true_center ? 1 : 0;
+            } else {
+                //FINGERS CROSSED EMOGI
+                amount_to_place = x_in_y( min, max ) && ( !globally_unique ||
+                                  !get_overmapbuffer( dimension_id_ ).contains_unique_special( id ) ) ? 1 : 0;
+            }
         } else {
             // Number of instances normalized to terrain ratio
             float real_max = std::max( static_cast<float>( min ), max * rate );
@@ -6210,7 +7122,7 @@ void overmap::place_mongroups()
         if( get_option<bool>( "WANDER_SPAWNS" ) ) {
             if( !one_in( 16 ) || elem.size > 5 ) {
                 mongroup m( GROUP_ZOMBIE,
-                            tripoint_om_sm( project_to<coords::sm>( elem.pos ), 0 ),
+                            project_combine( pos(), project_to<coords::sm>( tripoint_om_omt( elem.pos, 0 ) ) ),
                             static_cast<int>( elem.size * 2.5 ),
                             elem.size * 80 );
                 //                m.set_target( zg.back().posx, zg.back().posy );
@@ -6225,9 +7137,9 @@ void overmap::place_mongroups()
         // Figure out where the dimensional lab is, and flood area with nether critters
         for( int x = 0; x < OMAPX; x++ ) {
             for( int y = 0; y < OMAPY; y++ ) {
-                tripoint_om_omt p( x, y, 0 );
-                if( ter( p ) == "central_lab_entrance" ) {
-                    add_mon_group( mongroup( GROUP_DIMENSIONAL_SURFACE, project_to<coords::sm>( p ), 5, 30 ) );
+                if( ter( tripoint_om_omt( x, y, 0 ) ) == "central_lab_entrance" ) {
+                    add_mon_group( mongroup( GROUP_DIMENSIONAL_SURFACE, project_to<coords::sm>( tripoint_abs_omt( x, y,
+                                             0 ) ), 5, 30 ) );
                 }
             }
         }
@@ -6236,23 +7148,17 @@ void overmap::place_mongroups()
     // Place the "put me anywhere" groups
     int numgroups = rng( 0, 3 );
     for( int i = 0; i < numgroups; i++ ) {
-        add_mon_group( mongroup( GROUP_WORM, tripoint( rng( 0, OMAPX * 2 - 1 ), rng( 0,
-                                 OMAPY * 2 - 1 ), 0 ),
+        auto offset = tripoint_om_sm( rng( 0, OMAPX * 2 - 1 ), rng( 0, OMAPY * 2 - 1 ), 0 );
+        add_mon_group( mongroup( GROUP_WORM, project_combine( pos(), offset ),
                                  rng( 20, 40 ), rng( 30, 50 ) ) );
     }
 }
 
 void overmap::place_nemesis( const tripoint_abs_omt p )
 {
-    tripoint_abs_sm pos_sm = project_to<coords::sm>( p );
-    point_abs_om omp;
-    tripoint_om_sm local_sm;
-    std::tie( omp, local_sm ) = project_remain<coords::om>( pos_sm );
-
-    mongroup nemesis( GROUP_NEMESIS, local_sm, 1, 1 );
+    mongroup nemesis( GROUP_NEMESIS, project_to<coords::sm>( p ), 1, 1 );
     nemesis.horde = true;
     nemesis.horde_behaviour = "nemesis";
-    nemesis.abs_pos = pos_sm;
     add_mon_group( nemesis );
 }
 
@@ -6302,29 +7208,28 @@ void overmap::place_radios()
     }
 }
 
-void overmap::open( overmap_special_batch &enabled_specials )
+auto overmap::open( const dimension_id &dim_id,
+                    overmap_special_batch &enabled_specials ) -> void
 {
-    // const std::string terfilename = overmapbuffer::terrain_filename( loc );
-
     const auto ter_reader = [&]( std::istream & fin ) {
         overmap::unserialize( fin, string_format( "overmap terrain %d.%d", loc.x(), loc.y() ) );
     };
 
-    if( g->get_active_world()->read_overmap( loc, ter_reader ) ) {
-        // const std::string plrfilename = overmapbuffer::player_filename( loc );
+    if( g->get_active_world()->read_overmap( dim_id.str(), loc, ter_reader ) ) {
         const auto plr_reader = [&]( std::istream & fin ) {
             overmap::unserialize_view( fin, string_format( "overmap visibility %d.%d", loc.x(), loc.y() ) );
         };
-        g->get_active_world()->read_overmap_player_visibility( loc, plr_reader );
+        g->get_active_world()->read_overmap_player_visibility( dim_id.str(), loc, plr_reader );
     } else { // No map exists!  Prepare neighbors, and generate one.
+        auto &owning_omb = get_overmapbuffer( dim_id );
         std::vector<const overmap *> pointers;
         // Fetch south and north
         for( int i = -1; i <= 1; i += 2 ) {
-            pointers.push_back( overmap_buffer.get_existing( loc + point( 0, i ) ) );
+            pointers.push_back( owning_omb.get_existing( loc + point( 0, i ) ) );
         }
         // Fetch east and west
         for( int i = -1; i <= 1; i += 2 ) {
-            pointers.push_back( overmap_buffer.get_existing( loc + point( i, 0 ) ) );
+            pointers.push_back( owning_omb.get_existing( loc + point( i, 0 ) ) );
         }
 
         // pointers looks like (north, south, west, east)
@@ -6333,15 +7238,24 @@ void overmap::open( overmap_special_batch &enabled_specials )
 }
 
 // Note: this may throw io errors from std::ofstream
-void overmap::save() const
+auto overmap::save( const dimension_id &dim_id ) const -> void
 {
-    g->get_active_world()->write_overmap_player_visibility( loc, [&]( std::ostream & stream ) {
+    g->get_active_world()->write_overmap_player_visibility( dim_id.str(),
+    loc, [&]( std::ostream & stream ) {
         serialize_view( stream );
     } );
 
-    g->get_active_world()->write_overmap( loc, [&]( std::ostream & stream ) {
+    g->get_active_world()->write_overmap( dim_id.str(), loc, [&]( std::ostream & stream ) {
         serialize( stream );
     } );
+}
+
+void overmap::save() const
+{
+    // Legacy overload: delegates to the dim-aware version using the
+    // currently-active dimension.  Not safe for background threads; use
+    // save(dim_id) instead when calling from worker contexts.
+    save( g_active_dimension_id );
 }
 
 void overmap::add_mon_group( const mongroup &group )
@@ -6351,7 +7265,8 @@ void overmap::add_mon_group( const mongroup &group )
     // makes the diffuse setting obsolete (as it only controls how the radius
     // is interpreted) - it's only used when adding monster groups with function.
     if( group.radius == 1 ) {
-        zg.insert( std::pair<tripoint_om_sm, mongroup>( group.pos, group ) );
+        zg.insert( std::pair<tripoint_om_sm, mongroup>( project_remain<coords::om>
+                   ( group.abs_pos ).remainder_tripoint, group ) );
         return;
     }
     // diffuse groups use a circular area, non-diffuse groups use a rectangular area
@@ -6398,7 +7313,7 @@ void overmap::add_mon_group( const mongroup &group )
             // for a single-submap group.
             mongroup tmp( group );
             tmp.radius = 1;
-            tmp.pos += point( x, y );
+            tmp.abs_pos += point( x, y );
             tmp.population = p;
             // This *can* create groups outside of the area of this overmap.
             // As this function is called during generating the overmap, the
@@ -6448,7 +7363,8 @@ bool overmap::is_omt_generated( const tripoint_om_omt &loc ) const
         project_to<coords::sm>( project_combine( pos(), loc ) );
 
     // TODO: fix point types
-    const bool is_generated = MAPBUFFER.lookup_submap( global_sm_loc.raw() ) != nullptr;
+    const bool is_generated =
+        MAPBUFFER_REGISTRY.get( dimension_id_ ).lookup_submap( global_sm_loc ) != nullptr;
 
     return is_generated;
 }
@@ -6460,7 +7376,8 @@ void overmap::set_electric_grid_connections( const tripoint_om_omt &p,
     for( size_t i = 0; i < six_cardinal_directions.size(); i++ ) {
         tripoint_om_omt other_p = p + six_cardinal_directions[i];
         tripoint_abs_omt other_p_global = project_combine( pos(), other_p );
-        overmap_with_local_coords other = overmap_buffer.get_om_global( other_p_global );
+        overmap_with_local_coords other = get_overmapbuffer( dimension_id_ ).get_om_global(
+                                              other_p_global );
         size_t opposite_direction = i + ( ( i % 2 ) ? -1 : 1 );
         other.om->electric_grid_connections[other.local][opposite_direction] = connections[i];
     }

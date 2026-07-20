@@ -45,11 +45,23 @@ using ascii_art_id = string_id<ascii_art>;
 class disease_type;
 using diseasetype_id = string_id<disease_type>;
 
+class dimension;
+using dimension_id = string_id<dimension>;
+
 class emit;
 using emit_id = string_id<emit>;
 
 class enchantment;
 using enchantment_id = string_id<enchantment>;
+
+class enchantment_value;
+using enchantment_value_id = string_id<enchantment_value>;
+
+class enchantment_flag;
+using enchantment_flag_id = string_id<enchantment_flag>;
+
+class enchantment_condition;
+using enchantment_condition_id = string_id<enchantment_condition>;
 
 class fault;
 using fault_id = string_id<fault>;
@@ -193,6 +205,9 @@ using quality_id = string_id<quality>;
 class VehicleGroup;
 using vgroup_id = string_id<VehicleGroup>;
 
+class VehiclePalette;
+using vpalette_id = string_id<VehiclePalette>;
+
 class vitamin;
 using vitamin_id = string_id<vitamin>;
 
@@ -204,6 +219,9 @@ using vproto_id = string_id<vehicle_prototype>;
 
 struct weather_type;
 using weather_type_id = string_id<weather_type>;
+
+struct world_type;
+using world_type_id = string_id<world_type>;
 
 class zone_type;
 using zone_type_id = string_id<zone_type>;
@@ -221,5 +239,4 @@ using flag_id = string_id<json_flag>;
 class json_trait_flag;
 using trait_flag_id = int_id<json_trait_flag>;
 using trait_flag_str_id = string_id<json_trait_flag>;
-
 

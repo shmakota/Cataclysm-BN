@@ -23,6 +23,7 @@
 #include "units.h"
 #include "catalua_type_operators.h"
 
+class lua_monster_callback_actor;
 class Creature;
 class monster;
 struct dealt_projectile_attack;
@@ -80,6 +81,7 @@ enum m_flag : int {
     MF_NOHEAD,              // Headshots not allowed!
     MF_HARDTOSHOOT,         // It's one size smaller for ranged attacks, no less then creature_size::tiny
     MF_GRABS,               // Its attacks may grab us!
+    MF_GRAB_IMMUNE,         // Cannot be grabbed by another creature
     MF_BASHES,              // Bashes down doors
     MF_DESTROYS,            // Bashes down walls and more
     MF_BORES,               // Tunnels through just about anything
@@ -120,7 +122,8 @@ enum m_flag : int {
     MF_BONES,               // May produce bones and sinews when butchered; if combined with POISON flag, tainted bones, if combined with HUMAN, human bones
     MF_FAT,                 // May produce fat when butchered; if combined with POISON flag, tainted fat
     MF_CONSOLE_DESPAWN,     // Despawns when a nearby console is properly hacked
-    MF_IMMOBILE,            // Doesn't move (e.g. turrets)
+    MF_IMMOBILE,            // Doesn't move & doesn't use non-special attacks (e.g. turrets)
+    MF_STATIONARY,          // Stationary, but will fight back (e.g. training dummies)
     MF_ID_CARD_DESPAWN,     // Despawns when a science ID card is used on a nearby console
     MF_RIDEABLE_MECH,       // A rideable mech that is immobile until ridden.
     MF_CARD_OVERRIDE,        // Not a mech, but can be converted to friendly using an ID card in the same way that mechs can.
@@ -157,6 +160,7 @@ enum m_flag : int {
     MF_INTERIOR_AMMO,       // Monster contain's its ammo inside itself, no need to load on launch. Prevents ammo from being dropped on disable.
     MF_CLIMBS,              // Monsters that can climb certain terrain and furniture
     MF_PACIFIST,            // Monsters that will never use melee attack, useful for having them use grab without attacking the player
+    MF_KEEP_DISTANCE,       // Attempts to keep tracking_distance between itself and its current target.
     MF_PUSH_MON,            // Monsters that can push creatures out of their way
     MF_PUSH_VEH,            // Monsters that can push vehicles out of their way
     MF_NIGHT_INVISIBILITY,  // Monsters that are invisible in poor light conditions
@@ -171,7 +175,9 @@ enum m_flag : int {
     MF_CANPLAY,             // This monster can be played with if it's a pet.
     MF_PET_MOUNTABLE,       // This monster can be mounted and ridden when tamed.
     MF_PET_HARNESSABLE,     // This monster can be harnessed when tamed.
-    MF_DOGFOOD,             // This monster will respond to the `dog whistle` item.
+    MF_CAN_FETCH,           // This monster can fetch items for its tamer when tamed.
+    MF_DOGFOOD,             // DEPRECATED This monster will respond to the `dog whistle` item.
+    MF_DOG_WHISTLE,         // This monster will respond to the `dog whistle` item.
     MF_MILKABLE,            // This monster is milkable.
     MF_SHEARABLE,           // This monster is shearable.
     MF_NO_BREED,            // This monster doesn't breed, even though it has breed data
@@ -199,8 +205,14 @@ enum m_flag : int {
     MF_VOLATILE,            // This monster tends to explode if hit by fire or bullets, fire weapons will always catch them on fire.
     MF_CANT_CLONE,            // This monster can't be recreated using cloning vats, genome samples will fail if used on it.
     MF_MOUNTABLE_STAIRS,     // When ridden, this monster can go up or down stairs and climb.
+    MF_MOUNTABLE_LADDER,    //When ridden, this monster can go up or down terrain with the DIFFICULT_Z flag (i.e ladders).
     MF_MOUNTABLE_OBSTACLES,     // When ridden, this monster can pass obstacles like fences or doorways when mounted.
+    MF_MOUNTABLE_DOORS,     //Player can open/close doors while riding this monster
+    MF_MOUNTABLE_LEDGE,     //Player can drop down ledges while riding this monster
     MF_FACTION_MEMORY,      // This monster tracks anger separately per faction
+    MF_COMBAT_MOUNT,        // This monster is trained for combat
+    MF_CANT_TRAIN,            // This monster can't be trained for combat
+    MF_POLICE_EYEBOT,            // A drone capable of summoning reinforcements, see mattack::photograph
 
     MF_MAX                  // Sets the length of the flags - obviously must be LAST
 };
@@ -279,8 +291,8 @@ struct mtype {
         mtype_id id;
 
         std::map<itype_id, int> starting_ammo; // Amount of ammo the monster spawns with.
-        // Name of item group that is used to create item dropped upon death, or empty.
-        item_group_id death_drops;
+        // Names of item groups used to create items dropped upon death.
+        std::vector<item_group_id> death_drops;
 
         /** Stores effect data for effects placed on attack */
         std::vector<mon_effect_data> atk_effs;
@@ -310,6 +322,9 @@ struct mtype {
         int speed = 0;          /** e.g. human = 100 */
         int agro = 0;           /** chance will attack [-100,100] */
         int morale = 0;         /** initial morale level at spawn */
+        // How close the monster is willing to approach its target when following or keeping distance.
+        int tracking_distance = 8;
+        std::optional<int> preferred_z;
 
         // Number of hitpoints regenerated per turn.
         int regenerates = 0;
@@ -334,6 +349,25 @@ struct mtype {
 
         // Pet food category this monster is in
         pet_food_data petfood;
+
+        struct pet_training_level_flags {
+            int level = 0;
+            std::vector<m_flag> flags;
+        };
+
+        struct pet_training_multipliers {
+            // Per-level multipliers: 1.2 means each training level gives +20% of base stat.
+            // Values below 1.0 would decrease stats; values above 1.0 increase them.
+            float hp = 1.2f;
+            float melee = 1.15f;
+            float dodge = 1.15f;
+            int max_level = 3;
+            int min_skill = 3;
+            std::vector<pet_training_level_flags> level_flags;
+        };
+        // Per-level stat multipliers when this monster is trained as a pet.
+        // Absent means this monster cannot be trained.
+        std::optional<pet_training_multipliers> pet_training;
 
         std::set<scenttype_id> scents_tracked; /**Types of scent tracked by this mtype*/
         std::set<scenttype_id> scents_ignored; /**Types of scent ignored by this mtype*/
@@ -402,6 +436,8 @@ struct mtype {
 
         // Do we indiscriminately attack characters, or should we wait until one annoys us?
         bool aggro_character = true;
+        std::optional<std::string> lua_attitude;
+        std::optional<std::string> lua_ai;
 
         mtype();
         /**
@@ -427,12 +463,20 @@ struct mtype {
          * If this monster is a rideable mech with enhanced strength, this is the strength it gives to the player
          */
         int mech_str_bonus = 0;
+        /**
+         * If present, disarming techniques will work on this creature
+         */
+        item_group_id monster_weapon;
 
         /** Emission sources that cycle each turn the monster remains alive */
         std::map<emit_id, time_duration> emit_fields;
 
         pathfinding_settings legacy_path_settings;
         pathfinding_settings legacy_path_settings_buffed;
+
+        /** Lua callback actor (non-owning, owned by catalua.cpp static maps).
+        *  Mutable because it is wired post-construction through const factory references. */
+        mutable const lua_monster_callback_actor *lua_callbacks = nullptr;
 
         PathfindingSettings path_settings;
         RouteSettings route_settings;
@@ -478,4 +522,3 @@ struct mtype {
 };
 
 mon_effect_data load_mon_effect_data( const JsonObject &e );
-

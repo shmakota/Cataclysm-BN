@@ -123,6 +123,26 @@ local scraps = gapi.create_item(ItypeId.new("scrap"), 3)
 target_monster:as_monster():add_item(scraps)
 ```
 
+### 몬스터 상호작용을 무작위로 막기
+
+Lua 콘솔에 아래 코드를 붙여 넣으면 몬스터 상호작용이 50% 확률로
+실패하게 할 수 있습니다:
+
+```lua
+game.add_hook("on_try_monster_interaction", function(params)
+    local monster = params.monster
+
+    gapi.add_msg(string.format("당신은 %s에게 말을 걸어보려 합니다", monster:get_name()))
+    if math.random(2) == 1 then
+        gapi.add_msg(MsgType.warning, string.format("당신은 %s(와)과 상호작용하기엔 너무 수줍습니다!", monster:get_name()))
+        return false
+    end
+end)
+```
+
+`false` 를 반환하면 기본 펫, 메카, 우호적 몬스터 상호작용이 막히고,
+`true` 를 반환하면 그대로 진행됩니다.
+
 ## NPC
 
 ### NPC 생성 및 삭제
@@ -136,6 +156,23 @@ local new_npc = map:place_npc(place_point, "thug")
 
 -- 나중에 NPC를 조용히 삭제할 수 있습니다
 new_npc:erase()
+```
+
+### NPC 조종 전환에 반응하기
+
+플레이어가 동료 NPC 조종으로 전환한 뒤 모드 상태를 갱신해야 할 때
+`on_control_npc` 훅을 사용합니다. 이 훅은 전환 후 실행되므로 현재 조종
+중인 캐릭터는 `gapi.get_avatar()`로 읽습니다.
+
+```lua
+local mod = game.mod_runtime[game.current_mod]
+game.add_hook("on_control_npc", function(...) return mod.on_control_npc(...) end)
+
+mod.on_control_npc = function(params)
+    local controlled = gapi.get_avatar()
+
+    gapi.add_msg(MsgType.good, string.format("이제 %s을(를) 조종합니다.", controlled:get_name()))
+end
 ```
 
 ## 날씨 훅

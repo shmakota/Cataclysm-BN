@@ -4,7 +4,7 @@
     "type": "TOOL",
     "category": "electronics",
     "name": { "str": "advanced UPS", "str_pl": "advanced UPS's" },
-    "description": "This is an advanced version of the unified power supply, or UPS.  Designed for military use to power advanced weapons, it uses plutonium fuel cells which provide better efficiency, but are not rechargeable.  It can power many household electronics as well.",
+    "description": "This is an advanced version of the unified power supply, or UPS.  Designed for military use to power advanced weapons, it uses plutonium fuel cells which provide better efficiency and self-charging capability, in exchange for lacking the ability to swap out batteries for sustained use.  It can power many household electronics as well.",
     "weight": "500 g",
     "volume": "2 L",
     "price": "5600 USD",
@@ -14,11 +14,15 @@
     "material": [ "aluminum", "plastic" ],
     "symbol": ";",
     "color": "light_green",
-    "ammo": "plutonium",
-    "max_charges": 2500,
+    "ammo": "battery",
+    "initial_charges": 5000,
+    "max_charges": 5000,
     "ups_eff_mult": 2,
     "ups_recharge_rate": 10,
-    "flags": [ "IS_UPS" ]
+    "looks_like": "battery",
+    "//": "Twice the recharge rate, half the size of a heavy plutonium battery.",
+    "relic_data": { "recharge_scheme": [ { "type": "time", "interval": "12 m", "rate": 40 } ] },
+    "flags": [ "IS_UPS", "LEAK_DAM", "RADIOACTIVE", "NO_RELOAD", "NO_UNLOAD" ]
   },
   {
     "id": "camera",
@@ -130,7 +134,7 @@
     "type": "TOOL",
     "copy-from": "laptop",
     "name": { "str": "control laptop" },
-    "description": "A modified laptop, now capable of transmitting in the ultra-high frequencies utilized by robots.  Activate it to command robots from afar, or to toggle charging via UPS.",
+    "description": "A modified laptop, now capable of transmitting in the ultra-high frequencies utilized by robots.  Activate it to command robots from afar, or to toggle charging via UPS.  It will also automatically display any targeting data provided by friendly drones in the area.",
     "price": "100 USD",
     "price_postapoc": "80 USD",
     "charges_per_use": 2,
@@ -160,7 +164,7 @@
     "ammo": "battery",
     "initial_charges": 500,
     "max_charges": 700,
-    "flags": [ "WATCH", "ALARMCLOCK", "RECHARGE", "NO_UNLOAD", "NO_RELOAD" ]
+    "flags": [ "WATCH", "ALARMCLOCK", "RECHARGE", "NO_UNLOAD", "NO_RELOAD", "DRONE_CAM" ]
   },
   {
     "id": "control_laptop_screen_lit",
@@ -170,7 +174,7 @@
     "power_draw": 5000,
     "revert_to": "laptop",
     "use_action": { "target": "control_laptop", "msg": "You stop lighting up the screen.", "menu_text": "Turn off", "type": "transform" },
-    "flags": [ "WATCH", "LIGHT_20", "TRADER_AVOID", "RECHARGE", "NO_UNLOAD", "NO_RELOAD" ]
+    "flags": [ "WATCH", "LIGHT_20", "TRADER_AVOID", "RECHARGE", "NO_UNLOAD", "NO_RELOAD", "DRONE_CAM" ]
   },
   {
     "id": "control_laptop_music",
@@ -180,7 +184,7 @@
     "power_draw": 7000,
     "revert_to": "control_laptop",
     "use_action": "MP3_ON",
-    "flags": [ "WATCH", "TRADER_AVOID", "RECHARGE", "NO_UNLOAD", "NO_RELOAD" ]
+    "flags": [ "WATCH", "TRADER_AVOID", "RECHARGE", "NO_UNLOAD", "NO_RELOAD", "DRONE_CAM" ]
   },
   {
     "type": "TOOL_ARMOR",
@@ -258,7 +262,7 @@
     "type": "TOOL",
     "name": { "str": "wrist computer - music", "str_pl": "wrist computers - music" },
     "description": "This wrist computer is playing music, steadily raising your morale.  You can't hear anything else while you're listening.",
-    "power_draw": 300,
+    "power_draw": 5000,
     "revert_to": "wrist_comp_budget",
     "use_action": [ "MP3_ON" ],
     "flags": [
@@ -316,7 +320,7 @@
     "id": "wrist_comp_control",
     "name": { "str": "wrist control computer" },
     "copy-from": "wrist_comp_budget",
-    "description": "A fancy wrist-mounted computer, with a menagerie of useful features, such as SD reading, a built-in thermometer, and even a radiation monitor!",
+    "description": "A modified wrist-mounted computer, now capable of transmitting in the ultra-high frequencies utilized by robots, including drones which provide targeting info.  Activate it to command robots from afar or utilize its other features.",
     "weight": "112 g",
     "price": "120 USD",
     "price_postapoc": "100 USD",
@@ -357,7 +361,8 @@
       "NO_UNLOAD",
       "NO_RELOAD",
       "THERMOMETER",
-      "FANCY"
+      "FANCY",
+      "DRONE_CAM"
     ],
     "coverage": 15,
     "symbol": "[",
@@ -369,7 +374,7 @@
     "type": "TOOL",
     "name": { "str": "wrist control computer - music", "str_pl": "wrist control computers - music" },
     "description": "This wrist computer is playing music, steadily raising your morale.  You can't hear anything else while you're listening.",
-    "power_draw": 300,
+    "power_draw": 5000,
     "revert_to": "wrist_comp_control",
     "use_action": [ "MP3_ON" ],
     "magazine_well": "250 ml"
@@ -444,8 +449,28 @@
     "initial_charges": 160,
     "max_charges": 200,
     "charges_per_use": 1,
-    "use_action": [ "EINKTABLETPC", "TOGGLE_UPS_CHARGING" ],
+    "use_action": [
+      "EINKTABLETPC",
+      {
+        "type": "music_player",
+        "target": "eink_tablet_pc_music",
+        "msg": "You put in the earbuds and start listening to music.",
+        "moves": 200,
+        "need_charges": 1
+      },
+      "TOGGLE_UPS_CHARGING"
+    ],
     "flags": [ "WATCH", "RECHARGE", "NO_UNLOAD", "NO_RELOAD" ]
+  },
+  {
+    "id": "eink_tablet_pc_music",
+    "copy-from": "eink_tablet_pc",
+    "type": "TOOL",
+    "name": { "str": "e-ink tablet PC - music", "str_pl": "e-ink tablet PCs - music" },
+    "description": "This e-ink tablet PC is playing music, steadily raising your morale.  You can't hear anything else while you're listening.",
+    "power_draw": 2500,
+    "revert_to": "eink_tablet_pc",
+    "use_action": [ "MP3_ON" ]
   },
   {
     "id": "electrohack",
@@ -525,6 +550,39 @@
     "magazine_well": "250 ml"
   },
   {
+    "id": "sonar_device",
+    "type": "TOOL",
+    "category": "electronics",
+    "name": { "str": "handheld sonar" },
+    "description": "A rugged sonar unit with a compact transducer and display.  Activate it to ping nearby underwater terrain and sketch what you find onto the overmap.",
+    "weight": "500 g",
+    "volume": "500 ml",
+    "price": "450 USD",
+    "price_postapoc": "15 USD",
+    "bashing": 2,
+    "material": [ "plastic", "steel" ],
+    "symbol": ";",
+    "color": "light_blue",
+    "ammo": "battery",
+    "charges_per_use": 100,
+    "use_action": "sonar_scan",
+    "magazines": [
+      [
+        "battery",
+        [
+          "light_battery_cell",
+          "light_plus_battery_cell",
+          "light_minus_battery_cell",
+          "light_atomic_battery_cell",
+          "light_minus_atomic_battery_cell",
+          "light_minus_disposable_cell",
+          "light_disposable_cell"
+        ]
+      ]
+    ],
+    "magazine_well": "250 ml"
+  },
+  {
     "id": "hand_crank_charger",
     "type": "TOOL",
     "category": "electronics",
@@ -577,8 +635,8 @@
     "material": [ "plastic", "aluminum" ],
     "weight": "2721 g",
     "volume": "2500 ml",
-    "price": 75000,
-    "price_postapoc": 250,
+    "price": "750 USD",
+    "price_postapoc": "250 cent",
     "bashing": 6,
     "ammo": "battery",
     "initial_charges": 500,
@@ -751,8 +809,8 @@
     "description": "A popular, fancy smartphone.  Capable of making photos due to integrated camera and illuminating an area as per flashlight app, assuming it has enough charge.  The smartphone also has a clock app that includes an alarm.  Runs on a small, rechargeable power cell compatible with Unified Power Supply if set to charge from one.",
     "weight": "230 g",
     "volume": "100 ml",
-    "price": 20000,
-    "price_postapoc": 200,
+    "price": "200 USD",
+    "price_postapoc": "2 USD",
     "material": [ "plastic", "aluminum" ],
     "looks_like": "cell_phone",
     "symbol": ";",
@@ -830,8 +888,8 @@
     "description": "Never charge your phone again with the Rivtech atomic smartphone.  Rated for 10 million years of use, this cutting-edge gadget had been on public markets for less than a week when the Cataclysm hit, and their eye-watering price made them a rarity.  It includes an alarm clock, a high-resolution camera, and a bright flashlight.",
     "weight": "300 g",
     "volume": "50 ml",
-    "price": 200000,
-    "price_postapoc": 2500,
+    "price": "2000 USD",
+    "price_postapoc": "25 USD",
     "material": [ "plastic", "aluminum" ],
     "looks_like": "cell_phone",
     "symbol": ";",
@@ -948,7 +1006,7 @@
     "id": "bullet_vibrator",
     "type": "TOOL",
     "category": "electronics",
-    "name": { "str": "bullet vibrator (off)" },
+    "name": { "str": "bullet vibrator (off)", "str_pl": "bullet vibrators (off)" },
     "description": "This battery-devouring device is just the thing to knead the tension out and help you relax.  Use it to turn it on and start letting it buzz away.",
     "weight": "100 g",
     "volume": "100 ml",
@@ -987,7 +1045,7 @@
     "id": "bullet_vibrator_on",
     "type": "TOOL",
     "category": "electronics",
-    "name": { "str": "bullet vibrator (on)" },
+    "name": { "str": "bullet vibrator (on)", "str_pl": "bullet vibrators (on)" },
     "copy-from": "bullet_vibrator",
     "power_draw": 25000,
     "revert_to": "bullet_vibrator",
@@ -1158,5 +1216,21 @@
       ]
     ],
     "magazine_well": "500 ml"
+  },
+  {
+    "id": "power_portal_key",
+    "type": "TOOL",
+    "category": "electronics",
+    "name": { "str": "power portal keycard" },
+    "description": "A programmable electronic keycard used to pair two power portal nodes. Stores the absolute location of a single portal endpoint; re-attuning it to a different portal simply overwrites the stored data. Carry this to the second portal and use its interface to complete the link.",
+    "weight": "10 g",
+    "volume": "10 ml",
+    "price": "200 USD",
+    "price_postapoc": "15 USD",
+    "bashing": 0,
+    "material": [ "plastic", "steel" ],
+    "symbol": ";",
+    "color": "cyan",
+    "flags": [ "BELT_CLIP" ]
   }
 ]

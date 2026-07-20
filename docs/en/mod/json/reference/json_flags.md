@@ -1,5 +1,21 @@
 # JSON Flags
 
+## Example
+
+```json
+{
+  "type": "json_flag", // Required type
+  "id": "GENERIC_FLAG", // Flag ID
+  "context": [], // Fluff field that does nothing but is required to exist
+  "craft_inherit": true, // Items made with it will keep this flag
+  "requires_flag": true, // Used by vehicle part flags, requires another part with this ID on the tile
+  "inherit": true, // Item mods will pass this flag down to the item
+  "tag": "string" // Translatable string appended to the item's UI display name, if the item has this flag
+}
+```
+
+-
+
 ## Notes
 
 - Some flags (items, effects, vehicle parts) have to be defined in `flags.json` or `vp_flags.json`
@@ -109,60 +125,6 @@ The following ammo types are (or will soon be) available in in-repo mods
 - `545x39` 5.45x39mm
 - `270win` .270 winchester
 
-### Effects
-
-- `ACIDBOMB` Leaves a pool of acid on detonation.
-- `BEANBAG` Stuns the target.
-- `BLACKPOWDER` May clog up the gun with blackpowder fouling, which will also cause rust.
-- `BLINDS_EYES` Blinds the target if it hits the head (ranged projectiles can't actually hit the
-  eyes at the moment).
-- `BOUNCE` Inflicts target with `bounced` effect and rebounds to a nearby target without this
-  effect.
-- `COOKOFF` Explodes when lit on fire.
-- `CUSTOM_EXPLOSION` Explosion as specified in `"explosion"` field of used ammo. See `JSON_INFO.md`.
-- `DRAW_AS_LINE` Doesn't go through regular bullet animation, instead draws a line and the bullet on
-  its end for one frame.
-- `EXPLOSIVE_BIG` Large explosion without any shrapnel.
-- `EXPLOSIVE_HUGE` Huge explosion without any shrapnel.
-- `EXPLOSIVE` Explodes without any shrapnel.
-- `FLAME` Very small explosion that lights fires.
-- `FLARE` Lights the target on fire.
-- `FLASHBANG` Blinds and deafens nearby targets.
-- `FRAG` Small explosion that spreads shrapnel.
-- `INCENDIARY` Lights target on fire.
-- `LARGE_BEANBAG` Heavily stuns the target.
-- `LASER` Creates a trail of laser (the field type)
-- `LIGHTNING` Creates a trail of lightning.
-- `MININUKE_MOD` Small thermo-nuclear detonation that leaves behind radioactive fallout.
-- `MUZZLE_SMOKE` Generate a small cloud of smoke at the source.
-- `NAPALM` Explosion that spreads fire.
-- `NEVER_MISFIRES` Firing ammo without this flag may trigger a misfiring, this is independent of the
-  weapon flags.
-- `NOGIB` Prevents overkill damage on the target (target won't explode into gibs, see also the
-  monster flag NO_GIBS).
-- `NO_PENETRATE_OBSTACLES` Prevents a projectile from going through a tile with obstacles, such as
-  chainlink fences or dressers.
-- `TANGLE` When this projectile hits a target, it has a chance to tangle them up and immobilise
-  them.
-- `NO_EMBED` When an item would be spawned from the projectile, it will always be spawned on the
-  ground rather than in monster's inventory. Implied for active thrown items. Doesn't do anything on
-  projectiles that do not drop items.
-- `NO_ITEM_DAMAGE` Will not damage items on the map even when it otherwise would try to.
-- `PLASMA` Creates a trail of superheated plasma.
-- `RECOVER_[X]` Has a (X-1/X) chance to create a single charge of the used ammo at the point of
-  impact.
-- `RECYCLED` (For handmade ammo) causes the gun to misfire sometimes, this independent of the weapon
-  flags.
-- `SHOT` Multiple smaller pellets; less effective against armor but increases chance to hit and no
-  point-blank penalty
-- `SMOKE_BIG` Generates a large cloud of smoke at the target.
-- `SMOKE` Generates a cloud of smoke at the target.
-- `STREAM_BIG` Leaves a trail of intense fire fields.
-- `STREAM` Leaves a trail of fire fields.
-- `TRAIL` Creates a trail of smoke.
-- `WIDE` Prevents `HARDTOSHOOT` monster flag from having any effect. Implied by `SHOT` or liquid
-  ammo.
-
 ## Armor
 
 ### Covers
@@ -205,6 +167,7 @@ to find which flags work elsewhere.
   cooler depending on ambient and bodily temperature.
 - `COLLAR` This piece of clothing has a wide collar that can keep your mouth warm.
 - `DEAF` Makes the player deaf.
+- `DRONE_CAM` Allows you to see targets marked by friendly drones such as eyebots.
 - `ELECTRIC_IMMUNE` This gear completely protects you from electric discharges.
 - `FANCY` Wearing this clothing gives a morale bonus if the player doesn't have the
   `Fashion Deficient` trait.
@@ -267,6 +230,7 @@ to find which flags work elsewhere.
 - `WATERPROOF` Prevents the covered body-part(s) from getting wet in any circumstance.
 - `WATER_FRIENDLY` Prevents the item from making the body part count as unfriendly to water and thus
   causing negative morale from being wet.
+- `WORN_GUN` Allows the gun to be fired while worn as armor.
 - `ALLOWS_FLIGHT` While active, drains UPS to provide flight.
 - `ALWAYS_ALLOWS_FLIGHT` Always allow flight.
 
@@ -537,6 +501,8 @@ List of known flags, used in both `terrain.json` and `furniture.json`.
 - `BARRICADABLE_DOOR` Door that can be barricaded.
 - `BARRICADABLE_WINDOW_CURTAINS`
 - `BARRICADABLE_WINDOW` Window that can be barricaded.
+- `BASH_TRANSFORM` If this furniture possesses the `transform` examine action, bashing has a chance
+  to trigger (e.g. flipping tables).
 - `BASHABLE` Players + Monsters can bash this.
 - `BLOCK_WIND` This terrain will block the effects of wind.
 - `BURROWABLE` Burrowing monsters can travel under this terrain, while most others can't (e.g.
@@ -774,6 +740,7 @@ List of known flags, used in both `terrain.json` and `furniture.json`.
 - `SLEEP_IGNORE` ... This item is not shown as before-sleep warning.
 - `SLOW_WIELD` ... Has an additional time penalty upon wielding. For melee weapons and guns this is
   offset by the relevant skill. Stacks with "NEEDS_UNFOLD".
+- `SECRET_ENCHANTMENTS` ... Enchantments on this item aren't shown in item info.
 - `TACK` ... Item can be used as tack for a mount.
 - `TIE_UP` ... Item can be used to tie up a creature.
 - `TINDER` ... This item can be used as tinder for lighting a fire with a REQUIRES_TINDER flagged
@@ -793,8 +760,10 @@ List of known flags, used in both `terrain.json` and `furniture.json`.
 - `BIPOD` Handling bonus only applies on MOUNTABLE map/vehicle tiles. Does not include wield time
   penalty (see SLOW_WIELD).
 - `CHARGE` Has to be charged to fire. Higher charges do more damage.
-- `COLLAPSIBLE_STOCK` Reduces weapon volume proportional to the base size of the gun (excluding any
-  mods). Does not include wield time penalty (see NEEDS_UNFOLD).
+- `COLLAPSIBLE_STOCK` **DEPRECATED**: Use `volume_multiplier` in gunmod definitions instead.
+  Previously reduced weapon volume proportional to the base size of the gun (excluding any
+  mods). `volume_multiplier: 0.67` replicates the old behavior. Does not include wield time
+  penalty (see NEEDS_UNFOLD).
 - `CONSUMABLE` Makes a gunpart have a chance to get damaged depending on ammo fired, and definable
   fields 'consume_chance' and 'consume_divisor'.
 - `CROSSBOW` Counts as a crossbow for the purpose of gunmod compatibility. Default behavior is to
@@ -1044,6 +1013,7 @@ Multiple death functions can be used. Not all combinations make sense.
 - `BILE_BLOOD` Makes monster bleed bile.
 - `BIOPROOF` Makes monster immune to Bio damage (A damage type mostly used by magic mods)
 - `COLDPROOF` Makes monster immune to Cold damage (A damage type mostly used by magic mods)
+- `COMBAT_MOUNT` Makes pet able to approach combat without becoming immobile nor knocking the player off
 - `DARKPROOF` Makes monster immune to Dark damage (A damage type completely used by magic mods)
 - `LIGHTPROOF` Makes monster immune to Light damage (A damage type completely used by magic mods)
 - `PSIPROOF` Makes monster immune to Psionic damage (A damage type mostly used by magic mods)
@@ -1055,6 +1025,7 @@ Multiple death functions can be used. Not all combinations make sense.
 - `CAN_DIG` Can dig _and_ walk.
 - `CAN_OPEN_DOORS` Can open doors on its path.
 - `CANPLAY` This creature can be played with if it's a pet.
+- `CANT_TRAIN` This creature cannot be trained for combat
 - `CATFOOD` Becomes friendly / tamed with cat food.
 - `CATTLEFODDER` Becomes friendly / tamed with cattle fodder.
 - `CBM_CIV` May produce a common CBM a power CBM when butchered.
@@ -1094,7 +1065,8 @@ Multiple death functions can be used. Not all combinations make sense.
 - `MF_CARD_OVERRIDE` Not a mech, but can be converted to friendly using an ID card in the same way
   that mechs can.
 - `CONSOLE_DESPAWN` Despawns when a nearby console is properly hacked.
-- `IMMOBILE` Doesn't move (e.g. turrets)
+- `IMMOBILE` Doesn't move & doesn't use non-special attacks (e.g. turrets)
+- `STATIONARY` Stationary, but will fight back (e.g. training dummies )
 - `ID_CARD_DESPAWN` Despawns when a science ID card is used on a nearby console
 - `INTERIOR_AMMO` Monster contains ammo inside itself, no need to load on launch. Prevents ammo from
   being dropped on disable.
@@ -1119,8 +1091,16 @@ Multiple death functions can be used. Not all combinations make sense.
 - `PAY_BOT` Creature can be turned into a pet for a limited time in exchange of e-money.
 - `PET_MOUNTABLE` Creature can be ridden or attached to an harness.
 - `PET_HARNESSABLE`Creature can be attached to an harness.
+- `POLICE_EYEBOT` Changes the behavior of the `PHOTOGRAPH` special attack. Without it, the attack will only
+  do anything if the user is friendly, with it non-friendly bots can summon reinforcements.
+- `MOUNTABLE_STAIRS` Player can go up/down stairs while riding this creature.
+- `MOUNTABLE_LADDER` Player can go up/down stairs that have the difficult_z flag while riding this creature.
+- `MOUNTABLE_OBSTACLES` Player can travel over fences/doors while riding this creature.
+- `MOUNTABLE_DOORS` Player can open/close doors while riding this creature.
+- `MOUNTABLE_LEDGE` Player can jump down ledges while riding this creature.
 - `NULL` Source use only.
 - `PACIFIST` That monster will never do melee attacks.
+- `KEEP_DISTANCE` Monster will try to keep `tracking_distance` number of tiles between it and its current target.
 - `PARALYZE` Attack may paralyze the player with venom.
 - `PLASTIC` Reduces Bashing damage taken by 50%, 66% or 75%. Randomly selected with each hit.
 - `POISON` Poisonous to eat.
@@ -1230,7 +1210,8 @@ example, impale and scratch.
 - `PARROT_AT_DANGER` Performs the same function as PARROT, but only if the creature sees an angry
   monster from a hostile faction.
 - `PAID_BOT` For creature with PAY_BOT flag, removes the ally status when the pet effect runs out.
-- `PHOTOGRAPH` Photograph the player. Causes a robot attack?
+- `PHOTOGRAPH` If friendly, scans the surrounding area to mark targets for the player. If non-friendly,
+  photographs the player and summons reinforcements if user has the `POLICE_EYEBOT` flag, otherwise no effect.
 - `PLANT` Fungal spores take seed and grow into a fungaloid.
 - `PULL_METAL_WEAPON` Pull weapon that's made of iron or steel from the player's hand.
 - `RANGED_PULL` Pull targets towards attacker.
@@ -1585,6 +1566,7 @@ Those flags are added by the game code to specific items (that specific welder, 
 - `SPAWN_FRIENDLY` Applied to eggs laid by pets and to pet bots reverted to items. Any monster that
   hatches from said egg will also spawn friendly, and deployable bots flagged with this will skip
   checking for player skills since it's already been configured correctly once already.
+- `SPAWN_HOSTILE` `place_monster` items with this flag will always deploy a monster that's always hostile, such as for a target dummy; Inverse of SPAWN_FRIENDLY
 - `USE_UPS` The tool has the UPS mod and is charged from an UPS.
 - `WARM` A hidden flag used to track an item's journey to/from hot, buffers between HOT and cold.
 - `WET` Item is wet and will slowly dry off (e.g. towel).
@@ -1663,7 +1645,7 @@ Those flags are added by the game code to specific items (that specific welder, 
 - `EVENTURN` Only on during even turns.
 - `EXTENDABLE` A protusion which can attach to other extendable protusions
 - `EXTENDS_VISION` Extends player vision (cameras, mirrors, etc.)
-- `EXTRA_DRAG` tells the vehicle that the part exerts engine power reduction.
+- `EXTRA_DRAG` tells the vehicle that the part exerts engine `power` reduction if the part is enabled. The part needs to be set to permanently enabled in C++ or made able to be switched on in C++.
 - `FAUCET`
 - `FLAT_SURF` Part with a flat hard surface (e.g. table).
 - `FLOATS` Provide buoyancy to boats
@@ -1721,6 +1703,7 @@ Those flags are added by the game code to specific items (that specific welder, 
   It is damaged by running it over non-`DIGGABLE` surfaces.
 - `PLOW` Tills the soil underneath the part while active. Takes damage from unsuitable terrain at a
   level proportional to the speed of the vehicle.
+- `POWERED_BY_ENGINE` tells the vehicle that the part exerts engine `power` reduction. Does not require the part to be enabled in C++.
 - `POWER_TRANSFER` Transmits power to and from an attached thingy (probably a vehicle).
 - `PROPELLER` Part that is a propeller rotor, needs propeller_diameter field
 - `PROTRUSION` Part sticks out so no other parts can be installed over it.

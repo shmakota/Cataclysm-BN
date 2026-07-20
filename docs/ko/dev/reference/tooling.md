@@ -1,40 +1,36 @@
 # 개발자 도구
 
-## 코드 스타일 (astyle)
+## 코드 스타일 (C++)
 
-소스 코드의 자동 포매팅은 [Artistic Style](http://astyle.sourceforge.net/) 또는 줄여서 `astyle`로 수행됩니다.
+C++ 포매팅은 top-level `src/*.cpp`와 `src/*.h`에만 [Artistic Style](http://astyle.sourceforge.net/)을 사용합니다. 대부분의 다른 C++ 파일은 [clang-format](https://clang.llvm.org/docs/ClangFormat.html)을 사용합니다. `tools/clang-tidy-plugin/test/` 같은 포매터에 민감한 fixture는 변경하지 않습니다. 파일별 도구 선택은 저장소 helper에 맡기세요.
 
-시스템이나 개인 선호도에 따라 코드베이스에서 호출하는 여러 방법이 있습니다.
-
-### astyle 직접 호출
-
-`astyle`만 설치되어 있는 경우:
+### C++ 포매팅 호출
 
 ```sh
-astyle --options=.astylerc --recursive src/*.cpp,*.h tests/*.cpp,*.h tools/*.cpp,*.h
+just fmt
+# 또는 C++만
+just fmt-cpp
 ```
 
-### make를 통해 astyle 호출
+### CMake를 통해 C++ 포매팅 호출
 
-`make`와 `astyle`이 모두 설치되어 있는 경우:
+CMake 빌드 트리를 설정했고 `bash`를 사용할 수 있다면 이 타겟은 같은 C++ helper를 호출합니다:
 
 ```sh
-make astyle
+cmake --build <build-dir> --target format
 ```
 
-### pre-commit 훅을 통해 astyle 호출
+### pre-commit 훅을 통해 포매팅 호출
 
-관련 도구가 모두 설치되어 있는 경우 git pre-commit 훅 (일반적으로 `.git/hooks/pre-commit`)에 다음 명령을 추가하여 git이 코드 및 json 스타일을 자동으로 확인하도록 할 수 있습니다:
+선택적 훅을 설치하세요:
 
 ```sh
-git diff --cached --name-only -z HEAD | grep -z 'data/.*\.json' | \
-    xargs -r -0 -L 1 ./tools/format/json_formatter.[ce]* || exit 1
-
-make astyle-check || exit 1
+just hooks-setup
 ```
 
 ### Visual Studio용 Astyle 확장
 
+top-level `src/*.cpp`와 `src/*.h`에만 사용하세요. 저장소 스타일에는 `just fmt-cpp`를 사용하세요.
 Visual Studio Marketplace에 astyle 확장이 있지만 VS2019 또는 VS2022에서 우리 목적으로 올바르게 작동하는 것으로 (아직) 확인된 것은 없습니다.
 
 #### Visual Studio 2022
@@ -83,11 +79,11 @@ _참고:_ `Tools` - `Options` - `Environment` - `Keybindings` 메뉴에서 언�
 
 ## ctags
 
-예를 들어 [`ctags`](http://ctags.sourceforge.net/)를 통해 `tags` 파일을 만드는 일반적인 수단 외에도 CDDA JSON 데이터에서 가져온 정의 위치로 `tags` 파일을 보강하기 위해 `tools/json_tools/cddatags.py`를 제공합니다. `cddatags.py`는 소스 코드 태그를 포함하는 tags 파일을 안전하게 업데이트하도록 설계되었으므로 `tags` 파일에 두 가지 유형의 태그를 모두 원하면 `ctags -R . && tools/json_tools/cddatags.py`를 실행할 수 있습니다. 또는 이것을 수행하는 `Makefile`의 규칙이 있습니다. `make ctags` 또는 `make etags`를 실행하면 됩니다.
+예를 들어 [`ctags`](http://ctags.sourceforge.net/)를 통해 `tags` 파일을 만드는 일반적인 수단 외에도 CDDA JSON 데이터에서 가져온 정의 위치로 `tags` 파일을 보강하기 위해 `tools/json_tools/cddatags.py`를 제공합니다. `cddatags.py`는 소스 코드 태그를 포함하는 tags 파일을 안전하게 업데이트하도록 설계되었으므로 `tags` 파일에 두 가지 유형의 태그를 모두 원하면 `ctags -R . && tools/json_tools/cddatags.py`를 실행할 수 있습니다.
 
 ## clang-tidy
 
-Cataclysm에는 [clang-tidy 구성 파일](https://github.com/cataclysmbn/Cataclysm-BN/blob/main/.clang-tidy)이 있으며 `clang-tidy`가 사용 가능하면 실행하여 코드베이스의 정적 분석을 수행할 수 있습니다. CI로 LLVM 18의 `clang-tidy`로 테스트하므로 가장 일관된 결과를 위해 해당 버전을 사용할 수 있습니다.
+Cataclysm에는 [clang-tidy 구성 파일](https://github.com/cataclysmbn/Cataclysm-BN/blob/main/.clang-tidy)이 있으며 `clang-tidy`가 사용 가능하면 실행하여 코드베이스의 정적 분석을 수행할 수 있습니다. CI로 LLVM 22의 `clang-tidy`로 테스트하므로 가장 일관된 결과를 위해 해당 버전을 사용할 수 있습니다.
 
 실행하려면 몇 가지 옵션이 있습니다.
 
@@ -118,7 +114,7 @@ grep '"file": "' build/compile_commands.json | \
 
 ```sh
 sudo apt-get install \
-  clang-18 libclang-18-dev llvm-18 llvm-18-dev clang-tidy-18
+  clang-22 libclang-22-dev llvm-22 llvm-22-dev clang-tidy-22
 ```
 
 빌드를 구성할 때 cmake 플래그에 `CATA_CLANG_TIDY_PLUGIN=ON`을 추가합니다.

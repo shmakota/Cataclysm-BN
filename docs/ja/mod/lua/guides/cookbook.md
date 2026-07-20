@@ -123,6 +123,26 @@ local scraps = gapi.create_item(ItypeId.new("scrap"), 3)
 target_monster:as_monster():add_item(scraps)
 ```
 
+### モンスターとの対話をランダムに止める
+
+Lua コンソールに次のコードを貼り付けると、モンスターとの対話が
+50% の確率で失敗するようになります:
+
+```lua
+game.add_hook("on_try_monster_interaction", function(params)
+    local monster = params.monster
+
+    gapi.add_msg(string.format("あなたは %s に話しかけようとします", monster:get_name()))
+    if math.random(2) == 1 then
+        gapi.add_msg(MsgType.warning, string.format("あなたは %s と対話するにはシャイすぎます!", monster:get_name()))
+        return false
+    end
+end)
+```
+
+`false` を返すと通常のペット、メカ、友好的モンスターとの対話を止め、`true` を返すと
+そのまま続行します。
+
 ## NPC
 
 ### NPCの生成と削除
@@ -136,6 +156,23 @@ local new_npc = map:place_npc(place_point, "thug")
 
 -- 後でNPCを静かに削除できます
 new_npc:erase()
+```
+
+### NPCへの操作切り替えに反応する
+
+プレイヤーが仲間NPCの操作に切り替えた後でmodの状態を更新したい場合は
+`on_control_npc` フックを使います。このフックは切り替え後に実行されるため、
+現在操作中のキャラクターは `gapi.get_avatar()` で取得します。
+
+```lua
+local mod = game.mod_runtime[game.current_mod]
+game.add_hook("on_control_npc", function(...) return mod.on_control_npc(...) end)
+
+mod.on_control_npc = function(params)
+    local controlled = gapi.get_avatar()
+
+    gapi.add_msg(MsgType.good, string.format("現在 %s を操作しています。", controlled:get_name()))
+end
 ```
 
 ## 天気フック

@@ -20,7 +20,8 @@
     "charges_per_use": 1,
     "qualities": [ [ "COOK", 2 ], [ "BOIL", 2 ], [ "CONTAIN", 1 ] ],
     "relic_data": { "recharge_scheme": [ { "type": "solar", "interval": "10 m", "rate": 1 } ] },
-    "use_action": "HOTPLATE"
+    "use_action": "HOTPLATE",
+    "flags": [ "RECHARGE", "NO_UNLOAD" ]
   },
   {
     "id": "knife_crt",
@@ -74,13 +75,7 @@
     "color": "dark_gray",
     "material": [ "hardsteel" ],
     "relic_data": {
-      "passive_effects": [
-        {
-          "has": "WIELD",
-          "condition": "ALWAYS",
-          "values": [ { "value": "DEXTERITY", "add": 4 }, { "value": "SPEED", "add": 30 } ]
-        }
-      ]
+      "passive_effects": [ { "conditions": [ "WIELD" ], "values": [ { "value": "DEXTERITY", "add": 4 }, { "value": "SPEED", "add": 30 } ] } ]
     },
     "weight": "2500 g",
     "volume": "2500 ml",
@@ -157,9 +152,8 @@
     "relic_data": {
       "passive_effects": [
         {
-          "has": "WIELD",
-          "condition": "ALWAYS",
-          "values": [ { "value": "STRENGTH", "add": 10 }, { "value": "ARMOR_ELEC", "multiply": -1 } ],
+          "conditions": [ "WIELD" ],
+          "values": [ { "value": "STRENGTH", "add": 10 }, { "value": "ARMOR_ELECTRIC", "multiply": -1 } ],
           "mutations": [ "CRT_BERSERK_EFFECT" ],
           "hit_you_effect": [
             {
@@ -179,7 +173,7 @@
     "bashing": 95,
     "to_hit": 5,
     "symbol": ";",
-    "qualities": [ [ "PRY", 2 ] ],
+    "qualities": [ [ "PRY", 4 ] ],
     "use_action": "CROWBAR",
     "flags": [ "UNBREAKABLE_MELEE" ],
     "techniques": [ "WBLOCK_3", "tec_feint", "tec_counter", "BERSERK", "DSBI", "DSINERTIAL" ]

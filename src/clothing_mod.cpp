@@ -13,6 +13,7 @@
 #include "item.h"
 #include "json.h"
 #include "string_id.h"
+#include "type_id_implement.h"
 
 namespace
 {
@@ -21,21 +22,8 @@ generic_factory<clothing_mod> all_clothing_mods( "clothing mods" );
 
 } // namespace
 
+IMPLEMENT_STRING_AND_INT_IDS( clothing_mod, all_clothing_mods );
 static std::map<clothing_mod_type, std::vector<clothing_mod>> clothing_mods_by_type;
-
-/** @relates string_id */
-template<>
-bool string_id<clothing_mod>::is_valid() const
-{
-    return all_clothing_mods.is_valid( *this );
-}
-
-/** @relates string_id */
-template<>
-const clothing_mod &string_id<clothing_mod>::obj() const
-{
-    return all_clothing_mods.obj( *this );
-}
 
 namespace io
 {
@@ -71,6 +59,7 @@ void clothing_mod::load( const JsonObject &jo, const std::string & )
     mandatory( jo, was_loaded, "implement_prompt", implement_prompt );
     mandatory( jo, was_loaded, "destroy_prompt", destroy_prompt );
     optional( jo, was_loaded, "restricted", restricted, false );
+    optional( jo, was_loaded, "use_base_material", use_base_material, false );
 
     for( const JsonObject mv_jo : jo.get_array( "mod_value" ) ) {
         mod_value mv;

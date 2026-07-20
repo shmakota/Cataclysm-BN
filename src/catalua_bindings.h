@@ -13,6 +13,8 @@ void override_default_print( sol::state &lua );
 void forbid_unsafe_functions( sol::state &lua );
 
 void reg_avatar( sol::state &lua );
+void reg_bionics( sol::state &lua );
+void mod_bionic_data( sol::state &lua );
 void reg_character( sol::state &lua );
 void reg_colors( sol::state &lua );
 void reg_constants( sol::state &lua );
@@ -32,9 +34,12 @@ void reg_inventory( sol::state &lua );
 void reg_item( sol::state &lua );
 void reg_locale_api( sol::state &lua );
 void reg_map( sol::state &lua );
+void reg_mapgendata( sol::state &lua );
 void reg_mission( sol::state &lua );
 void reg_mission_type( sol::state &lua );
 void reg_monster( sol::state &lua );
+auto reg_monster_type_ids( sol::state &lua ) -> void;
+auto reg_monster_groups( sol::state &lua ) -> void;
 void mod_mutation_branch( sol::state &lua );
 void reg_magic( sol::state &lua );
 void reg_names( sol::state &lua );
@@ -61,5 +66,3 @@ void reg_units( sol::state &lua );
 void reg_all_bindings( sol::state &lua );
 
 } // namespace cata
-
-
