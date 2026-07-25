@@ -4001,7 +4001,7 @@ bool jmapgen_setmap::apply( const mapgendata &dat, const point_rel_ms &offset ) 
             }
             break;
             case JMAPGEN_SETMAP_BASH: {
-                m.bash( point_omt_ms( x_get(), y_get() ), 9999 );
+                m.bash( point_omt_ms( x_get(), y_get() ), 9999, true );
             }
             break;
 
