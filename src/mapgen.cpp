@@ -2389,7 +2389,8 @@ class jmapgen_spawn_item : public jmapgen_piece
 
             const point_omt_ms p = { x.get(), y.get() };
 
-            detached_ptr<item> itm = item::spawn( chosen_id, calendar::start_of_cataclysm );
+            detached_ptr<item> itm = item::in_its_container( item::spawn( chosen_id,
+                                     calendar::start_of_cataclysm ) );
 
             const int spawns = dat.m.edit_item_for_spawn_rate( *itm );
             const int total_spawns = spawn_count * spawns;
