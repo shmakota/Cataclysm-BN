@@ -1388,6 +1388,12 @@ These branches are also the valid entries for the categories of `dreams` in `dre
   usually a house.
 - `IS_BRIDGE` Will be expanded to a bridge in mapgen, terrains with the id of this object followed by _under, _road, head_ground and head_ramp must be defined, and _center_under may also be defined.
 
+## Mapgen
+
+#### Flags
+
+- `ERASE_ALL_BEFORE_PLACING_TERRAIN` In the name, removes vehicles fields furniture and items before placing terrain down
+
 ## Recipes
 
 ### Categories
