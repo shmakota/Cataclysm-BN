@@ -601,6 +601,29 @@ In addition there are the following children of this enchantment
 - `SKILL_EXP_STABBING`
 - `SKILL_EXP_UNARMED`
 
+##### Encumbrance
+
+Character wide encumbrance modifier, children modify certain bodyparts.
+Note: This is the first enchantment with two tiers of parents, left arm inherits arm which inherits overall
+These are the children.
+
+- `ENCUMBRANCE_TORSO`
+- `ENCUMBRANCE_HEAD`
+- `ENCUMBRANCE_EYES`
+- `ENCUMBRANCE_MOUTH`
+- `ENCUMBRANCE_ARM`
+  - `ENCUMBRANCE_ARM_L`
+  - `ENCUMBRANCE_ARM_R`
+- `ENCUMBRANCE_HAND`
+  - `ENCUMBRANCE_HAND_L`
+  - `ENCUMBRANCE_HAND_R`
+- `ENCUMBRANCE_LEG`
+  - `ENCUMBRANCE_LEG_L`
+  - `ENCUMBRANCE_LEG_R`
+- `ENCUMBRANCE_FOOT`
+  - `ENCUMBRANCE_FOOT_L`
+  - `ENCUMBRANCE_FOOT_R`
+
 #### Item values
 
 ##### ITEM_ATTACK_COST
