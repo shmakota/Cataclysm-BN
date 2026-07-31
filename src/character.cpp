@@ -8977,7 +8977,13 @@ void Character::recalculate_enchantment_cache()
     enchantment_sources.clear();
 
     visit_items( [&]( const item * it ) {
-        for( const enchantment &ench : it->get_enchantments() ) {
+        for( const enchantment &ench : it->get_enchantments( true ) ) {
+            if( ench.is_active( *this, *it ) ) {
+                enchantment_cache->force_add( ench );
+                enchantment_sources.emplace_back( &ench, it );
+            }
+        }
+        for( const enchantment &ench : it->get_enchantments( false ) ) {
             if( ench.is_active( *this, *it ) ) {
                 enchantment_cache->force_add( ench );
                 enchantment_sources.emplace_back( &ench, it );
