@@ -1764,7 +1764,11 @@ void Character::melee_attack( Creature &t, bool allow_special, const matec_id *f
         params["target"] = &t;
         params["success"] = attack_hit;
     } );
-
+    cata::run_hooks( "on_creature_attacked_by_character", [ &, this]( auto & params ) {
+        params["char"] = this;
+        params["target"] = &t;
+        params["success"] = attack_hit;
+    } );
 }
 
 void Character::reach_attack( const tripoint_bub_ms &p )
