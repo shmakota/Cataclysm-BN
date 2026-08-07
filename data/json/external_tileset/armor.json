@@ -68,7 +68,7 @@
         "sprite_width": 32,
         "sprite_height": 32,
         "sprite_offset_y": -4,
-        "tiles": [ 
+        "tiles": [
           { "id": "overlay_worn_goggles_ir", "fg": 11, "masks": [ { "type": "tint", "fg": 27 } ], "rotates": true },
           { "id": "overlay_worn_goggles_nv", "fg": 15, "masks": [ { "type": "tint", "fg": 31 } ], "rotates": true },
           {

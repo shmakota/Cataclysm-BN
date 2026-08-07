@@ -2657,5 +2657,10 @@
     "id": "ERASE_ALL_BEFORE_PLACING_TERRAIN",
     "type": "json_flag",
     "context": [ "mapgen" ]
+  },
+  {
+    "id": "CRAFT_WITH_FULL_MAG",
+    "type": "json_flag",
+    "context": [ "GENERIC" ]
   }
 ]

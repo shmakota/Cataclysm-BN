@@ -1194,6 +1194,7 @@ void complete_craft( Character &who, item &craft )
             params["batch_size"] = batch_size;
             params["hot_result"] = should_heat;
             params["dehydrated_result"] = is_dehydrated;
+            params["crafting_menu"] = false;
         } );
         // Don't store components for things that ignores components (e.g wow 'conjured bread')
         if( ignore_component ) {
@@ -1257,6 +1258,9 @@ void complete_craft( Character &who, item &craft )
         // If we created a tool that spawns empty, don't preset its ammotype.
         if( !newit->ammo_remaining() ) {
             newit->ammo_unset();
+        }
+        if( newit->has_flag( flag_id( "CRAFT_WITH_FULL_MAG" ) ) ) {
+            newit->ammo_set( newit->ammo_default(), newit->ammo_capacity() );
         }
         if( newit->made_of( LIQUID ) ) {
             liquid_handler::handle_all_liquid( std::move( newit ), PICKUP_RANGE );
