@@ -680,6 +680,7 @@ static void set_components( item &of, const std::vector<item *> &used,
     if( batch_size <= 1 ) {
         for( item * const &it : used ) {
             components.push_back( item::spawn( *it ) );
+            components.back()->set_flag( flag_id( "COMPONENT" ) );
         }
         return;
     }
@@ -691,9 +692,11 @@ static void set_components( item &of, const std::vector<item *> &used,
             // This assumes all (count-by-charges) items of the same type have been merged into one,
             // which has a charges value that can be evenly divided by batch_size.
             components.back()->charges = tmp->charges / batch_size;
+            components.back()->set_flag( flag_id( "COMPONENT" ) );
         } else {
             if( ( non_charges_counter + offset ) % batch_size == 0 ) {
                 components.push_back( item::spawn( *tmp ) );
+                components.back()->set_flag( flag_id( "COMPONENT" ) );
             }
             non_charges_counter++;
         }

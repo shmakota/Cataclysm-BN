@@ -2053,6 +2053,11 @@
     "context": [  ]
   },
   {
+    "id": "COMPONENT",
+    "type": "json_flag",
+    "context": [  ]
+  },
+  {
     "id": "PROCESSING",
     "type": "json_flag",
     "context": [  ]
