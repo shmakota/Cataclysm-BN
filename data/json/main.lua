@@ -12,6 +12,7 @@ local robofac = require("lua/robofac")
 local nuclear_tear = require("lua/nuclear_tear")
 local minirose = require("lua/minirose")
 local plumbing = require("lua/plumbing")
+local genome = require("lua/itemgroup_modifiers/genome")
 
 local mod = game.mod_runtime[game.current_mod]
 local storage = game.mod_storage[game.current_mod]
@@ -30,4 +31,5 @@ mod.spray_can = spray_can
 mod.robofac = robofac
 mod.nuclear_tear = nuclear_tear
 mod.minirose = minirose
+mod.genome = genome
 mod.cvd_machine = cvd_machine

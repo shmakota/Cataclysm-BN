@@ -38,6 +38,9 @@ end)
 game.add_hook("on_explosion_start", function(...) return mod.nuclear_tear.on_explosion(...) end)
 game.add_hook("on_character_death", function(...) return mod.minirose.on_character_death(...) end)
 
+-- Itemgroup Modifiers
+game.itemgroup_postprocessors["genome_drive"] = function(...) return mod.genome.postprocess(...) end
+
 -- Mapgen
 game.mapgen_functions["slimepit"] = function(...) return mod.slimepit.draw(...) end
 game.mapgen_functions["lab"] = function(...) return mod.lab.draw(...) end
