@@ -1467,6 +1467,78 @@
     "looks_like": "fd_water"
   },
   {
+    "id": "fd_tea",
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "tea splatter", "sym": "~" },
+      { "name": "tea stain" },
+      { "name": "puddle of tea" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "brown",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_soda",
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "soda splatter", "sym": "~" },
+      { "name": "soda stain" },
+      { "name": "puddle of soda" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "magenta",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_mutagen",
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "mutagen splatter", "sym": "~" },
+      { "name": "mutagen stain" },
+      { "name": "puddle of mutagen" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "green",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_plutonium_slurry",
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "nuclear waste splatter", "sym": "~" },
+      { "name": "nuclear waste stain" },
+      { "name": "puddle of nuclear waste" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "green",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
     "id": "fd_juice",
     "type": "field_type",
     "intensity_levels": [
@@ -1480,7 +1552,7 @@
     "half_life": "30 minutes",
     "underwater_age_speedup": "5 minutes",
     "phase": "liquid",
-    "tint": "magenta",
+    "tint": "yellow",
     "display_field": true,
     "looks_like": "fd_water"
   },
