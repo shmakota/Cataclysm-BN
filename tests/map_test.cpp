@@ -10,6 +10,7 @@
 #include "field_type.h"
 #include "game.h"
 #include "game_constants.h"
+#include "iexamine.h"
 #include "item.h"
 #include "map.h"
 #include "map_helpers.h"
@@ -179,6 +180,44 @@ TEST_CASE("moving_between_adjacent_pit_traps") {
         g->u.add_known_trap(positions.destination, here.tr_at(positions.destination));
 
         CHECK_FALSE(g->get_dangerous_tile(positions.destination).empty());
+    }
+}
+
+TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][movement][jump]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto origin = tripoint_bub_ms(60, 60, 1);
+    const auto middle = origin + tripoint_rel_ms::east();
+    const auto landing = middle + tripoint_rel_ms::east();
+    const auto landing_below = landing + tripoint_rel_ms::below();
+    for (const auto& pos : here.points_in_radius(origin, 2)) {
+        here.ter_set(pos, ter_id("t_floor"));
+        here.furn_set(pos, furn_id("f_null"));
+        const auto below = pos + tripoint_rel_ms::below();
+        here.ter_set(below, ter_id("t_floor"));
+        here.furn_set(below, furn_id("f_null"));
+    }
+
+    g->place_player(origin);
+    g->u.str_cur = 8;
+    g->u.moves = 1000;
+
+    SECTION("can vault a normal adjacent tile") {
+        const auto moves_before = g->u.moves;
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+        CHECK(g->u.moves < moves_before);
+    }
+
+    SECTION("can jump into open air and immediately resolve the ledge fall") {
+        here.ter_set(landing, ter_id("t_open_air"));
+        const auto moves_before = g->u.moves;
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing_below);
+        CHECK(g->u.moves < moves_before);
     }
 }
 

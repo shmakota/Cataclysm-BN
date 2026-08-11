@@ -5598,6 +5598,101 @@ void iexamine::pay_gas( player &p, const tripoint_bub_ms &examp )
     }
 }
 
+namespace
+{
+
+struct jump_over_tile_state {
+    tripoint_abs_ms examp = tripoint_abs_ms::zero();
+    tripoint_abs_ms dest = tripoint_abs_ms::zero();
+};
+
+static constexpr auto jump_over_tile_base_move_cost = 200;
+
+auto get_jump_over_tile_state( const player &p,
+                               const tripoint_bub_ms &examp_bub ) -> jump_over_tile_state
+{
+    const auto examp = bub_to_abs( examp_bub );
+    const auto impulse = ( examp - p.abs_pos() ).xy() * 2;
+    return {
+        .examp = examp,
+        .dest = p.abs_pos() + impulse,
+    };
+}
+
+auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
+                              const bool show_messages ) -> bool
+{
+    const auto jump_state = get_jump_over_tile_state( p, examp_bub );
+    const auto dir = jump_state.examp - p.abs_pos();
+    if( jump_state.examp == p.abs_pos() || dir.z() != 0 ||
+        std::abs( dir.x() ) > 1 || std::abs( dir.y() ) > 1 ) {
+        return false;
+    }
+
+    if( p.get_str() < 4 ) {
+        if( show_messages ) {
+            add_msg( m_warning, _( "You are too weak to jump over an obstacle." ) );
+        }
+        return false;
+    }
+
+    if( 100 * p.weight_carried() / p.weight_capacity() > 25 ) {
+        if( show_messages ) {
+            add_msg( m_warning, _( "You are too burdened to jump over an obstacle." ) );
+        }
+        return false;
+    }
+
+    auto &buffer = p.get_mapbuffer();
+    if( !buffer.valid_move( jump_state.examp, jump_state.dest, { .flying = true } ) ) {
+        if( show_messages ) {
+            add_msg( m_warning, _( "You cannot jump over an obstacle - something is blocking the way." ) );
+        }
+        return false;
+    }
+
+    if( const auto blocking_creature = buffer.creature_at( jump_state.dest ) ) {
+        if( show_messages ) {
+            add_msg( m_warning, _( "You cannot jump over an obstacle - there is %s blocking the way." ),
+                     blocking_creature->disp_name() );
+        }
+        return false;
+    }
+
+    return true;
+}
+
+} // namespace
+
+auto iexamine::can_jump_over_tile( const player &p, const tripoint_bub_ms &examp ) -> bool
+{
+    return can_jump_over_tile_impl( p, examp, false );
+}
+
+auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
+{
+    if( p.in_vehicle ) {
+        if( !character_funcs::can_fly( p ) &&
+            !query_yn( _( "Do you really want to jump off the vehicle?" ) ) ) {
+            return false;
+        }
+        get_map().unboard_vehicle( p.bub_pos() );
+    }
+
+    if( !can_jump_over_tile_impl( p, examp, true ) ) {
+        return false;
+    }
+
+    const auto jump_state = get_jump_over_tile_state( p, examp );
+    const auto move_cost = p.run_cost( jump_over_tile_base_move_cost );
+    add_msg( m_info, _( "You jump over an obstacle." ) );
+    p.mod_moves( -move_cost );
+    p.burn_move_stamina( move_cost );
+    p.setpos( jump_state.dest );
+    get_map().creature_on_trap( p, false );
+    return true;
+}
+
 void iexamine::ledge( player &p, const tripoint_bub_ms &examp_bub )
 {
     const auto examp = bub_to_abs( examp_bub );
@@ -5658,24 +5753,7 @@ void iexamine::ledge( player &p, const tripoint_bub_ms &examp_bub )
     cmenu.query();
     switch( cmenu.ret ) {
         case ledge_action::jump_over: {
-            const auto impulse = dir * 2;
-            const auto dest = p.abs_pos() + impulse;
-            if( p.get_str() < 4 ) {
-                add_msg( m_warning, _( "You are too weak to jump over an obstacle." ) );
-            } else if( 100 * p.weight_carried() / p.weight_capacity() > 25 ) {
-                add_msg( m_warning, _( "You are too burdened to jump over an obstacle." ) );
-            } else if( !buffer.valid_move( examp, dest, { .flying = true } ) ) {
-                add_msg( m_warning, _( "You cannot jump over an obstacle - something is blocking the way." ) );
-            } else if( const auto blocking_creature = buffer.creature_at( dest ) ) {
-                add_msg( m_warning, _( "You cannot jump over an obstacle - there is %s blocking the way." ),
-                         blocking_creature->disp_name() );
-            } else if( const auto dest_tile = tile_reader.get_tile( dest );
-                       dest_tile && dest_tile->get_ter_t().trap == tr_ledge ) {
-                add_msg( m_warning, _( "You are not going to jump over an obstacle only to fall down." ) );
-            } else {
-                add_msg( m_info, _( "You jump over an obstacle." ) );
-                p.setpos( dest );
-            }
+            iexamine::jump_over_tile( p, examp_bub );
             break;
         }
         case ledge_action::climb_down: {
