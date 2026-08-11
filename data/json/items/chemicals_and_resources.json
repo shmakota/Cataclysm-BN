@@ -432,8 +432,7 @@
     "phase": "liquid",
     "category": "chems",
     "fun": -45,
-    "//": "No scale_qty for this since can get this acid from butchering acidic monsters, player would be forced to dump any excess at their feet.",
-    "drop_action": { "type": "emit_actor", "emits": [ "emit_acid_splash" ] },
+    "//": "Spill handling now creates the acid field directly.",
     "ammo_data": { "ammo_type": "acid", "damage": { "damage_type": "acid", "amount": 3 }, "effects": [ "ACID_TRAIL" ] }
   },
   {
@@ -605,8 +604,7 @@
     "effects": [ "ACID_TRAIL_WEAK" ],
     "spill_field": "fd_acid",
     "phase": "liquid",
-    "container": "bottle_glass",
-    "drop_action": { "type": "emit_actor", "emits": [ "emit_acid_drop" ], "scale_qty": true }
+    "container": "bottle_glass"
   },
   {
     "type": "AMMO",
@@ -627,8 +625,7 @@
     "effects": [ "ACID_TRAIL_WEAK" ],
     "spill_field": "fd_acid",
     "phase": "liquid",
-    "container": "bottle_glass",
-    "drop_action": { "type": "emit_actor", "emits": [ "emit_acid_drop" ], "scale_qty": true }
+    "container": "bottle_glass"
   },
   {
     "type": "AMMO",
@@ -649,8 +646,7 @@
     "effects": [ "ACID_TRAIL_WEAK" ],
     "spill_field": "fd_acid",
     "phase": "liquid",
-    "container": "bottle_glass",
-    "drop_action": { "type": "emit_actor", "emits": [ "emit_acid_drop" ], "scale_qty": true }
+    "container": "bottle_glass"
   },
   {
     "type": "AMMO",
