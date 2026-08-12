@@ -909,6 +909,91 @@ void map::emit_field( const tripoint_bub_ms &pos, const emit_id &src, float mul 
     }
 }
 
+namespace
+{
+
+struct spilled_liquid_field_candidate {
+    int distance = 0;
+    tripoint_bub_ms pos = tripoint_bub_ms::zero();
+
+    auto operator<=>( const spilled_liquid_field_candidate & ) const = default; // *NOPAD*
+};
+
+} // namespace
+
+void map::spill_liquid_field( const tripoint_bub_ms &center, const field_type_id &type,
+                              int amount )
+{
+    if( amount <= 0 ) {
+        return;
+    }
+
+    if( get_field( center, type ) == nullptr ) {
+        propagate_field( center, type, amount, 1 );
+        return;
+    }
+
+    auto frontier = std::queue<tripoint_bub_ms>();
+    auto visited = std::set<tripoint_bub_ms>();
+    auto candidates_seen = std::set<tripoint_bub_ms>();
+    auto candidates = std::vector<spilled_liquid_field_candidate>();
+    auto represented_amount = 0;
+    frontier.push( center );
+
+    static const std::array<int, 8> x_offset = {{ -1, 1,  0, 0,  1, -1, -1, 1  }};
+    static const std::array<int, 8> y_offset = {{  0, 0, -1, 1, -1,  1, -1, 1  }};
+
+    while( !frontier.empty() ) {
+        const auto current = frontier.front();
+        frontier.pop();
+        if( visited.contains( current ) ) {
+            continue;
+        }
+        visited.insert( current );
+
+        const auto *existing_field = get_field( current, type );
+        if( existing_field == nullptr ) {
+            continue;
+        }
+        represented_amount += existing_field->get_field_intensity();
+
+        for( size_t i = 0; i < x_offset.size(); i++ ) {
+            const auto adjacent = current + point( x_offset[ i ], y_offset[ i ] );
+            if( get_field( adjacent, type ) != nullptr ) {
+                if( !visited.contains( adjacent ) ) {
+                    frontier.push( adjacent );
+                }
+                continue;
+            }
+
+            if( impassable( adjacent ) || obstructed_by_vehicle_rotation( current, adjacent ) ) {
+                continue;
+            }
+
+            if( candidates_seen.insert( adjacent ).second ) {
+                candidates.push_back( {
+                    .distance = rl_dist( center, adjacent ),
+                    .pos = adjacent,
+                } );
+            }
+        }
+    }
+
+    const auto target_amount = represented_amount + amount;
+    namespace ranges = std::ranges;
+    ranges::sort( candidates, {}, &spilled_liquid_field_candidate::distance );
+
+    for( const spilled_liquid_field_candidate &candidate : candidates ) {
+        if( represented_amount >= target_amount ) {
+            return;
+        }
+
+        if( add_field( candidate.pos, type, 1 ) ) {
+            represented_amount++;
+        }
+    }
+}
+
 void map::propagate_field( const tripoint_bub_ms &center, const field_type_id &type, int amount,
                            int max_intensity )
 {
