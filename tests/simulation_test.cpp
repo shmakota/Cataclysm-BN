@@ -70,6 +70,89 @@ TEST_CASE("fire_processes_in_loaded_submap_outside_bubble", "[simulation][field]
     MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
 
+TEST_CASE("adjacent_fire_ignites_fuel_fields", "[simulation][field][fire]") {
+    clear_all_state();
+    put_player_underground();
+
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    REQUIRE(sm != nullptr);
+
+    const auto fire_pt = point_sm_ms{5, 5};
+    const auto fuel_pt = point_sm_ms{6, 5};
+    const auto fuel_field = field_type_id("fd_fuel");
+    plant_fire(*sm, fire_pt);
+    plant_field(*sm, fuel_pt, fuel_field);
+
+    auto& dummy = get_avatar();
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+    REQUIRE(sm->get_field(fuel_pt).find_field(fuel_field) != nullptr);
+
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    CHECK(sm->get_field(fuel_pt).find_field(fuel_field) == nullptr);
+    const auto* fuel_fire = sm->get_field(fuel_pt).find_field(fd_fire);
+    REQUIRE(fuel_fire != nullptr);
+    CHECK(fuel_fire->get_field_intensity() >= 2);
+
+    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+}
+
+TEST_CASE("adjacent_fire_propagates_through_fuel_over_multiple_ticks", "[simulation][field][fire]") {
+    clear_all_state();
+    put_player_underground();
+
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    REQUIRE(sm != nullptr);
+
+    const auto fire_pt = point_sm_ms{5, 5};
+    const auto first_fuel_pt = point_sm_ms{6, 5};
+    const auto second_fuel_pt = point_sm_ms{7, 5};
+    const auto fuel_field = field_type_id("fd_fuel");
+    plant_fire(*sm, fire_pt);
+    plant_field(*sm, first_fuel_pt, fuel_field);
+    plant_field(*sm, second_fuel_pt, fuel_field);
+
+    auto& dummy = get_avatar();
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    CHECK(sm->get_field(first_fuel_pt).find_field(fuel_field) == nullptr);
+    CHECK(sm->get_field(second_fuel_pt).find_field(fuel_field) != nullptr);
+    REQUIRE(sm->get_field(first_fuel_pt).find_field(fd_fire) != nullptr);
+
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    CHECK(sm->get_field(first_fuel_pt).find_field(fuel_field) == nullptr);
+    CHECK(sm->get_field(second_fuel_pt).find_field(fuel_field) == nullptr);
+    REQUIRE(sm->get_field(first_fuel_pt).find_field(fd_fire) != nullptr);
+    REQUIRE(sm->get_field(second_fuel_pt).find_field(fd_fire) != nullptr);
+
+    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+}
+
+TEST_CASE("water_puddles_extinguish_fire_on_the_same_tile", "[simulation][field][fire][liquid]") {
+    clear_all_state();
+    put_player_underground();
+
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    REQUIRE(sm != nullptr);
+
+    const auto fire_pt = point_sm_ms{5, 5};
+    const auto water_field = field_type_id("fd_water");
+    plant_fire(*sm, fire_pt);
+    plant_field(*sm, fire_pt, water_field, 3);
+
+    auto& dummy = get_avatar();
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    CHECK(sm->get_field(fire_pt).find_field(fd_fire) == nullptr);
+    const auto* puddle_after = sm->get_field(fire_pt).find_field(water_field);
+    REQUIRE(puddle_after != nullptr);
+    CHECK(puddle_after->get_field_intensity() == 2);
+
+    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+}
+
 // ── Test 2 ────────────────────────────────────────────────────────────────────
 // Verify that a loaded, no-fire boundary submap stays requested while it is
 // adjacent to tracked fire.  This avoids request/load/prune/evict churn at fire

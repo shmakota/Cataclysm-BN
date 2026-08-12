@@ -56,6 +56,7 @@
 #include "explosion.h"
 #include "explosion_queue.h"
 #include "field.h"
+#include "field_ignition_utils.h"
 #include "field_type.h"
 #include "flag.h"
 #include "flat_set.h"
@@ -3698,6 +3699,8 @@ bool map::flammable_items_at( const tripoint_bub_ms &p, int threshold )
 
 bool map::is_flammable( const tripoint_bub_ms &p )
 {
+    static const auto fd_fuel = field_type_str_id( "fd_fuel" );
+
     if( flammable_items_at( p ) ) {
         return true;
     }
@@ -3707,6 +3710,10 @@ bool map::is_flammable( const tripoint_bub_ms &p )
     }
 
     if( has_flag( "FLAMMABLE_ASH", p ) ) {
+        return true;
+    }
+
+    if( get_field_intensity( p, fd_fuel.id() ) > 0 ) {
         return true;
     }
 
@@ -5126,6 +5133,16 @@ void map::shoot( const tripoint_bub_ms &origin, const tripoint_bub_ms &p, projec
     apply_ammo_trail_effects( p, proj.get_ammo_effects(), 1.0 );
 
     // Check fields?
+    if( inc ) {
+        static const auto fd_fuel = field_type_str_id( "fd_fuel" );
+        const auto fuel_intensity = get_field_intensity( p, fd_fuel.id() );
+        if( fuel_intensity > 0 ) {
+            remove_field( p, fd_fuel.id() );
+            add_field( p, fd_fire, fuel_field_fire_intensity( fuel_intensity ),
+                       fuel_field_fire_age( fuel_intensity ) );
+        }
+    }
+
     const field_entry *fieldhit = get_field( p, fd_web );
     if( fieldhit != nullptr ) {
         if( inc ) {
