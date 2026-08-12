@@ -534,6 +534,11 @@ void map::player_in_field( player &u )
 
 void map::creature_in_field( Creature &critter )
 {
+    static const auto effect_downed = efftype_id( "downed" );
+    static const auto flag_NOSLIP = flag_id( "NOSLIP" );
+    static const auto body_part_foot_l = bodypart_id( "foot_l" );
+    static const auto body_part_foot_r = bodypart_id( "foot_r" );
+
     bool in_vehicle = false;
     bool inside_vehicle = false;
     player *u = critter.as_player();
@@ -590,6 +595,14 @@ void map::creature_in_field( Creature &critter )
             const effect field_fx = fe.get_effect();
             if( critter.is_immune_field( cur_field_id ) || critter.is_immune_effect( field_fx.get_id() ) ) {
                 continue;
+            }
+            if( field_fx.get_id() == effect_downed ) {
+                if( Character *const character = critter.as_character();
+                    character != nullptr &&
+                    ( character->worn_with_flag( flag_NOSLIP, body_part_foot_l ) ||
+                      character->worn_with_flag( flag_NOSLIP, body_part_foot_r ) ) ) {
+                    continue;
+                }
             }
             bool effect_added = false;
             if( fe.is_environmental ) {
