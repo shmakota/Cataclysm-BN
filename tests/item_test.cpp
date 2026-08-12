@@ -2,6 +2,7 @@
 #include "calendar.h"
 #include "catch/catch.hpp"
 #include "enums.h"
+#include "field_type.h"
 #include "flag.h"
 #include "item.h"
 #include "itype.h"
@@ -104,6 +105,15 @@ TEST_CASE("gun_cycle_mode_wraps_from_last_to_first", "[item]") {
     REQUIRE(reach_bow.gun_set_mode(last_mode));
     reach_bow.gun_cycle_mode();
     CHECK(reach_bow.gun_get_mode_id() == first_mode);
+}
+
+TEST_CASE("common_liquids_define_spill_fields", "[item][liquid][field]") {
+    CHECK(item::spawn_temporary("water")->type->spill_field == field_type_id("fd_water"));
+    CHECK(item::spawn_temporary("water_sewage")->type->spill_field == field_type_id("fd_sewage"));
+    CHECK(item::spawn_temporary("gasoline")->type->spill_field == field_type_id("fd_fuel"));
+    CHECK(item::spawn_temporary("motor_oil")->type->spill_field == field_type_id("fd_oil"));
+    CHECK(field_type_id("fd_water").obj().get_tint() == c_blue);
+    CHECK(field_type_id("fd_sewage").obj().get_tint() == c_cyan);
 }
 
 TEST_CASE("stacking_cash_cards", "[item]") {

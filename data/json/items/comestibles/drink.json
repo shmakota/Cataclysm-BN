@@ -1420,6 +1420,7 @@
     "color": "light_blue",
     "phase": "liquid",
     "container": "bottle_plastic",
+    "spill_field": "fd_water",
     "quench": 50,
     "ammo_data": { "ammo_type": "water", "effects": [ "RECOVER_10" ] },
     "flags": [ "EATEN_COLD", "UNSAFE_CONSUME" ],

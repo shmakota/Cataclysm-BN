@@ -340,6 +340,7 @@
     "price": "0 cent",
     "price_postapoc": "0 cent",
     "volume": "250 ml",
+    "spill_field": "fd_water",
     "phase": "liquid",
     "ammo_type": "components",
     "category": "chems"
@@ -357,6 +358,7 @@
     "price": "0 cent",
     "price_postapoc": "0 cent",
     "volume": "250 ml",
+    "spill_field": "fd_water",
     "phase": "liquid",
     "ammo_type": "components",
     "category": "chems"
@@ -1126,6 +1128,7 @@
     "symbol": "~",
     "description": "Turbid liquid from the sewers with awful stench.",
     "volume": "250 ml",
+    "spill_field": "fd_sewage",
     "phase": "liquid",
     "ammo_type": "components",
     "category": "chems"

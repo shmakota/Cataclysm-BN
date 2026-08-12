@@ -183,6 +183,7 @@ struct field_type {
         bool accelerated_decay = false;
         bool display_items = true;
         bool display_field = false;
+        nc_color tint = c_unset;
         field_type_id wandering_field;
         std::string looks_like;
 
@@ -209,6 +210,9 @@ struct field_type {
         }
         bool get_transparent( int level = 0 ) const {
             return get_intensity_level( level ).transparent;
+        }
+        nc_color get_tint() const {
+            return tint;
         }
         int get_move_cost( int level = 0 ) const {
             return get_intensity_level( level ).move_cost;
@@ -348,4 +352,3 @@ extern field_type_id fd_null,
        fd_smoke_vent,
        fd_tindalos_rift
        ;
-

@@ -1429,5 +1429,81 @@
     "display_items": true,
     "display_field": true,
     "looks_like": "fd_fog"
+  },
+  {
+    "id": "fd_water",
+    "type": "field_type",
+    "legacy_enum_id": 51,
+    "intensity_levels": [
+      { "name": "water splatter", "sym": "~", "color": "light_blue" },
+      { "name": "water stain" },
+      { "name": "puddle of water", "color": "cyan" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "blue",
+    "display_field": true,
+    "looks_like": "fd_blood"
+  },
+  {
+    "id": "fd_sewage",
+    "type": "field_type",
+    "legacy_enum_id": 52,
+    "intensity_levels": [
+      { "name": "sewage splatter", "sym": "~", "color": "green" },
+      { "name": "sewage stain" },
+      { "name": "puddle of sewage", "color": "light_green" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "1 hours",
+    "underwater_age_speedup": "10 minutes",
+    "phase": "liquid",
+    "tint": "cyan",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_fuel",
+    "type": "field_type",
+    "legacy_enum_id": 53,
+    "intensity_levels": [
+      { "name": "fuel splatter", "sym": "~", "color": "light_red" },
+      { "name": "fuel stain" },
+      { "name": "puddle of fuel", "color": "yellow" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "45 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "yellow",
+    "display_field": true,
+    "looks_like": "fd_bile"
+  },
+  {
+    "id": "fd_oil",
+    "type": "field_type",
+    "legacy_enum_id": 54,
+    "intensity_levels": [
+      { "name": "oil splatter", "sym": "~", "color": "dark_gray" },
+      { "name": "oil stain" },
+      { "name": "oil slick", "color": "light_gray" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "2 hours",
+    "underwater_age_speedup": "10 minutes",
+    "phase": "liquid",
+    "tint": "dark_gray",
+    "display_field": true,
+    "looks_like": "fd_fuel"
   }
 ]

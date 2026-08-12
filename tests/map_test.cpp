@@ -80,6 +80,16 @@ auto mapgen_item_count_in_radius(
     return result;
 }
 
+auto count_field_tiles_in_radius(
+    map& here, const tripoint_bub_ms& center, const size_t radius,
+    const field_type_id& field_id) -> int {
+    auto result = 0;
+    for (const auto& pos : here.points_in_radius(center, radius)) {
+        result += here.get_field(pos, field_id) != nullptr ? 1 : 0;
+    }
+    return result;
+}
+
 } // namespace
 
 TEST_CASE("mapgen_items_stay_on_sealed_container_tiles", "[mapgen][item][regression]") {
@@ -199,6 +209,56 @@ TEST_CASE("destroy_grabbed_furniture") {
             }
         }
     }
+}
+
+TEST_CASE("spilled_liquids_become_fields_without_dropping_items", "[map][item][liquid][field]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto center = tripoint_bub_ms(60, 60, 0);
+    for (const auto& pos : here.points_in_radius(center, 2)) {
+        here.i_clear(pos);
+        here.remove_field(pos, fd_blood);
+        here.ter_set(pos, ter_id("t_floor"));
+        here.furn_set(pos, furn_id("f_null"));
+    }
+
+    auto spilled_blood = item::spawn("blood", calendar::turn);
+    spilled_blood->charges = 10;
+
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(spilled_blood), false));
+
+    auto center_items = here.i_at(center);
+    CHECK(center_items.empty());
+
+    CHECK(count_field_tiles_in_radius(here, center, 2, fd_blood) > 1);
+}
+
+TEST_CASE("repeated_liquid_spills_expand_existing_puddles", "[map][item][liquid][field]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto center = tripoint_bub_ms(60, 60, 0);
+    const auto water_field = field_type_id("fd_water");
+    for (const auto& pos : here.points_in_radius(center, 2)) {
+        here.i_clear(pos);
+        here.remove_field(pos, water_field);
+        here.ter_set(pos, ter_id("t_floor"));
+        here.furn_set(pos, furn_id("f_null"));
+    }
+
+    auto first_pour = item::spawn("water", calendar::turn);
+    first_pour->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(first_pour), false));
+    CHECK(count_field_tiles_in_radius(here, center, 2, water_field) == 1);
+
+    auto second_pour = item::spawn("water", calendar::turn);
+    second_pour->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(second_pour), false));
+
+    auto center_items = here.i_at(center);
+    CHECK(center_items.empty());
+    CHECK(count_field_tiles_in_radius(here, center, 2, water_field) > 1);
 }
 
 TEST_CASE("mapbuffer_vehicle_lookup_uses_absolute_coordinates") {
