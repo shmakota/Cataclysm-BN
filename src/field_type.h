@@ -181,6 +181,7 @@ struct field_type {
         time_duration half_life = 0_turns;
         phase_id phase = PNULL;
         bool accelerated_decay = false;
+        bool conductive = false;
         bool display_items = true;
         bool display_field = false;
         bool moppable = false;
@@ -189,6 +190,10 @@ struct field_type {
         std::string looks_like;
 
         fields::stacking_type stacking_type = fields::stacking_type::intensity;
+
+        auto is_conductive() const -> bool {
+            return conductive;
+        }
 
         LUA_TYPE_OPS( field_type, id );
 

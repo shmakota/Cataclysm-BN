@@ -136,6 +136,25 @@
     "looks_like": "fd_bile"
   },
   {
+    "id": "fd_acid_water",
+    "type": "field_type",
+    "immunity_data": { "traits": [ "ACIDPROOF" ] },
+    "intensity_levels": [
+      { "name": "acid water splatter", "sym": "5", "color": "light_green" },
+      { "name": "acid water smear" },
+      { "name": "puddle of acid water", "color": "green" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "90 minutes",
+    "underwater_age_speedup": "15 minutes",
+    "phase": "liquid",
+    "tint": "green",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
     "id": "fd_sap",
     "type": "field_type",
     "legacy_enum_id": 8,
@@ -1446,8 +1465,8 @@
     "type": "field_type",
     "intensity_levels": [
       { "name": "water splatter", "sym": "~", "color": "light_blue" },
-      { "name": "water stain" },
-      { "name": "puddle of water", "color": "cyan" }
+      { "name": "water puddle" },
+      { "name": "pool of water", "color": "cyan" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1460,12 +1479,31 @@
     "looks_like": "fd_acid"
   },
   {
+    "id": "fd_salt_water",
+    "type": "field_type",
+    "conductive": true,
+    "intensity_levels": [
+      { "name": "salt water splatter", "sym": "~", "color": "light_cyan" },
+      { "name": "salt water puddle" },
+      { "name": "pool of salt water", "color": "cyan" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "cyan",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
     "id": "fd_milk",
     "type": "field_type",
     "intensity_levels": [
       { "name": "milk splatter", "sym": "~", "color": "white" },
-      { "name": "milk stain" },
-      { "name": "puddle of milk", "color": "light_gray" }
+      { "name": "milk puddle" },
+      { "name": "pool of milk", "color": "light_gray" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1483,7 +1521,7 @@
     "intensity_levels": [
       { "name": "tea splatter", "sym": "~", "color": "brown" },
       { "name": "tea stain" },
-      { "name": "puddle of tea", "color": "brown" }
+      { "name": "pool of tea", "color": "brown" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1518,8 +1556,8 @@
           }
         ]
       },
-      { "name": "soda stain" },
-      { "name": "puddle of soda" }
+      { "name": "fizzy soda puddle" },
+      { "name": "fizzy pool of soda" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1538,7 +1576,9 @@
       {
         "name": "syrup splatter",
         "sym": "~",
-        "color": "magenta",
+        "color": "brown"
+      },
+      { "name": "syrup smear",
         "effects": [
           {
             "effect_id": "sap",
@@ -1554,8 +1594,7 @@
           }
         ]
       },
-      { "name": "syrup stain" },
-      { "name": "puddle of syrup" }
+      { "name": "syrupy pool" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1574,7 +1613,9 @@
       {
         "name": "glue splatter",
         "sym": "~",
-        "color": "white",
+        "color": "white"
+      },
+      { "name": "glop of glue",
         "effects": [
           {
             "effect_id": "sap",
@@ -1590,8 +1631,7 @@
           }
         ]
       },
-      { "name": "glue stain" },
-      { "name": "puddle of glue" }
+      { "name": "pool of glue" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1608,8 +1648,8 @@
     "type": "field_type",
     "intensity_levels": [
       { "name": "mutagen splatter", "sym": "~", "color": "light_green" },
-      { "name": "mutagen stain" },
-      { "name": "puddle of mutagen", "color": "green" }
+      { "name": "mutagen puddle" },
+      { "name": "pool of mutagen", "color": "green" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1626,8 +1666,8 @@
     "type": "field_type",
     "intensity_levels": [
       { "name": "alcohol splatter", "sym": "~" },
-      { "name": "alcohol stain" },
-      { "name": "puddle of alcohol" }
+      { "name": "alcohol puddle" },
+      { "name": "pool of alcohol" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1643,9 +1683,9 @@
     "id": "fd_plutonium_slurry",
     "type": "field_type",
     "intensity_levels": [
-      { "name": "nuclear waste splatter", "sym": "~", "color": "light_green", "extra_radiation_max": 1 },
-      { "name": "nuclear waste stain", "extra_radiation_max": 2 },
-      { "name": "puddle of nuclear waste", "color": "green", "extra_radiation_max": 3 }
+      { "name": "nuclear waste splatter", "sym": "~", "color": "light_green"},
+      { "name": "nuclear waste puddle" },
+      { "name": "pool of nuclear waste", "color": "green", "extra_radiation_max": 1 }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1663,7 +1703,7 @@
     "intensity_levels": [
       { "name": "juice splatter", "sym": "~", "color": "yellow" },
       { "name": "juice stain" },
-      { "name": "puddle of juice", "color": "light_red" }
+      { "name": "pool of juice", "color": "light_red" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1700,8 +1740,8 @@
           }
         ]
       },
-      { "name": "motor oil stain" },
-      { "name": "puddle of motor oil", "color": "light_gray" }
+      { "name": "motor oil puddle" },
+      { "name": "pool of motor oil", "color": "light_gray" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1738,8 +1778,8 @@
           }
         ]
       },
-      { "name": "cooking oil stain" },
-      { "name": "puddle of cooking oil", "color": "brown" }
+      { "name": "cooking oil puddle" },
+      { "name": "pool of cooking oil", "color": "brown" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1776,8 +1816,8 @@
           }
         ]
       },
-      { "name": "industrial lubricant stain" },
-      { "name": "puddle of industrial lubricant", "color": "light_gray" }
+      { "name": "industrial lubricant puddle" },
+      { "name": "industrial lubricant slick", "color": "light_gray" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1794,8 +1834,8 @@
     "type": "field_type",
     "intensity_levels": [
       { "name": "chemical splatter", "sym": "~", "color": "white" },
-      { "name": "chemical stain" },
-      { "name": "puddle of chemicals", "color": "light_gray" }
+      { "name": "chemical smear" },
+      { "name": "pool of chemicals", "color": "light_gray" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1812,8 +1852,8 @@
     "type": "field_type",
     "intensity_levels": [
       { "name": "condiment splatter", "sym": "~", "color": "light_red" },
-      { "name": "condiment stain" },
-      { "name": "puddle of condiments", "color": "brown" }
+      { "name": "condiment puddle" },
+      { "name": "pool of condiments", "color": "brown" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1829,9 +1869,9 @@
     "id": "fd_sewage",
     "type": "field_type",
     "intensity_levels": [
-      { "name": "sewage splatter", "sym": "~", "color": "green" },
-      { "name": "sewage stain" },
-      { "name": "puddle of sewage", "color": "light_green" }
+      { "name": "sewage smear", "sym": "~", "color": "green" },
+      { "name": "sewage puddle" },
+      { "name": "pool of sewage", "color": "light_green" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1868,8 +1908,8 @@
           }
         ]
       },
-      { "name": "soapy water stain" },
-      { "name": "puddle of soapy water", "color": "cyan" }
+      { "name": "soapy water puddle" },
+      { "name": "pool of soapy water", "color": "cyan" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1887,8 +1927,8 @@
     "legacy_enum_id": 53,
     "intensity_levels": [
       { "name": "fuel splatter", "sym": "~", "color": "light_red" },
-      { "name": "fuel stain" },
-      { "name": "puddle of fuel", "color": "yellow" }
+      { "name": "fuel puddle" },
+      { "name": "pool of fuel", "color": "yellow" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1901,11 +1941,30 @@
     "looks_like": "fd_blood"
   },
   {
+    "id": "fd_sticky_fuel",
+    "type": "field_type",
+    "legacy_enum_id": 53,
+    "intensity_levels": [
+      { "name": "sticky fuel splatter", "sym": "~", "color": "light_red" },
+      { "name": "sticky fuel smear" },
+      { "name": "sticky fuel glob", "color": "yellow" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "4 hours",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "yellow",
+    "display_field": true,
+    "looks_like": "fd_blood"
+  },
+  {
     "id": "fd_oil",
     "type": "field_type",
     "intensity_levels": [
       { "name": "oil splatter", "sym": "~", "color": "dark_gray" },
-      { "name": "oil stain" },
+      { "name": "oil smear" },
       { "name": "oil slick", "color": "light_gray" }
     ],
     "description_affix": "covered_in_a",

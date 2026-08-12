@@ -144,15 +144,29 @@ int map::burn_body_part( player &u, field_entry &cur, body_part bp_token, const 
 }
 
 
-bool ter_furn_has_flag( const ter_t &ter, const furn_t &furn, const ter_bitflags flag )
+auto ter_furn_has_flag( const ter_t &ter, const furn_t &furn, const ter_bitflags flag ) -> bool
 {
     return ter.has_flag( flag ) || furn.has_flag( flag );
 }
 
-static inline bool check_flammable( const map_data_common_t &t )
+static inline auto check_flammable( const map_data_common_t &t ) -> bool
 {
-    return t.has_flag( TFLAG_FLAMMABLE ) || t.has_flag( TFLAG_FLAMMABLE_ASH ) ||
-           t.has_flag( TFLAG_FLAMMABLE_HARD );
+    return t.is_flammable();
+}
+
+static inline auto check_basic_flammable( const map_data_common_t &t ) -> bool
+{
+    return t.is_basic_flammable();
+}
+
+static inline auto check_ash_flammable( const map_data_common_t &t ) -> bool
+{
+    return t.is_ash_flammable();
+}
+
+static inline auto check_hard_flammable( const map_data_common_t &t ) -> bool
+{
+    return t.is_hard_flammable();
 }
 
 /*
@@ -1292,6 +1306,40 @@ auto ignite_fuel_field( field_cache_dirty_context const &ctx, SubTile &dst,
     return fire;
 }
 
+auto conductive_field_intensity( const field &fields ) -> int
+{
+    auto max_intensity = 0;
+    std::ranges::for_each( fields, [&]( const auto &field_pair ) {
+        if( field_pair.second.get_field_type()->is_conductive() ) {
+            max_intensity = std::max( max_intensity, field_pair.second.get_field_intensity() );
+        }
+    } );
+    return max_intensity;
+}
+
+auto energize_conductive_field( SubTile &dst ) -> field_entry *
+{
+    if( !dst.valid() ) {
+        return nullptr;
+    }
+
+    const auto max_conductive_intensity = conductive_field_intensity( dst.get_field() );
+    if( max_conductive_intensity <= 0 ) {
+        return nullptr;
+    }
+
+    const auto electricity_intensity =
+        conductive_field_electricity_intensity( max_conductive_intensity );
+    auto *electricity = dst.get_field().find_field( fd_electricity );
+    if( electricity != nullptr ) {
+        electricity->set_field_intensity(
+            std::max( electricity->get_field_intensity(), electricity_intensity ) );
+        return electricity;
+    }
+
+    return sub_add_field( dst, fd_electricity, electricity_intensity, 0_turns );
+}
+
 auto consume_fire_smothering_puddle( field &curfield,
                                      const field_type_str_id &field_type ) -> bool
 {
@@ -1327,6 +1375,14 @@ auto sub_passable( const SubTile &tile ) -> bool
         return false;
     }
     return true;
+}
+
+auto sub_grounded( const SubTile &tile ) -> bool
+{
+    if( !tile.valid() ) {
+        return false;
+    }
+    return !sub_passable( tile ) || conductive_field_intensity( tile.get_field() ) > 0;
 }
 
 // Simplified gas spread check (no wind / vehicle-rotation).
@@ -1528,25 +1584,25 @@ auto process_fields_in_submap( const dimension_id &dim, submap &sm,
                         if( ter.has_flag( TFLAG_SWIMMABLE ) ) {
                             cur.set_field_age( cur.get_field_age() + 4_minutes * tick_turns );
                         }
-                        if( ter_furn_has_flag( ter, frn, TFLAG_FLAMMABLE ) ) {
+                        if( ter.is_basic_flammable() || frn.is_basic_flammable() ) {
                             time_added += tick_duration * ( 5 - cur.get_field_intensity() );
                             if( cur.get_field_intensity() > 1 &&
                                 one_in( 200 - cur.get_field_intensity() * 50 ) ) {
                                 sm.set_ter( local, t_dirt );
                             }
-                        } else if( ter_furn_has_flag( ter, frn, TFLAG_FLAMMABLE_HARD ) && one_in( 3 ) ) {
+                        } else if( ( ter.is_hard_flammable() || frn.is_hard_flammable() ) && one_in( 3 ) ) {
                             time_added += tick_duration * ( 4 - cur.get_field_intensity() );
                             if( cur.get_field_intensity() > 1 &&
                                 one_in( 200 - cur.get_field_intensity() * 50 ) ) {
                                 sm.set_ter( local, t_dirt );
                             }
-                        } else if( ter.has_flag( TFLAG_FLAMMABLE_ASH ) ) {
+                        } else if( ter.is_ash_flammable() ) {
                             time_added += tick_duration * ( 5 - cur.get_field_intensity() );
                             if( cur.get_field_intensity() > 1 &&
                                 one_in( 200 - cur.get_field_intensity() * 50 ) ) {
                                 sm.set_ter( local, t_dirt );
                             }
-                        } else if( frn.has_flag( TFLAG_FLAMMABLE_ASH ) ) {
+                        } else if( frn.is_ash_flammable() ) {
                             time_added += tick_duration * ( 5 - cur.get_field_intensity() );
                             if( cur.get_field_intensity() > 1 &&
                                 one_in( 200 - cur.get_field_intensity() * 50 ) ) {
@@ -1568,9 +1624,7 @@ auto process_fields_in_submap( const dimension_id &dim, submap &sm,
                         if( above_sm ) {
                             const auto &above_ter = above_sm->get_ter( local ).obj();
                             if( above_ter.has_flag( TFLAG_NO_FLOOR ) ||
-                                above_ter.has_flag( TFLAG_FLAMMABLE ) ||
-                                above_ter.has_flag( TFLAG_FLAMMABLE_ASH ) ||
-                                above_ter.has_flag( TFLAG_FLAMMABLE_HARD ) ) {
+                                above_ter.is_flammable() ) {
                                 auto *fire_above = above_sm->get_field( local ).find_field( fd_fire );
                                 if( fire_above ) {
                                     fire_above->mod_field_age( -2_turns );
@@ -1687,9 +1741,12 @@ auto process_fields_in_submap( const dimension_id &dim, submap &sm,
                                 ( check_flammable( dter ) || check_flammable( dfur ) ||
                                   nearwebfld ) &&
                                 ( ( power >= 3 && cur.get_field_age() < 0_turns && one_in( 20 ) ) ||
-                                  ( power >= 2 && ter_furn_has_flag( dter, dfur, TFLAG_FLAMMABLE ) && one_in( 2 ) ) ||
-                                  ( power >= 2 && ter_furn_has_flag( dter, dfur, TFLAG_FLAMMABLE_ASH ) && one_in( 2 ) ) ||
-                                  ( power >= 3 && ter_furn_has_flag( dter, dfur, TFLAG_FLAMMABLE_HARD ) && one_in( 5 ) ) ||
+                                  ( power >= 2 && ( check_basic_flammable( dter ) ||
+                                                    check_basic_flammable( dfur ) ) && one_in( 2 ) ) ||
+                                  ( power >= 2 && ( check_ash_flammable( dter ) ||
+                                                    check_ash_flammable( dfur ) ) && one_in( 2 ) ) ||
+                                  ( power >= 3 && ( check_hard_flammable( dter ) ||
+                                                    check_hard_flammable( dfur ) ) && one_in( 5 ) ) ||
                                   nearwebfld ||
                                   ( dst_has_flammable_items && one_in( 5 ) ) );
                             if( can_ignite ) {
@@ -1790,6 +1847,10 @@ auto process_fields_in_submap( const dimension_id &dim, submap &sm,
             // ---- fd_electricity ------------------------------------------
             if( !is_newborn && cur_fd_type_id == fd_electricity && !one_in( 5 ) ) {
                 auto self = SubTile{ &sm, local, pos };
+                std::ranges::for_each( eight_dirs_sm, [&]( const point & d ) {
+                    auto dst = neighbor_tile( &sm, pos, local, d, mb );
+                    static_cast<void>( energize_conductive_field( dst ) );
+                } );
                 if( !sub_passable( self ) && cur.get_field_intensity() > 1 ) {
                     auto tries = 0;
                     while( tries < 10 &&
@@ -1815,7 +1876,7 @@ auto process_fields_in_submap( const dimension_id &dim, submap &sm,
                     std::vector<point> grounded;
                     std::ranges::for_each( eight_dirs_sm, [&]( const point & d ) {
                         auto dst = neighbor_tile( &sm, pos, local, d, mb );
-                        if( dst.valid() && !sub_passable( dst ) ) {
+                        if( sub_grounded( dst ) ) {
                             grounded.push_back( d );
                         }
                     } );
@@ -1874,9 +1935,7 @@ auto process_fields_in_submap( const dimension_id &dim, submap &sm,
                 if( dst.valid() ) {
                     const auto &dter = dst.get_ter_t();
                     const auto &dfrn = dst.get_furn_t();
-                    if( ter_furn_has_flag( dter, dfrn, TFLAG_FLAMMABLE ) ||
-                        ter_furn_has_flag( dter, dfrn, TFLAG_FLAMMABLE_ASH ) ||
-                        ter_furn_has_flag( dter, dfrn, TFLAG_FLAMMABLE_HARD ) ) {
+                    if( dter.is_flammable() || dfrn.is_flammable() ) {
                         sub_add_field( dst, fd_fire, 1, 0_turns );
                     }
                     const auto dst_has_flammable = std::ranges::any_of(

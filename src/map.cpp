@@ -3705,11 +3705,7 @@ bool map::is_flammable( const tripoint_bub_ms &p )
         return true;
     }
 
-    if( has_flag( "FLAMMABLE", p ) ) {
-        return true;
-    }
-
-    if( has_flag( "FLAMMABLE_ASH", p ) ) {
+    if( ter( p ).obj().is_flammable() || furn( p ).obj().is_flammable() ) {
         return true;
     }
 
@@ -5230,7 +5226,7 @@ bool map::hit_with_fire( const tripoint_bub_ms &p )
     }
 
     // non passable but flammable terrain, set it on fire
-    if( has_flag( "FLAMMABLE", p ) || has_flag( "FLAMMABLE_ASH", p ) ) {
+    if( ter( p ).obj().is_flammable() || furn( p ).obj().is_flammable() ) {
         add_field( p, fd_fire, 3 );
     }
     return true;

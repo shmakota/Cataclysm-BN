@@ -350,6 +350,17 @@ TEST_CASE("place_player_can_safely_move_multiple_submaps") {
     CHECK(get_map().get_abs_sub() == player_reality_bubble_origin().xy());
 }
 
+TEST_CASE("json_flammable_terrain_counts_as_flammable", "[map][fire]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto pos = tripoint_bub_ms(60, 60, 0);
+    here.ter_set(pos, ter_str_id("t_test_flammable_bool").id());
+
+    CHECK(here.is_flammable(pos));
+    CHECK_FALSE(here.has_flag("FLAMMABLE", pos));
+}
+
 TEST_CASE("mapbuffer_resident_lookup_uses_absolute_coordinates") {
     clear_all_state();
 

@@ -222,6 +222,7 @@ void field_type::load( const JsonObject &jo, const std::string & )
     const auto stacking_type_reader = enum_flags_reader<fields::stacking_type> { "field stacking types" };
     optional( jo, was_loaded, "stacking_type", stacking_type, stacking_type_reader );
     optional( jo, was_loaded, "accelerated_decay", accelerated_decay, false );
+    optional( jo, was_loaded, "conductive", conductive, false );
     optional( jo, was_loaded, "display_items", display_items, true );
     optional( jo, was_loaded, "display_field", display_field, false );
     optional( jo, was_loaded, "moppable", moppable, false );

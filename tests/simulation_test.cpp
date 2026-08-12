@@ -164,6 +164,64 @@ TEST_CASE("water_puddles_extinguish_fire_on_the_same_tile", "[simulation][field]
     MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
 
+TEST_CASE("adjacent_electricity_energizes_salt_water_fields", "[simulation][field][electric][liquid]") {
+    clear_all_state();
+    put_player_underground();
+
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    REQUIRE(sm != nullptr);
+
+    const auto electricity_pt = point_sm_ms{5, 5};
+    const auto salt_water_pt = point_sm_ms{6, 5};
+    const auto salt_water_field = field_type_id("fd_salt_water");
+    plant_field(*sm, electricity_pt, fd_electricity, 3);
+    plant_field(*sm, salt_water_pt, salt_water_field, 2);
+
+    auto& dummy = get_avatar();
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+    REQUIRE(sm->get_field(salt_water_pt).find_field(fd_electricity) == nullptr);
+
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    const auto* energized = sm->get_field(salt_water_pt).find_field(fd_electricity);
+    REQUIRE(energized != nullptr);
+    CHECK(energized->get_field_intensity() >= 2);
+    REQUIRE(sm->get_field(salt_water_pt).find_field(salt_water_field) != nullptr);
+
+    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+}
+
+TEST_CASE("adjacent_electricity_propagates_through_salt_water_over_multiple_ticks",
+          "[simulation][field][electric][liquid]") {
+    clear_all_state();
+    put_player_underground();
+
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    REQUIRE(sm != nullptr);
+
+    const auto electricity_pt = point_sm_ms{5, 5};
+    const auto first_salt_water_pt = point_sm_ms{6, 5};
+    const auto second_salt_water_pt = point_sm_ms{7, 5};
+    const auto salt_water_field = field_type_id("fd_salt_water");
+    plant_field(*sm, electricity_pt, fd_electricity, 3);
+    plant_field(*sm, first_salt_water_pt, salt_water_field, 2);
+    plant_field(*sm, second_salt_water_pt, salt_water_field, 2);
+
+    auto& dummy = get_avatar();
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    REQUIRE(sm->get_field(first_salt_water_pt).find_field(fd_electricity) != nullptr);
+    CHECK(sm->get_field(second_salt_water_pt).find_field(fd_electricity) == nullptr);
+
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    REQUIRE(sm->get_field(first_salt_water_pt).find_field(fd_electricity) != nullptr);
+    REQUIRE(sm->get_field(second_salt_water_pt).find_field(fd_electricity) != nullptr);
+
+    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+}
+
 // ── Test 2 ────────────────────────────────────────────────────────────────────
 // Verify that a loaded, no-fire boundary submap stays requested while it is
 // adjacent to tracked fire.  This avoids request/load/prune/evict churn at fire
