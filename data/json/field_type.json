@@ -1433,7 +1433,6 @@
   {
     "id": "fd_water",
     "type": "field_type",
-    "legacy_enum_id": 51,
     "intensity_levels": [
       { "name": "water splatter", "sym": "~", "color": "light_blue" },
       { "name": "water stain" },
@@ -1445,14 +1444,159 @@
     "half_life": "30 minutes",
     "underwater_age_speedup": "5 minutes",
     "phase": "liquid",
-    "tint": "blue",
+    "tint": "cyan",
     "display_field": true,
-    "looks_like": "fd_blood"
+    "looks_like": "fd_acid"
+  },
+  {
+    "id": "fd_milk",
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "milk splatter", "sym": "~" },
+      { "name": "milk stain" },
+      { "name": "puddle of milk" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "white",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_juice",
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "juice splatter", "sym": "~" },
+      { "name": "juice stain" },
+      { "name": "puddle of juice" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "magenta",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_motor_oil",
+    "type": "field_type",
+    "intensity_levels": [
+      {
+        "name": "motor oil splatter",
+        "sym": "~",
+        "dangerous": true,
+        "effects": [
+          {
+            "effect_id": "downed",
+            "body_part": "torso",
+            "intensity": 1,
+            "min_duration": "1 turn",
+            "max_duration": "1 turn",
+            "immune_in_vehicle": true,
+            "chance_outside_vehicle": 8,
+            "is_environmental": false,
+            "message": "You slip on the soapy water!",
+            "message_npc": "<npcname> slips on the soapy water!",
+            "message_type": "bad"
+          }
+        ]
+      },
+      { "name": "motor oil stain" },
+      { "name": "puddle of motor oil" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "dark_gray",
+    "display_field": true,
+    "looks_like": "fd_bile"
+  },
+  {
+    "id": "fd_cooking_oil",
+    "type": "field_type",
+    "intensity_levels": [
+      {
+        "name": "cooking oil splatter",
+        "sym": "~",
+        "dangerous": true,
+        "effects": [
+          {
+            "effect_id": "downed",
+            "body_part": "torso",
+            "intensity": 1,
+            "min_duration": "1 turn",
+            "max_duration": "1 turn",
+            "immune_in_vehicle": true,
+            "chance_outside_vehicle": 8,
+            "is_environmental": false,
+            "message": "You slip on the soapy water!",
+            "message_npc": "<npcname> slips on the soapy water!",
+            "message_type": "bad"
+          }
+        ]
+      },
+      { "name": "cooking oil stain" },
+      { "name": "puddle of cooking oil" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "yellow",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_chemical",
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "chemical splatter", "sym": "~" },
+      { "name": "chemical stain" },
+      { "name": "puddle of chemicals" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "white",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_condiment",
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "condiment splatter", "sym": "~" },
+      { "name": "condiment stain" },
+      { "name": "puddle of condiments" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "brown",
+    "display_field": true,
+    "looks_like": "fd_bile"
   },
   {
     "id": "fd_sewage",
     "type": "field_type",
-    "legacy_enum_id": 52,
     "intensity_levels": [
       { "name": "sewage splatter", "sym": "~", "color": "green" },
       { "name": "sewage stain" },
@@ -1463,6 +1607,81 @@
     "accelerated_decay": true,
     "half_life": "1 hours",
     "underwater_age_speedup": "10 minutes",
+    "phase": "liquid",
+    "tint": "brown",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_soapy_water",
+    "type": "field_type",
+    "intensity_levels": [
+      {
+        "name": "soapy water splatter",
+        "sym": "~",
+        "color": "light_cyan",
+        "dangerous": true,
+        "effects": [
+          {
+            "effect_id": "downed",
+            "body_part": "torso",
+            "intensity": 1,
+            "min_duration": "1 turn",
+            "max_duration": "1 turn",
+            "immune_in_vehicle": true,
+            "chance_outside_vehicle": 8,
+            "is_environmental": false,
+            "message": "You slip on the soapy water!",
+            "message_npc": "<npcname> slips on the soapy water!",
+            "message_type": "bad"
+          }
+        ]
+      },
+      { "name": "soapy water stain" },
+      { "name": "puddle of soapy water", "color": "cyan" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
+    "phase": "liquid",
+    "tint": "cyan",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_strong_acid",
+    "type": "field_type",
+    "intensity_levels": [
+      {
+        "name": "strong acid splatter",
+        "sym": "~",
+        "dangerous": true,
+        "effects": [
+          {
+            "effect_id": "downed",
+            "body_part": "torso",
+            "intensity": 1,
+            "min_duration": "1 turn",
+            "max_duration": "1 turn",
+            "immune_in_vehicle": true,
+            "chance_outside_vehicle": 8,
+            "is_environmental": false,
+            "message": "You slip on the soapy water!",
+            "message_npc": "<npcname> slips on the soapy water!",
+            "message_type": "bad"
+          }
+        ]
+      },
+      { "name": "strong acid stain" },
+      { "name": "puddle of strong acid" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "30 minutes",
+    "underwater_age_speedup": "5 minutes",
     "phase": "liquid",
     "tint": "cyan",
     "display_field": true,
@@ -1490,7 +1709,6 @@
   {
     "id": "fd_oil",
     "type": "field_type",
-    "legacy_enum_id": 54,
     "intensity_levels": [
       { "name": "oil splatter", "sym": "~", "color": "dark_gray" },
       { "name": "oil stain" },
@@ -1502,7 +1720,7 @@
     "half_life": "2 hours",
     "underwater_age_speedup": "10 minutes",
     "phase": "liquid",
-    "tint": "dark_gray",
+    "tint": "brown",
     "display_field": true,
     "looks_like": "fd_fuel"
   }
