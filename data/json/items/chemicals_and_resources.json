@@ -363,7 +363,8 @@
     "volume": "250 ml",
     "spill_field": "fd_soapy_water",
     "phase": "liquid",
-    "ammo_type": "components",
+    "ammo_type": "water",
+    "effects": [ "STREAM_SOAPY_WATER" ],
     "category": "chems"
   },
   {
