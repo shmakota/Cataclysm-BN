@@ -1424,7 +1424,7 @@
     "container": "bottle_plastic",
     "spill_field": "fd_water",
     "quench": 50,
-    "ammo_data": { "ammo_type": "water", "effects": [ "RECOVER_10" ] },
+    "ammo_data": { "ammo_type": "water", "effects": [ "RECOVER_10", "STREAM_WATER" ] },
     "flags": [ "EATEN_COLD", "UNSAFE_CONSUME" ],
     "use_action": "BLECH_BECAUSE_UNCLEAN"
   },

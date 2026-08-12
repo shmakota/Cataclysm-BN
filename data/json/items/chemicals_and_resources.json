@@ -427,6 +427,7 @@
     "description": "Concentrated acid.  Don't drink it.",
     "price": "20 USD",
     "price_postapoc": "50 cent",
+    "spill_field": "fd_acid",
     "volume": "250 ml",
     "phase": "liquid",
     "category": "chems",
@@ -602,6 +603,7 @@
     "ammo_type": "acid",
     "damage": { "damage_type": "acid", "amount": 6 },
     "effects": [ "ACID_TRAIL_WEAK" ],
+    "spill_field": "fd_acid",
     "phase": "liquid",
     "container": "bottle_glass",
     "drop_action": { "type": "emit_actor", "emits": [ "emit_acid_drop" ], "scale_qty": true }
@@ -623,6 +625,7 @@
     "ammo_type": "acid",
     "damage": { "damage_type": "acid", "amount": 5 },
     "effects": [ "ACID_TRAIL_WEAK" ],
+    "spill_field": "fd_acid",
     "phase": "liquid",
     "container": "bottle_glass",
     "drop_action": { "type": "emit_actor", "emits": [ "emit_acid_drop" ], "scale_qty": true }
@@ -644,6 +647,7 @@
     "ammo_type": "acid",
     "damage": { "damage_type": "acid", "amount": 4 },
     "effects": [ "ACID_TRAIL_WEAK" ],
+    "spill_field": "fd_acid",
     "phase": "liquid",
     "container": "bottle_glass",
     "drop_action": { "type": "emit_actor", "emits": [ "emit_acid_drop" ], "scale_qty": true }
@@ -719,6 +723,7 @@
     "bashing": 1,
     "ammo_type": "components",
     "phase": "liquid",
+    "spill_field": "fd_acid",
     "container": "bottle_glass"
   },
   {

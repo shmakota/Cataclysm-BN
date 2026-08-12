@@ -1519,7 +1519,7 @@
     "phase": "liquid",
     "tint": "dark_gray",
     "display_field": true,
-    "looks_like": "fd_bile"
+    "looks_like": "fd_blood"
   },
   {
     "id": "fd_cooking_oil",
@@ -1651,43 +1651,6 @@
     "looks_like": "fd_water"
   },
   {
-    "id": "fd_strong_acid",
-    "type": "field_type",
-    "intensity_levels": [
-      {
-        "name": "strong acid splatter",
-        "sym": "~",
-        "dangerous": true,
-        "effects": [
-          {
-            "effect_id": "downed",
-            "body_part": "torso",
-            "intensity": 1,
-            "min_duration": "1 turn",
-            "max_duration": "1 turn",
-            "immune_in_vehicle": true,
-            "chance_outside_vehicle": 8,
-            "is_environmental": false,
-            "message": "You slip on the soapy water!",
-            "message_npc": "<npcname> slips on the soapy water!",
-            "message_type": "bad"
-          }
-        ]
-      },
-      { "name": "strong acid stain" },
-      { "name": "puddle of strong acid" }
-    ],
-    "description_affix": "covered_in_a",
-    "is_splattering": true,
-    "accelerated_decay": true,
-    "half_life": "30 minutes",
-    "underwater_age_speedup": "5 minutes",
-    "phase": "liquid",
-    "tint": "cyan",
-    "display_field": true,
-    "looks_like": "fd_water"
-  },
-  {
     "id": "fd_fuel",
     "type": "field_type",
     "legacy_enum_id": 53,
@@ -1704,7 +1667,7 @@
     "phase": "liquid",
     "tint": "yellow",
     "display_field": true,
-    "looks_like": "fd_bile"
+    "looks_like": "fd_blood"
   },
   {
     "id": "fd_oil",
