@@ -1242,6 +1242,22 @@
     "phase": "liquid"
   },
   {
+    "type": "AMMO",
+    "id": "industrial_lubricant",
+    "category": "chems",
+    "price": "10 cent",
+    "price_postapoc": "5 cent",
+    "name": { "str_sp": "industrial lubricant" },
+    "symbol": "!",
+    "color": "white",
+    "container": "bottle_glass",
+    "spill_field": "fd_industrial_lubricant",
+    "description": "A viscous liquid used as an industrial lubricant.",
+    "volume": "1 ml",
+    "ammo_type": "components",
+    "phase": "liquid"
+  },
+  {
     "type": "COMESTIBLE",
     "id": "chem_DMSO",
     "comestible_type": "MED",
