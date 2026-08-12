@@ -183,6 +183,7 @@ struct field_type {
         bool accelerated_decay = false;
         bool display_items = true;
         bool display_field = false;
+        bool moppable = false;
         nc_color tint = c_unset;
         field_type_id wandering_field;
         std::string looks_like;

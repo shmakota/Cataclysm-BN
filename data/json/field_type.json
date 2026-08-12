@@ -17,7 +17,8 @@
     "half_life": "2 days",
     "phase": "liquid",
     "accelerated_decay": true,
-    "display_field": true
+    "display_field": true,
+    "moppable": true
   },
   {
     "id": "fd_bile",
@@ -31,6 +32,7 @@
     "half_life": "1 days",
     "phase": "liquid",
     "accelerated_decay": true,
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_acid"
   },
@@ -50,6 +52,7 @@
     "half_life": "2 days",
     "phase": "solid",
     "accelerated_decay": true,
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_blood"
   },
@@ -69,6 +72,7 @@
     "half_life": "2 days",
     "phase": "solid",
     "accelerated_decay": true,
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_blood_veggy"
   },
@@ -108,6 +112,7 @@
     "half_life": "1 days",
     "phase": "liquid",
     "accelerated_decay": true,
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_blood_veggy"
   },
@@ -215,6 +220,7 @@
     "half_life": "10 minutes",
     "underwater_age_speedup": "10 minutes",
     "phase": "liquid",
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_sap"
   },
@@ -763,6 +769,7 @@
     "half_life": "2 days",
     "phase": "liquid",
     "accelerated_decay": true,
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_blood"
   },
@@ -778,6 +785,7 @@
     "half_life": "2 days",
     "phase": "liquid",
     "accelerated_decay": true,
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_blood"
   },
@@ -797,6 +805,7 @@
     "half_life": "2 days",
     "phase": "liquid",
     "accelerated_decay": true,
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_blood"
   },
@@ -816,6 +825,7 @@
     "half_life": "2 days",
     "phase": "solid",
     "accelerated_decay": true,
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_blood_insect"
   },
@@ -835,6 +845,7 @@
     "half_life": "2 days",
     "phase": "solid",
     "accelerated_decay": true,
+    "moppable": true,
     "display_field": true,
     "looks_like": "fd_blood_invertebrate"
   },
@@ -1611,12 +1622,30 @@
     "looks_like": "fd_water"
   },
   {
+    "id": "fd_alcohol",
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "alcohol splatter", "sym": "~" },
+      { "name": "alcohol stain" },
+      { "name": "puddle of alcohol" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "90 minutes",
+    "underwater_age_speedup": "15 minutes",
+    "phase": "liquid",
+    "tint": "brown",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
     "id": "fd_plutonium_slurry",
     "type": "field_type",
     "intensity_levels": [
-      { "name": "nuclear waste splatter", "sym": "~", "color": "light_green" },
-      { "name": "nuclear waste stain" },
-      { "name": "puddle of nuclear waste", "color": "green" }
+      { "name": "nuclear waste splatter", "sym": "~", "color": "light_green", "extra_radiation_max": 1 },
+      { "name": "nuclear waste stain", "extra_radiation_max": 2 },
+      { "name": "puddle of nuclear waste", "color": "green", "extra_radiation_max": 3 }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,

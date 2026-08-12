@@ -224,6 +224,7 @@ void field_type::load( const JsonObject &jo, const std::string & )
     optional( jo, was_loaded, "accelerated_decay", accelerated_decay, false );
     optional( jo, was_loaded, "display_items", display_items, true );
     optional( jo, was_loaded, "display_field", display_field, false );
+    optional( jo, was_loaded, "moppable", moppable, false );
     assign( jo, "tint", tint );
     optional( jo, was_loaded, "wandering_field", wandering_field_id, "fd_null" );
 

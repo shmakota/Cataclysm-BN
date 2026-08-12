@@ -3917,21 +3917,15 @@ bool map::mop_spills( const tripoint_bub_ms &p )
     }
 
     field &fld = field_at( p );
-    static const std::vector<field_type_id> to_check = {
-        fd_blood,
-        fd_blood_veggy,
-        fd_blood_insect,
-        fd_blood_invertebrate,
-        fd_gibs_flesh,
-        fd_gibs_veggy,
-        fd_gibs_insect,
-        fd_gibs_invertebrate,
-        fd_bile,
-        fd_slime,
-        fd_sludge
-    };
-    for( field_type_id fid : to_check ) {
-        retval |= fld.remove_field( fid );
+    auto fields_to_remove = std::vector<field_type_id>{};
+    for( const auto &[field_id, entry] : fld ) {
+        static_cast<void>( field_id );
+        if( entry.is_moppable() ) {
+            fields_to_remove.push_back( entry.get_field_type() );
+        }
+    }
+    for( const field_type_id &field_id : fields_to_remove ) {
+        retval |= fld.remove_field( field_id );
     }
 
     if( const optional_vpart_position vp = veh_at( p ) ) {

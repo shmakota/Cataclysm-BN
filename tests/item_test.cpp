@@ -115,12 +115,17 @@ TEST_CASE("common_liquids_define_spill_fields", "[item][liquid][field]") {
     CHECK(item::spawn_temporary("water_sewage")->type->spill_field == field_type_id("fd_sewage"));
     CHECK(item::spawn_temporary("gasoline")->type->spill_field == field_type_id("fd_fuel"));
     CHECK(item::spawn_temporary("motor_oil")->type->spill_field == field_type_id("fd_oil"));
+    CHECK(item::spawn_temporary("plut_slurry")->type->spill_field
+          == field_type_id("fd_plutonium_slurry"));
     CHECK(field_type_id("fd_water").obj().get_tint() == c_blue);
     CHECK(field_type_id("fd_sewage").obj().get_tint() == c_cyan);
     CHECK(item::spawn_temporary("soapy_water")->ammo_type() == ammotype("water"));
     CHECK(field_type_id("fd_soapy_water").obj().get_intensity_level().field_effects.size() == 1);
     CHECK(field_type_id("fd_soapy_water").obj().get_intensity_level().field_effects.front().id
           == efftype_id("downed"));
+    CHECK(field_type_id("fd_plutonium_slurry").obj().get_extra_radiation_max(0) == 1);
+    CHECK(field_type_id("fd_plutonium_slurry").obj().get_extra_radiation_max(1) == 2);
+    CHECK(field_type_id("fd_plutonium_slurry").obj().get_extra_radiation_max(2) == 3);
 }
 
 TEST_CASE("super_soaker_uses_water_without_mount_restrictions", "[item][gun]") {
