@@ -11667,8 +11667,7 @@ bool item::on_drop( const tripoint_bub_ms &pos, map &m )
     const auto spilled_to_field =
         made_of( LIQUID ) && type->spill_field != fd_null && !m.has_flag( flag_LIQUIDCONT, pos );
     if( spilled_to_field ) {
-        const auto spill_amount = count_by_charges() ? charges : 1;
-        m.spill_liquid_field( pos, type->spill_field, spill_amount );
+        m.spill_liquid_field( pos, *this );
     }
     you.flag_encumbrance();
 

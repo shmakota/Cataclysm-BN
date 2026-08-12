@@ -110,6 +110,8 @@ TEST_CASE("gun_cycle_mode_wraps_from_last_to_first", "[item]") {
 
 TEST_CASE("common_liquids_define_spill_fields", "[item][liquid][field]") {
     CHECK(item::spawn_temporary("water")->type->spill_field == field_type_id("fd_water"));
+    CHECK(
+        item::spawn_temporary("soapy_water")->type->spill_field == field_type_id("fd_soapy_water"));
     CHECK(item::spawn_temporary("water_sewage")->type->spill_field == field_type_id("fd_sewage"));
     CHECK(item::spawn_temporary("gasoline")->type->spill_field == field_type_id("fd_fuel"));
     CHECK(item::spawn_temporary("motor_oil")->type->spill_field == field_type_id("fd_oil"));

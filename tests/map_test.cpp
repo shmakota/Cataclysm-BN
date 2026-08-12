@@ -23,6 +23,7 @@
 #include "submap.h"
 #include "submap_load_manager.h"
 #include "type_id.h"
+#include "units.h"
 #include "vehicle.h"
 
 #include <memory>
@@ -86,6 +87,18 @@ auto count_field_tiles_in_radius(
     auto result = 0;
     for (const auto& pos : here.points_in_radius(center, radius)) {
         result += here.get_field(pos, field_id) != nullptr ? 1 : 0;
+    }
+    return result;
+}
+
+auto total_field_intensity_in_radius(
+    map& here, const tripoint_bub_ms& center, const size_t radius,
+    const field_type_id& field_id) -> int {
+    auto result = 0;
+    for (const auto& pos : here.points_in_radius(center, radius)) {
+        if (const auto* field = here.get_field(pos, field_id)) {
+            result += field->get_field_intensity();
+        }
     }
     return result;
 }
@@ -234,7 +247,7 @@ TEST_CASE("spilled_liquids_become_fields_without_dropping_items", "[map][item][l
     CHECK(count_field_tiles_in_radius(here, center, 2, fd_blood) > 1);
 }
 
-TEST_CASE("repeated_liquid_spills_expand_existing_puddles", "[map][item][liquid][field]") {
+TEST_CASE("repeated_liquid_spills_intensify_before_expanding", "[map][item][liquid][field]") {
     clear_all_state();
 
     auto& here = get_map();
@@ -251,16 +264,61 @@ TEST_CASE("repeated_liquid_spills_expand_existing_puddles", "[map][item][liquid]
     first_pour->charges = 1;
     REQUIRE_FALSE(here.add_item_or_charges(center, std::move(first_pour), false));
     CHECK(count_field_tiles_in_radius(here, center, 2, water_field) == 1);
+    REQUIRE(here.get_field(center, water_field) != nullptr);
+    CHECK(here.get_field(center, water_field)->get_field_intensity() == 1);
 
     auto second_pour = item::spawn("water", calendar::turn);
     second_pour->charges = 1;
     REQUIRE_FALSE(here.add_item_or_charges(center, std::move(second_pour), false));
+    CHECK(count_field_tiles_in_radius(here, center, 2, water_field) == 1);
+    REQUIRE(here.get_field(center, water_field) != nullptr);
+    CHECK(here.get_field(center, water_field)->get_field_intensity() == 2);
+
+    auto third_pour = item::spawn("water", calendar::turn);
+    third_pour->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(third_pour), false));
+    CHECK(count_field_tiles_in_radius(here, center, 2, water_field) == 1);
+    REQUIRE(here.get_field(center, water_field) != nullptr);
+    CHECK(
+        here.get_field(center, water_field)->get_field_intensity() == water_field.obj().get_max_intensity());
+
+    auto fourth_pour = item::spawn("water", calendar::turn);
+    fourth_pour->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(fourth_pour), false));
 
     auto center_items = here.i_at(center);
     CHECK(center_items.empty());
     CHECK(count_field_tiles_in_radius(here, center, 2, water_field) > 1);
 }
 
+TEST_CASE(
+    "gasoline_spills_scale_with_volume_instead_of_raw_charges", "[map][item][liquid][field]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto center = tripoint_bub_ms(60, 60, 0);
+    const auto fuel_field = field_type_id("fd_fuel");
+    for (const auto& pos : here.points_in_radius(center, 12)) {
+        here.i_clear(pos);
+        here.remove_field(pos, fuel_field);
+        here.ter_set(pos, ter_id("t_floor"));
+        here.furn_set(pos, furn_id("f_null"));
+    }
+
+    auto spilled_gasoline = item::spawn("gasoline", calendar::turn);
+    spilled_gasoline->charges = 10000;
+    const auto max_fuel_intensity = fuel_field.obj().get_max_intensity();
+    const auto spill_tiles =
+        divide_round_up(units::to_milliliter(spilled_gasoline->volume()), 1000);
+    const auto expected_visual_intensity = std::min(
+        static_cast<int>(std::max<decltype(spill_tiles)>(1, spill_tiles)), 90 * max_fuel_intensity);
+
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(spilled_gasoline), false));
+    CHECK(count_field_tiles_in_radius(here, center, 12, fuel_field) <= 90);
+    CHECK(total_field_intensity_in_radius(here, center, 12, fuel_field) == expected_visual_intensity);
+    REQUIRE(here.get_field(center, fuel_field) != nullptr);
+    CHECK(here.get_field(center, fuel_field)->get_field_intensity() == max_fuel_intensity);
+}
 TEST_CASE("mapbuffer_vehicle_lookup_uses_absolute_coordinates") {
     clear_all_state();
 

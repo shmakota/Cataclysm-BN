@@ -930,6 +930,8 @@ void map::emit_field( const tripoint_bub_ms &pos, const emit_id &src, float mul 
 namespace
 {
 
+static constexpr auto max_visual_spill_tiles = 90;
+
 struct spilled_liquid_field_candidate {
     int distance = 0;
     tripoint_bub_ms pos = tripoint_bub_ms::zero();
@@ -977,76 +979,141 @@ auto deserialize_spilled_liquid_item( const std::string &serialized_item ) -> de
 }
 } // namespace
 
-void map::spill_liquid_field( const tripoint_bub_ms &center, const field_type_id &type,
-                              int amount )
+void map::spill_liquid_field( const tripoint_bub_ms &center, const item &liquid )
 {
-    if( amount <= 0 ) {
-        return;
-    }
+    namespace ranges = std::ranges;
 
-    if( get_field( center, type ) == nullptr ) {
-        propagate_field( center, type, amount, 1 );
+    const auto type = liquid.type->spill_field;
+    const auto max_field_intensity = type.obj().get_max_intensity();
+    const auto max_visual_amount = max_visual_spill_tiles * max_field_intensity;
+    static constexpr auto spill_tile_volume = 1_liter;
+    const auto spill_tiles = divide_round_up(
+                                 units::to_milliliter( liquid.volume() ),
+                                 units::to_milliliter( spill_tile_volume ) );
+    const auto amount = static_cast<int>( std::max<decltype( spill_tiles )>( 1, spill_tiles ) );
+    auto serialized_liquid = serialize_spilled_liquid_item( liquid );
+    if( amount <= 0 ) {
         return;
     }
 
     auto frontier = std::queue<tripoint_bub_ms>();
     auto visited = std::set<tripoint_bub_ms>();
+    auto spill_tiles_seen = std::set<tripoint_bub_ms>();
+    auto spill_tiles_to_fill = std::vector<tripoint_bub_ms>();
     auto candidates_seen = std::set<tripoint_bub_ms>();
     auto candidates = std::vector<spilled_liquid_field_candidate>();
     auto represented_amount = 0;
-    frontier.push( center );
-
-    static const std::array<int, 8> x_offset = {{ -1, 1,  0, 0,  1, -1, -1, 1  }};
-    static const std::array<int, 8> y_offset = {{  0, 0, -1, 1, -1,  1, -1, 1  }};
-
-    while( !frontier.empty() ) {
-        const auto current = frontier.front();
-        frontier.pop();
-        if( visited.contains( current ) ) {
-            continue;
-        }
-        visited.insert( current );
-
-        const auto *existing_field = get_field( current, type );
-        if( existing_field == nullptr ) {
-            continue;
-        }
-        represented_amount += existing_field->get_field_intensity();
-
-        for( size_t i = 0; i < x_offset.size(); i++ ) {
-            const auto adjacent = current + point( x_offset[ i ], y_offset[ i ] );
-            if( get_field( adjacent, type ) != nullptr ) {
-                if( !visited.contains( adjacent ) ) {
-                    frontier.push( adjacent );
-                }
-                continue;
-            }
-
-            if( impassable( adjacent ) || obstructed_by_vehicle_rotation( current, adjacent ) ) {
-                continue;
-            }
-
-            if( candidates_seen.insert( adjacent ).second ) {
-                candidates.push_back( {
-                    .distance = rl_dist( center, adjacent ),
-                    .pos = adjacent,
-                } );
-            }
-        }
-    }
-
-    const auto target_amount = represented_amount + amount;
-    namespace ranges = std::ranges;
-    ranges::sort( candidates, {}, &spilled_liquid_field_candidate::distance );
-
-    for( const spilled_liquid_field_candidate &candidate : candidates ) {
-        if( represented_amount >= target_amount ) {
+    const auto sort_spill_tiles = [&]() {
+        ranges::sort( spill_tiles_to_fill, [&]( const tripoint_bub_ms &lhs, const tripoint_bub_ms &rhs ) {
+            return std::tuple( rl_dist( center, lhs ), lhs.x(), lhs.y(), lhs.z() ) <
+                   std::tuple( rl_dist( center, rhs ), rhs.x(), rhs.y(), rhs.z() );
+        } );
+    };
+    const auto sort_candidates = [&]() {
+        ranges::sort( candidates, [&]( const spilled_liquid_field_candidate &lhs,
+        const spilled_liquid_field_candidate &rhs ) {
+            return std::tuple( lhs.distance, lhs.pos.x(), lhs.pos.y(), lhs.pos.z() ) <
+                   std::tuple( rhs.distance, rhs.pos.x(), rhs.pos.y(), rhs.pos.z() );
+        } );
+    };
+    const auto add_candidate = [&]( const tripoint_bub_ms &current, const tripoint_bub_ms &adjacent ) {
+        if( spill_tiles_seen.contains( adjacent ) || candidates_seen.contains( adjacent ) ||
+            impassable( adjacent ) || obstructed_by_vehicle_rotation( current, adjacent ) ) {
             return;
         }
 
-        if( add_field( candidate.pos, type, 1 ) ) {
-            represented_amount++;
+        candidates_seen.insert( adjacent );
+        candidates.push_back( {
+            .distance = rl_dist( center, adjacent ),
+            .pos = adjacent,
+        } );
+    };
+    const auto expand_candidates = [&]( const tripoint_bub_ms &current ) {
+        for( const auto &[dx, dy] : spilled_liquid_adjacent_offsets ) {
+            const auto adjacent = current + point( dx, dy );
+            if( get_field( adjacent, type ) != nullptr ) {
+                continue;
+            }
+            add_candidate( current, adjacent );
         }
+    };
+
+    if( get_field( center, type ) != nullptr ) {
+        frontier.push( center );
+        while( !frontier.empty() ) {
+            const auto current = frontier.front();
+            frontier.pop();
+            if( visited.contains( current ) ) {
+                continue;
+            }
+            visited.insert( current );
+
+            const auto *existing_field = get_field( current, type );
+            if( existing_field == nullptr ) {
+                continue;
+            }
+            spill_tiles_seen.insert( current );
+            spill_tiles_to_fill.push_back( current );
+            represented_amount += existing_field->get_field_intensity();
+
+            for( const auto &[dx, dy] : spilled_liquid_adjacent_offsets ) {
+                const auto adjacent = current + point( dx, dy );
+                if( get_field( adjacent, type ) != nullptr ) {
+                    if( !visited.contains( adjacent ) ) {
+                        frontier.push( adjacent );
+                    }
+                    continue;
+                }
+                add_candidate( current, adjacent );
+            }
+        }
+    } else {
+        candidates_seen.insert( center );
+        candidates.push_back( {
+            .distance = 0,
+            .pos = center,
+        } );
+    }
+
+    sort_spill_tiles();
+    const auto target_amount = std::min( represented_amount + amount, max_visual_amount );
+    while( represented_amount < target_amount ) {
+        auto changed = false;
+        for( const auto &tile : spill_tiles_to_fill ) {
+            auto *existing_field = get_field( tile, type );
+            if( existing_field == nullptr || existing_field->get_field_intensity() >= max_field_intensity ) {
+                continue;
+            }
+            mod_field_intensity( tile, type, 1 );
+            represented_amount++;
+            changed = true;
+            if( represented_amount >= target_amount ) {
+                break;
+            }
+        }
+        if( represented_amount >= target_amount ) {
+            break;
+        }
+        if( spill_tiles_to_fill.size() < max_visual_spill_tiles && !candidates.empty() ) {
+            sort_candidates();
+            const auto candidate = candidates.front();
+            candidates.erase( candidates.begin() );
+            if( add_field( candidate.pos, type, 1 ) ) {
+                represented_amount++;
+                changed = true;
+                spill_tiles_seen.insert( candidate.pos );
+                spill_tiles_to_fill.push_back( candidate.pos );
+                sort_spill_tiles();
+                expand_candidates( candidate.pos );
+            }
+        }
+        if( !changed ) {
+            break;
+        }
+    }
+
+    if( auto *center_field = get_field( center, type ) ) {
+        center_field->add_spilled_liquid_item( std::move( serialized_liquid ) );
     }
 }
 

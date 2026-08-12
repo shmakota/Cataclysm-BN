@@ -1,4 +1,5 @@
 #include "avatar.h"
+#include "batch_turns.h"
 #include "cached_options.h"
 #include "cata_utility.h"
 #include "catch/catch.hpp"
@@ -34,6 +35,16 @@ static auto make_blank_submap(mapbuffer& mb, const tripoint_abs_sm& pos) -> subm
 // Add fd_fire to @p sm at @p local and keep field_count / field_cache / is_uniform consistent.
 static auto plant_fire(submap& sm, const point_sm_ms& local, int intensity = 1) -> void {
     if (sm.get_field(local).add_field(fd_fire, intensity, 0_turns)) {
+        ++sm.field_count;
+        sm.field_cache.push_back(local);
+        sm.is_uniform = false;
+    }
+}
+
+static auto plant_field(
+    submap& sm, const point_sm_ms& local, const field_type_id& field_type,
+    int intensity = 1) -> void {
+    if (sm.get_field(local).add_field(field_type, intensity, 0_turns)) {
         ++sm.field_count;
         sm.field_cache.push_back(local);
         sm.is_uniform = false;
@@ -242,4 +253,22 @@ TEST_CASE("fire_isolated_between_dimensions", "[simulation][field][dimension]") 
     }
 
     MAPBUFFER_REGISTRY.unload_dimension(TEST_DIM_ID);
+}
+
+TEST_CASE("batch_turns_decay_plain_display_liquid_fields", "[simulation][field][liquid]") {
+    clear_all_state();
+    put_player_underground();
+
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    REQUIRE(sm != nullptr);
+
+    const auto spill_pt = point_sm_ms{5, 5};
+    const auto water_field = field_type_id("fd_water");
+    plant_field(*sm, spill_pt, water_field);
+
+    batch_turns_field(*sm, to_turns<int>(2_hours));
+
+    CHECK(sm->get_field(spill_pt).find_field(water_field) == nullptr);
+
+    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
