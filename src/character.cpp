@@ -6319,7 +6319,7 @@ void Character::update_bodytemp( const map &m, const weather_manager &weather )
         }
 
         // Climate Control eases the effects of high and low ambient temps
-        bp_conv = temp_corrected_by_climate_control( bp_conv );
+        bp_conv = temp_corrected_by_climate_control( bp_conv, bp );
 
         int bonus_fire_warmth = best_fire * 500;
 
@@ -10848,11 +10848,11 @@ int Character::bodytemp_modifier_traits_floor() const
     return mod;
 }
 
-int Character::temp_corrected_by_climate_control( int temperature )
+int Character::temp_corrected_by_climate_control( int temperature, bodypart_id id )
 {
     if( temperature > BODYTEMP_NORM ) {
         temperature -= bonus_from_enchantments( temperature,
-                                                enchantment_value_id( "CLIMATE_CONTROL_COOLING" ) );
+                                                enchantment_value_id( "CLIMATE_CONTROL_COOLING_" + to_upper_case( id.id().str() ) ) );
         if( in_climate_control() ) {
             temperature -= 1250;
         }
@@ -10862,7 +10862,7 @@ int Character::temp_corrected_by_climate_control( int temperature )
             temperature += 1250;
         }
         temperature += bonus_from_enchantments( temperature,
-                                                enchantment_value_id( "CLIMATE_CONTROL_HEATING" ) );
+                                                enchantment_value_id( "CLIMATE_CONTROL_HEATING_" + to_upper_case( id.id().str() ) ) );
         return std::min( BODYTEMP_NORM, temperature );
     }
     return temperature;
