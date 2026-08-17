@@ -5607,6 +5607,30 @@ struct jump_over_tile_state {
 };
 
 static constexpr auto jump_over_tile_base_move_cost = 200;
+static constexpr auto jump_over_tile_min_strength = 4;
+static constexpr auto jump_over_tile_stamina_burn_ratio = 7;
+
+auto jump_over_tile_carried_weight_percentage( const player &p ) -> int
+{
+    const auto carried_weight_grams = units::to_gram( p.weight_carried() );
+    const auto carry_capacity_grams = std::max( units::to_gram( p.weight_capacity() ), 1L );
+    return std::clamp( static_cast<int>( carried_weight_grams * 100 / carry_capacity_grams ), 0, 100 );
+}
+
+auto scale_jump_over_tile_cost_round_up( const int value, const int numerator,
+        const int denominator ) -> int
+{
+    return divide_round_up( value * numerator, denominator );
+}
+
+auto jump_over_tile_stamina_cost( const player &p, const int move_cost ) -> int
+{
+    const auto base_stamina_cost = scale_jump_over_tile_cost_round_up(
+                                       get_option<int>( "PLAYER_BASE_STAMINA_BURN_RATE" ) * move_cost,
+                                       jump_over_tile_stamina_burn_ratio, 100 );
+    return scale_jump_over_tile_cost_round_up(
+               base_stamina_cost, 100 + jump_over_tile_carried_weight_percentage( p ), 100 );
+}
 
 auto get_jump_over_tile_state( const player &p,
                                const tripoint_bub_ms &examp_bub ) -> jump_over_tile_state
@@ -5629,21 +5653,29 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
         return false;
     }
 
-    if( p.get_str() < 4 ) {
-        if( show_messages ) {
-            add_msg( m_warning, _( "You are too weak to jump over an obstacle." ) );
-        }
-        return false;
-    }
-
-    if( 100 * p.weight_carried() / p.weight_capacity() > 25 ) {
-        if( show_messages ) {
-            add_msg( m_warning, _( "You are too burdened to jump over an obstacle." ) );
-        }
+    if( !iexamine::can_start_jump_over_tile( p, show_messages ) ) {
         return false;
     }
 
     auto &buffer = p.get_mapbuffer();
+    const auto tile_reader = buffer.make_abs_tile_reader();
+    const auto jumped_tile = tile_reader.get_tile( jump_state.examp );
+    if( jumped_tile && jumped_tile->get_furn() != f_null && jumped_tile->get_furn_t().movecost < 0 ) {
+        if( show_messages ) {
+            add_msg( m_warning, _( "You cannot jump over that piece of furniture." ) );
+        }
+        return false;
+    }
+
+    if( const auto blocking_creature = buffer.creature_at( jump_state.examp ) ) {
+        if( blocking_creature->get_size() >= p.get_size() ) {
+            if( show_messages ) {
+                add_msg( m_warning, _( "You cannot jump over %s." ), blocking_creature->disp_name() );
+            }
+            return false;
+        }
+    }
+
     if( !buffer.valid_move( jump_state.examp, jump_state.dest, { .flying = true } ) ) {
         if( show_messages ) {
             add_msg( m_warning, _( "You cannot jump over an obstacle - something is blocking the way." ) );
@@ -5663,6 +5695,18 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
 }
 
 } // namespace
+
+auto iexamine::can_start_jump_over_tile( const player &p, const bool show_messages ) -> bool
+{
+    if( p.get_str() < jump_over_tile_min_strength ) {
+        if( show_messages ) {
+            add_msg( m_warning, _( "You are too weak to jump over an obstacle." ) );
+        }
+        return false;
+    }
+
+    return true;
+}
 
 auto iexamine::can_jump_over_tile( const player &p, const tripoint_bub_ms &examp ) -> bool
 {
@@ -5685,9 +5729,10 @@ auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
 
     const auto jump_state = get_jump_over_tile_state( p, examp );
     const auto move_cost = p.run_cost( jump_over_tile_base_move_cost );
+    const auto stamina_cost = jump_over_tile_stamina_cost( p, move_cost );
     add_msg( m_info, _( "You jump over an obstacle." ) );
     p.mod_moves( -move_cost );
-    p.burn_move_stamina( move_cost );
+    p.mod_stamina( -stamina_cost, false );
     p.setpos( jump_state.dest );
     get_map().creature_on_trap( p, false );
     return true;

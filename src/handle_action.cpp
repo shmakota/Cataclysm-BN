@@ -728,6 +728,10 @@ static void close()
 static auto jump() -> void
 {
     auto &you = get_avatar();
+    if( !iexamine::can_start_jump_over_tile( you, true ) ) {
+        return;
+    }
+
     const auto allowed = [&you]( const tripoint_bub_ms & pos ) {
         return iexamine::can_jump_over_tile( you, pos );
     };
