@@ -68,7 +68,14 @@ end
 local function auto_mop_surrounding(here, center)
   local mopped_tiles = 0
   for _, pt in ipairs(here:points_in_radius(center, 1)) do
-    if here:mop_spills(pt) then mopped_tiles = mopped_tiles + 1 end
+    local mopped_tile = false
+    for _, field_id in ipairs(here:get_field_ids_at(pt)) do
+      if field_id:obj().moppable then
+        here:remove_field_at(pt, field_id)
+        mopped_tile = true
+      end
+    end
+    if mopped_tile then mopped_tiles = mopped_tiles + 1 end
   end
   return mopped_tiles
 end
