@@ -2513,6 +2513,10 @@ class jmapgen_furniture : public jmapgen_piece
         jmapgen_furniture( const JsonObject &jsi ) : id( jsi.get_member( "furn" ) ) {
             // Used in simple cases
             assign( jsi, "palette", palette );
+
+            if( jsi.has_array( "colors" ) ) {
+                palette = MapgenColorPalette::define_new_palette( jsi );
+            }
         }
 
         jmapgen_furniture( const JsonValue &jsv ) {
@@ -2523,6 +2527,9 @@ class jmapgen_furniture : public jmapgen_piece
                 if( jsi.has_member( "furn" ) ) {
                     id = mapgen_value<furn_id>( jsi.get_member( "furn" ) );
                     assign( jsi, "palette", palette );
+                    if( jsi.has_array( "colors" ) ) {
+                        palette = MapgenColorPalette::define_new_palette( jsi );
+                    }
                 } else {
                     // If this object is using parameters distributions etc
                     id = mapgen_value<furn_id>( jsi );
@@ -2582,6 +2589,9 @@ class jmapgen_terrain : public jmapgen_piece
         jmapgen_terrain( const JsonObject &jsi ) : jmapgen_terrain( jsi.get_member( "ter" ) ) {
             // Used in simple cases
             assign( jsi, "palette", palette );
+            if( jsi.has_array( "colors" ) ) {
+                palette = MapgenColorPalette::define_new_palette( jsi );
+            }
         }
         jmapgen_terrain( const JsonValue &jsv ) {
             // Okay so we have an object
@@ -2591,6 +2601,9 @@ class jmapgen_terrain : public jmapgen_piece
                 if( jsi.has_member( "ter" ) ) {
                     id = mapgen_value<ter_id>( jsi.get_member( "ter" ) );
                     assign( jsi, "palette", palette );
+                    if( jsi.has_array( "colors" ) ) {
+                        palette = MapgenColorPalette::define_new_palette( jsi );
+                    }
                 } else {
                     // If this object is using parameters distributions etc
                     id = mapgen_value<ter_id>( jsi );

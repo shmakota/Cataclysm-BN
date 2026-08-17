@@ -368,6 +368,8 @@ Example:
 The palette causes the furniture to be default painted based off the palette
 The palette randomly chooses a color based of the position on the global overmap
 
+Can also defined an inline palette as a seperate option
+
 ## Set terrain, furniture, or traps with a "set" array
 
 **optional** Specific commands to set terrain, furniture, traps, radiation, etc. Array is processed
@@ -662,6 +664,8 @@ times):
 
 It is also possible to specify a color palette to apply
 The palette is a `mapgen_color_palette`
+
+Can also defined an inline palette as a seperate option
 
 ````json
 "terrain": {
