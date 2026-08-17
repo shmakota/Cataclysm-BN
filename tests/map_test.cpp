@@ -319,6 +319,48 @@ TEST_CASE(
     REQUIRE(here.get_field(center, fuel_field) != nullptr);
     CHECK(here.get_field(center, fuel_field)->get_field_intensity() == max_fuel_intensity);
 }
+TEST_CASE("mop_spills_respects_jsonized_field_property", "[map][field][mop]") {
+    clear_all_state();
+
+    auto &here = get_map();
+    const auto center = tripoint_bub_ms( 60, 60, 0 );
+    g->place_player( center );
+
+    SECTION("moppable fields are removed") {
+        const auto bile_field = field_type_id("fd_bile");
+        here.add_field(center, bile_field);
+
+        CHECK(here.mop_spills(center));
+        CHECK(here.get_field(center, bile_field) == nullptr);
+    }
+
+    SECTION("spilled liquid fields are removed") {
+        const auto water_field = field_type_id("fd_water");
+        auto spilled_water = item::spawn("water_clean", calendar::turn);
+        spilled_water->charges = 1;
+
+        REQUIRE_FALSE(here.add_item_or_charges(center, std::move(spilled_water), false));
+        CHECK(here.get_field(center, water_field) != nullptr);
+        CHECK(here.mop_spills(center));
+        CHECK(here.get_field(center, water_field) == nullptr);
+    }
+
+    SECTION("non-moppable fields remain") {
+        const auto fire_field = field_type_id("fd_fire");
+        here.add_field(center, fire_field);
+
+        CHECK_FALSE(here.mop_spills(center));
+        CHECK(here.get_field(center, fire_field) != nullptr);
+    }
+
+    SECTION("plain liquid fields are removed when marked moppable") {
+        const auto water_field = field_type_id("fd_water");
+        here.add_field(center, water_field);
+
+        CHECK(here.mop_spills(center));
+        CHECK(here.get_field(center, water_field) == nullptr);
+    }
+}
 TEST_CASE("mapbuffer_vehicle_lookup_uses_absolute_coordinates") {
     clear_all_state();
 
