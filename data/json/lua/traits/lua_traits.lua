@@ -13,39 +13,6 @@ local effect_shakes = EffectTypeId.new("shakes")
 local morale_indoor_misery = MoraleTypeDataId.new("morale_indoor_misery")
 local morale_outdoor_misery = MoraleTypeDataId.new("morale_outdoor_misery")
 local morale_clutter_intolerant = MoraleTypeDataId.new("morale_clutter_intolerant")
-local moppable_field_ids = {
-  FieldTypeId.new("fd_blood"):int_id(),
-  FieldTypeId.new("fd_blood_veggy"):int_id(),
-  FieldTypeId.new("fd_blood_insect"):int_id(),
-  FieldTypeId.new("fd_blood_invertebrate"):int_id(),
-  FieldTypeId.new("fd_gibs_flesh"):int_id(),
-  FieldTypeId.new("fd_gibs_veggy"):int_id(),
-  FieldTypeId.new("fd_gibs_insect"):int_id(),
-  FieldTypeId.new("fd_gibs_invertebrate"):int_id(),
-  FieldTypeId.new("fd_bile"):int_id(),
-  FieldTypeId.new("fd_slime"):int_id(),
-  FieldTypeId.new("fd_sludge"):int_id(),
-  FieldTypeId.new("fd_acid_water"):int_id(),
-  FieldTypeId.new("fd_water"):int_id(),
-  FieldTypeId.new("fd_salt_water"):int_id(),
-  FieldTypeId.new("fd_milk"):int_id(),
-  FieldTypeId.new("fd_tea"):int_id(),
-  FieldTypeId.new("fd_soda"):int_id(),
-  FieldTypeId.new("fd_syrup"):int_id(),
-  FieldTypeId.new("fd_mutagen"):int_id(),
-  FieldTypeId.new("fd_alcohol"):int_id(),
-  FieldTypeId.new("fd_plutonium_slurry"):int_id(),
-  FieldTypeId.new("fd_juice"):int_id(),
-  FieldTypeId.new("fd_cooking_oil"):int_id(),
-  FieldTypeId.new("fd_industrial_lubricant"):int_id(),
-  FieldTypeId.new("fd_chemical"):int_id(),
-  FieldTypeId.new("fd_condiment"):int_id(),
-  FieldTypeId.new("fd_sewage"):int_id(),
-  FieldTypeId.new("fd_soapy_water"):int_id(),
-  FieldTypeId.new("fd_fuel"):int_id(),
-  FieldTypeId.new("fd_sticky_fuel"):int_id(),
-  FieldTypeId.new("fd_oil"):int_id(),
-}
 
 local clutter_radius = 8
 local clutter_threshold = 12
@@ -101,14 +68,7 @@ end
 local function auto_mop_surrounding(here, center)
   local mopped_tiles = 0
   for _, pt in ipairs(here:points_in_radius(center, 1)) do
-    local mopped_tile = false
-    for _, field_id in ipairs(moppable_field_ids) do
-      if here:has_field_at(pt, field_id) then
-        here:remove_field_at(pt, field_id)
-        mopped_tile = true
-      end
-    end
-    if mopped_tile then mopped_tiles = mopped_tiles + 1 end
+    if here:mop_spills(pt) then mopped_tiles = mopped_tiles + 1 end
   end
   return mopped_tiles
 end
