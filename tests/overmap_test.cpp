@@ -202,8 +202,8 @@ TEST_CASE("overmap_special_exact_origin_restricts_placement", "[overmap]") {
 
     CHECK_FALSE(ACTIVE_OVERMAP_BUFFER.place_special(
         special.id, project_combine(point_abs_om::zero(), blocked_a), 0, 0));
-    CHECK(ACTIVE_OVERMAP_BUFFER.place_special(
-        special.id, project_combine(point_abs_om::zero(), allowed), 0, 0));
+    CHECK(ACTIVE_OVERMAP_BUFFER
+              .place_special(special.id, project_combine(point_abs_om::zero(), allowed), 0, 0));
     CHECK(om.check_overmap_special_type(special.id, allowed));
     CHECK_FALSE(om.check_overmap_special_type(special.id, blocked_a));
 }
@@ -220,8 +220,8 @@ TEST_CASE("overmap_special_origin_range_restricts_placement", "[overmap]") {
 
     CHECK_FALSE(ACTIVE_OVERMAP_BUFFER.place_special(
         special.id, project_combine(point_abs_om::zero(), blocked), 0, 0));
-    CHECK(ACTIVE_OVERMAP_BUFFER.place_special(
-        special.id, project_combine(point_abs_om::zero(), allowed), 0, 0));
+    CHECK(ACTIVE_OVERMAP_BUFFER
+              .place_special(special.id, project_combine(point_abs_om::zero(), allowed), 0, 0));
     CHECK(om.check_overmap_special_type(special.id, allowed));
     CHECK_FALSE(om.check_overmap_special_type(special.id, blocked));
 }

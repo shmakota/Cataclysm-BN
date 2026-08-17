@@ -1776,7 +1776,7 @@ struct mutable_overmap_placement_rule {
 };
 
 auto normalize_overmap_origin_range( inclusive_cuboid<tripoint_om_omt> range )
--> inclusive_cuboid<tripoint_om_omt>
+- > inclusive_cuboid<tripoint_om_omt>
 {
     if( range.p_min.x() > range.p_max.x() ) {
         std::swap( range.p_min.x(), range.p_max.x() );
@@ -1791,7 +1791,7 @@ auto normalize_overmap_origin_range( inclusive_cuboid<tripoint_om_omt> range )
 }
 
 auto load_overmap_origin_range( const JsonValue &value )
--> inclusive_cuboid<tripoint_om_omt>
+- > inclusive_cuboid<tripoint_om_omt>
 {
     if( value.test_array() ) {
         auto point = tripoint_om_omt();
@@ -1806,7 +1806,8 @@ auto load_overmap_origin_range( const JsonValue &value )
         return normalize_overmap_origin_range( range );
     }
 
-    value.throw_error( R"(overmap_origin must be a point [x, y, z] or an object with "from" and "to")" );
+    value.throw_error(
+        R"(overmap_origin must be a point [x, y, z] or an object with "from" and "to")" );
 }
 
 struct mutable_overmap_placement_rule_remainder {

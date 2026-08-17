@@ -111,10 +111,7 @@
     "type": "overmap_special",
     "id": "test_origin_range",
     "locations": [ "land" ],
-    "overmap_origin": {
-      "from": [ 30, 40, 0 ],
-      "to": [ 32, 41, 0 ]
-    },
+    "overmap_origin": { "from": [ 30, 40, 0 ], "to": [ 32, 41, 0 ] },
     "overmaps": [ { "point": [ 0, 0, 0 ], "overmap": "field" } ],
     "city_distance": [ 0, -1 ],
     "occurrences": [ 0, 1 ],
