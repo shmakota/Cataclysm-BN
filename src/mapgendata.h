@@ -14,7 +14,7 @@ struct point;
 struct tripoint;
 class mission;
 struct regional_settings;
-class map;
+class mapgen_constructor;
 class overmapbuffer;
 namespace om_direction
 {
@@ -69,6 +69,7 @@ class mapgendata
         time_point when_;
         ::mission *mission_;
         mapgen_arguments mapgen_args_;
+        std::set<flag_id> flags;
         // Explicit overmapbuffer for this generation context.
         // Stored as a reference so worker threads use the dimension-specific
         // buffer (get_overmapbuffer(dim)) rather than the active-dimension global.
@@ -94,7 +95,7 @@ class mapgendata
         const tripoint_abs_omt pos;
         const regional_settings &region;
 
-        map &m;
+        mapgen_constructor &m;
 
         weighted_int_list<ter_id> default_groundcover;
 
@@ -106,10 +107,10 @@ class mapgendata
             return omapbuf_;
         }
 
-        mapgendata( map &, dummy_settings_t );
+        mapgendata( mapgen_constructor &, dummy_settings_t );
 
-        mapgendata( const tripoint_abs_omt &over, map &m, float density, const time_point &when,
-                    ::mission *miss, overmapbuffer &omap );
+        mapgendata( const tripoint_abs_omt &over, mapgen_constructor &m, float density,
+                    const time_point &when, ::mission *miss, overmapbuffer &omap );
 
         /**
          * Creates a copy of this mapgen data, but stores a different @ref terrain_type.
@@ -129,6 +130,11 @@ class mapgendata
          * Creates a copy of this mapgendata, but stores new parameter values.
          */
         mapgendata( const mapgendata &other, const mapgen_arguments & );
+
+        /**
+         * Creates a copy of this mapgendata, but stores new parameter values.
+         */
+        mapgendata( const mapgendata &other, const mapgen_arguments &, const std::set<flag_id> & );
 
         const oter_id &terrain_type() const {
             return terrain_type_;
@@ -182,11 +188,13 @@ class mapgendata
         const oter_id &neighbor_at( om_direction::type dir ) const;
         const oter_id &neighbor_at( direction ) const;
         void fill_groundcover() const;
-        void square_groundcover( const point_bub_ms &p1, const point_bub_ms &p2 ) const;
+        void square_groundcover( const point_omt_ms &p1, const point_omt_ms &p2 ) const;
         ter_id groundcover() const;
         bool is_groundcover( const ter_id &iid ) const;
 
         bool has_join( const cube_direction, const std::string &join_id ) const;
+
+        bool has_flag( const flag_id &id ) const;
 
         template<typename Result>
         Result get_arg( const std::string &name ) const {
@@ -207,5 +215,4 @@ class mapgendata
             return mapgendata_detail::extract_variant_value<Result>( it->second );
         }
 };
-
 

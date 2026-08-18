@@ -5,6 +5,7 @@
 #include "player.h"
 #include "game.h"
 #include "mapgendata.h"
+#include "mapgen_constructor.h"
 #include "profile.h"
 #include "thread_pool.h"
 #include "sol/sol.hpp"
@@ -25,8 +26,7 @@ mapgen_function_lua::mapgen_function_lua( const std::string &func,
 void mapgen_function_lua::generate( mapgendata &dat )
 {
     ZoneScopedN( "mapgen_lua_generate" );
-    // generate_omt() must always be called on the main thread; this guard
-    // enforces that invariant for the Lua mapgen path.
+    // Lua mapgen must always run on the main thread.
     assert( !is_pool_worker_thread() );
     if( generate_func.valid() ) {
         sol::protected_function_result res = generate_func( &dat, &dat.m );

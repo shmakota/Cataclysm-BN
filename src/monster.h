@@ -36,6 +36,7 @@
 #include "monster_plan.h"
 #include "mtype.h"
 #include "visitable.h"
+#include "sounds.h"
 
 class Character;
 class JsonIn;
@@ -200,6 +201,7 @@ class monster : public Creature, public location_visitable<monster>
 
         // Movement
         auto shift( point_rel_sm sm_shift ) -> void; // Shifts local navigation state after a submap shift
+
         void set_goal( const tripoint_bub_ms &p );
         // Updates current pos AND our plans
         bool is_wandering() const; // Returns true if we have no plans
@@ -397,7 +399,7 @@ class monster : public Creature, public location_visitable<monster>
         // Combat
         bool is_fleeing( Character &who ) const; // True if we're fleeing
         auto attitude( const Character *u = nullptr ) const -> monster_attitude; // See the enum above
-        auto generic_npc_attitude_to() const -> Attitude;
+        auto generic_npc_attitude_to( const mfaction_id &who_faction ) const -> Attitude;
         Attitude attitude_to( const Creature &other ) const override;
         void process_triggers(); // Process things that anger/scare us
 
@@ -538,8 +540,15 @@ class monster : public Creature, public location_visitable<monster>
         void make_ally( const monster &z );
         // makes this monster a pet of the player
         void make_pet();
+
+        void make_pet( Character &actor );
+
         // check if this monster is a pet of the player
         bool is_pet() const;
+
+        character_id bonded_character_id; // id of bonded character ( for save/load )
+        void on_pet_bonding( Character *ch );
+
         // Add an item to inventory
         void add_item( detached_ptr<item> &&it );
         // check mech power levels and modify it.
@@ -555,16 +564,20 @@ class monster : public Creature, public location_visitable<monster>
                 detached_ptr<item> *result = nullptr );
         std::vector<detached_ptr<item>> clear_items();
         void drop_items();
+
         void drop_items( const tripoint_bub_ms &p );
 
         /**
          * Makes monster react to heard sound
          *
-         * @param source Location of the sound source
-         * @param vol Volume at the center of the sound source
-         * @param distance Distance to sound source (currently just rl_dist)
+         * @param source Sound event of the source sound.
+         * @param heard_vol Volume in mdB spl heard by the creature
+         * @param ambient Ambient volume in mdB spl
+         * @param reinforce_source Is the monster reinforcing the sound source, or should significantly prioritize heading to this sound over others?
+         * @param afraid_of_source Is the monster afraid of the sound source, fleeing it regardless of moral?
          */
-        void hear_sound( const tripoint_bub_ms &source, int vol, int distance );
+        void hear_sound( const sound_event &source, const short heard_vol, const short ambient,
+                         const bool reinforce_source = false, const bool afraid_of_source = false );
 
         bool is_hallucination() const override;    // true if the monster isn't actually real
 
@@ -579,6 +592,7 @@ class monster : public Creature, public location_visitable<monster>
                                     const std::string &npc_msg ) const override;
         void add_msg_player_or_npc( const game_message_params &params, const std::string &player_msg,
                                     const std::string &npc_msg ) const override;
+
         // TEMP VALUES
         tripoint_bub_ms wander_pos; // Wander destination - Just try to move in that direction
         int wandf;           // Urge to wander - Increased by sound, decrements each move
@@ -589,11 +603,12 @@ class monster : public Creature, public location_visitable<monster>
         // eligible on the first turn, which is correct).
         int next_turn = 0;
 
-        // LOD tier assigned by game::tier_assign_all() each monmove() pass.
+        // LOD tier assigned by game::tier_assign_all() on normal monmove passes.
         //   0 = Full   (≤20 tiles from player, or has an active target)
         //   1 = Coarse (20–60 tiles: reuse cached path, skip faction queries)
         //   2 = Macro  (>60 tiles: single Manhattan step every MACRO_INTERVAL)
-        // Transient — not saved or loaded; recalculated each monmove().
+        // Transient — not saved or loaded; activity skips may reuse stale tiers
+        // within one fixed-window batch.
         int8_t lod_tier     = 0;
         int     lod_cooldown = 0;  // turns remaining before demotion is allowed
 
@@ -605,13 +620,21 @@ class monster : public Creature, public location_visitable<monster>
         units::volume get_carried_volume() const;
 
         // DEFINING VALUES
+        // Is the monster friendly to the player.
+        // 0 = hostile
+        // -1 = Permanantly friendly/pet/allied
+        // >0 = freindly for x turns
         int friendly;
         int training_level = 0;
+        int pet_bond_level = 0;
+        static constexpr int pet_bond_max_level = 10;
         int anger = 0;
         int morale = 0;
         // Per-npcmove-pass cache of attitude_to() result for a generic NPC (no special traits).
-        // Valid when cached_npc_attitude_epoch == g_npcmove_attitude_epoch.
+        // Valid when cached_npc_attitude_epoch == g_npcmove_attitude_epoch and
+        // cached_npc_attitude_faction matches the assessing NPC's monster faction.
         uint32_t cached_npc_attitude_epoch = 0;
+        mfaction_id cached_npc_attitude_faction;
         Attitude cached_npc_attitude = A_NEUTRAL;
         std::unordered_map<mfaction_id, int> faction_anger;  //< Per-faction anger tracking
         // Our faction (species, for most monsters)
@@ -637,8 +660,17 @@ class monster : public Creature, public location_visitable<monster>
 
         auto setpos( const tripoint_bub_ms &p ) -> void override;
         auto setpos( const tripoint_abs_ms &p ) -> void override;
-        tripoint_bub_ms bub_pos() const override;
+        auto bub_pos() const -> tripoint_bub_ms override;
         auto abs_pos() const -> tripoint_abs_ms override;
+        auto get_dimension() const -> const dimension_id &override {
+            return dimension_id_;
+        }
+        auto set_dimension( const dimension_id &dim_id ) -> void override {
+            if( dimension_id_ != dim_id ) {
+                dimension_id_ = dim_id;
+                invalidate_mapbuffer_cache();
+            }
+        }
 
         short ignoring;
 
@@ -651,6 +683,10 @@ class monster : public Creature, public location_visitable<monster>
 
         // Ammunition if we use a gun.
         std::map<itype_id, int> ammo;
+        auto ammo_slot_items( const itype_id &ammo_id ) const -> std::vector<itype_id>;
+        auto ammo_capacity_for_slot( const itype_id &ammo_id ) const -> int;
+        auto ammo_count_for_slot( const itype_id &ammo_id ) const -> int;
+        auto loaded_ammo_for_slot( const itype_id &ammo_id ) const -> itype_id;
 
         /**
          * Convert this monster into an item (see @ref mtype::revert_to_itype).
@@ -666,14 +702,6 @@ class monster : public Creature, public location_visitable<monster>
         void init_from_item( const item &itm );
 
         time_point last_updated = calendar::turn_zero;
-        // ID of the dimension this monster belongs to.  Empty string = primary dimension.
-        // Set when the monster is spawned or loaded from a non-primary dimension submap.
-        // Persisted across saves so cross-dimension LOD assignment survives reload.
-        std::string dimension_id_ = "";  // empty = primary dimension
-        const std::string &get_dimension() const override {
-            return dimension_id_;
-        }
-
         /**
          * Do some cleanup and caching as monster is being unloaded from map.
          */
@@ -707,6 +735,7 @@ class monster : public Creature, public location_visitable<monster>
         detached_ptr<item> remove_tack_item( );
 
         item *get_tied_item() const;
+
         detached_ptr<item> set_tied_item( detached_ptr<item> &&to );
         detached_ptr<item> remove_tied_item( );
 
@@ -715,6 +744,7 @@ class monster : public Creature, public location_visitable<monster>
         detached_ptr<item> remove_armor_item( );
 
         item *get_storage_item() const;
+
         detached_ptr<item> set_storage_item( detached_ptr<item> &&to );
         detached_ptr<item> remove_storage_item( );
 
@@ -730,9 +760,18 @@ class monster : public Creature, public location_visitable<monster>
         void add_faction_anger( mfaction_id target_faction, int amount );
         auto get_faction_anger( mfaction_id target_faction ) const -> int;
 
+        const lua_monster_callback_actor *get_lua_callbacks() const;
+
         std::set<m_flag> monster_flags;
 
+
     private:
+        auto action_move_factor() const -> int override;
+
+        // ID of the dimension this monster belongs to.  Empty = primary dimension.
+        // Persisted across saves so cross-dimension LOD assignment survives reload.
+        dimension_id dimension_id_;
+
         void process_trigger( mon_trigger trig, int amount );
         void process_trigger( mon_trigger trig, const std::function < auto() -> int > &amount_func );
         void process_trigger( mon_trigger trig, int amount, mfaction_id target_faction );

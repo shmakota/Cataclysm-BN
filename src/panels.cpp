@@ -41,7 +41,7 @@
 #include "item.h"
 #include "json.h"
 #include "lua_sidebar_widgets.h"
-#include "magic.h"
+#include "magic/magic.h"
 #include "map.h"
 #include "messages.h"
 #include "omdata.h"
@@ -543,7 +543,7 @@ static std::string get_temp( const avatar &u )
 {
     std::string temp;
     if( u.has_item_with_flag( json_flag_THERMOMETER ) ||
-        u.has_bionic( bionic_id( "bio_infolink" ) ) ) {
+        u.has_enchantment_flag( enchantment_flag_id( "THERMOMETER" ) ) ) {
         temp = print_temperature( get_weather().get_temperature( u.abs_pos() ) );
     }
     if( temp.empty() ) {
@@ -1124,6 +1124,8 @@ static nc_color move_mode_color( avatar &u )
         return c_red;
     } else if( u.movement_mode_is( CMM_CROUCH ) ) {
         return c_light_blue;
+    } else if( u.movement_mode_is( CMM_PRONE ) ) {
+        return c_brown;
     } else {
         return c_light_gray;
     }
@@ -1135,6 +1137,8 @@ static std::string move_mode_string( avatar &u )
         return pgettext( "movement-type", "R" );
     } else if( u.movement_mode_is( CMM_CROUCH ) ) {
         return pgettext( "movement-type", "C" );
+    } else if( u.movement_mode_is( CMM_PRONE ) ) {
+        return pgettext( "movement-type", "P" );
     } else {
         return pgettext( "movement-type", "W" );
     }
@@ -1398,7 +1402,7 @@ static void draw_char_narrow( avatar &u, const catacurses::window &w )
     std::string movecost = std::to_string( u.movecounter ) + "(" + move_char + ")";
     bool m_style = get_option<std::string>( "MORALE_STYLE" ) == "horizontal";
     std::string smiley = morale_emotion( morale_pair.second, get_face_type( u ), m_style );
-    mvwprintz( w, point( 8, 0 ), c_light_gray, "%s", u.volume );
+    mvwprintz( w, point( 8, 0 ), c_light_gray, std::to_string( u.volume ) );
 
     // print stamina
     auto needs_pair = std::make_pair( get_hp_bar( u.get_stamina(), u.get_stamina_max() ).second,
@@ -1443,7 +1447,7 @@ static void draw_char_wide( avatar &u, const catacurses::window &w )
     bool m_style = get_option<std::string>( "MORALE_STYLE" ) == "horizontal";
     std::string smiley = morale_emotion( morale_pair.second, get_face_type( u ), m_style );
 
-    mvwprintz( w, point( 8, 0 ), c_light_gray, "%s", u.volume );
+    mvwprintz( w, point( 8, 0 ), c_light_gray, std::to_string( u.volume ) );
     mvwprintz( w, point( 23, 0 ), morale_pair.first, "%s", smiley );
     mvwprintz( w, point( 38, 0 ), focus_color( u.focus_pool ), "%s", u.focus_pool );
 
@@ -1760,7 +1764,7 @@ static void draw_env_compact( avatar &u, const catacurses::window &w )
                get_wind_desc( windpower ) + " " + get_wind_arrow( weather.winddirection ) );
 
     if( u.has_item_with_flag( json_flag_THERMOMETER ) ||
-        u.has_bionic( bionic_id( "bio_infolink" ) ) ) {
+        u.has_enchantment_flag( enchantment_flag_id( "THERMOMETER" ) ) ) {
         std::string temp = print_temperature( weather.get_temperature( u.abs_pos() ) );
         mvwprintz( w, point( 31 - utf8_width( temp ), 5 ), c_light_gray, temp );
     }
@@ -2292,7 +2296,7 @@ static void draw_time_classic( const avatar &u, const catacurses::window &w )
     }
 
     if( u.has_item_with_flag( json_flag_THERMOMETER ) ||
-        u.has_bionic( bionic_id( "bio_infolink" ) ) ) {
+        u.has_enchantment_flag( enchantment_flag_id( "THERMOMETER" ) ) ) {
         std::string temp = print_temperature( get_weather().get_temperature( u.abs_pos() ) );
         mvwprintz( w, point( 31, 0 ), c_light_gray, _( "Temp : " ) + temp );
     }
@@ -2443,7 +2447,7 @@ static std::vector<window_panel> initialize_default_compact_panels()
     ret.emplace_back( draw_messages_classic, translate_marker( "Log" ), -2, 32, true );
     ret.emplace_back( draw_compass, translate_marker( "Compass" ), 8, 32, true );
     ret.emplace_back( draw_compass, translate_marker( "Comp.Compass" ), 3, 32, false );
-    ret.emplace_back( draw_simple_compass, translate_marker( "Sim.Compass" ), 1, 44, false );
+    ret.emplace_back( draw_simple_compass, translate_marker( "Sim.Compass" ), 1, 32, false );
 #if defined(TILES)
     ret.emplace_back( draw_mminimap, translate_marker( "Map" ), -1, 32, true,
                       default_render, true );
@@ -2479,7 +2483,7 @@ static std::vector<window_panel> initialize_default_label_narrow_panels()
                       true );
     ret.emplace_back( draw_compass_padding, translate_marker( "Comp.Compass" ), 3, 32,
                       false );
-    ret.emplace_back( draw_simple_compass, translate_marker( "Sim.Compass" ), 1, 44, false );
+    ret.emplace_back( draw_simple_compass, translate_marker( "Sim.Compass" ), 1, 32, false );
 #if defined(TILES)
     ret.emplace_back( draw_mminimap, translate_marker( "Map" ), -1, 32, true,
                       default_render, true );
@@ -2514,7 +2518,7 @@ static std::vector<window_panel> initialize_default_label_panels()
     ret.emplace_back( draw_armor_comp, translate_marker( "comp.Armor" ), 1, 32, false );
     ret.emplace_back( draw_compass_padding, translate_marker( "Compass" ), 8, 44,
                       true );
-    ret.emplace_back( draw_compass_padding, translate_marker( "Comp.Compass" ), 3, 32,
+    ret.emplace_back( draw_compass_padding, translate_marker( "Comp.Compass" ), 3, 44,
                       false );
     ret.emplace_back( draw_simple_compass, translate_marker( "Sim.Compass" ), 1, 44, false );
 #if defined(TILES)

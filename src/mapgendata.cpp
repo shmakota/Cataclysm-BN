@@ -5,7 +5,7 @@
 #include "all_enum_values.h"
 #include "debug.h"
 #include "int_id.h"
-#include "map.h"
+#include "mapgen_constructor.h"
 #include "mapdata.h"
 #include "omdata.h"
 #include "overmap_special.h"
@@ -13,6 +13,7 @@
 #include "overmapbuffer_registry.h"
 #include "point.h"
 #include "regional_settings.h"
+#include "type_id.h"
 
 static const regional_settings dummy_regional_settings;
 
@@ -33,7 +34,7 @@ void mapgen_arguments::deserialize( JsonIn &ji )
     ji.read( map, true );
 }
 
-mapgendata::mapgendata( map &mp, dummy_settings_t )
+mapgendata::mapgendata( mapgen_constructor &mp, dummy_settings_t )
     : density_( 0 )
     , when_( calendar::turn )
     , mission_( nullptr )
@@ -48,8 +49,9 @@ mapgendata::mapgendata( map &mp, dummy_settings_t )
     std::ranges::fill( t_nesw, any );
 }
 
-mapgendata::mapgendata( const tripoint_abs_omt &over, map &mp, const float density,
-                        const time_point &when, ::mission *const miss, overmapbuffer &omap )
+mapgendata::mapgendata( const tripoint_abs_omt &over, mapgen_constructor &mp,
+                        const float density, const time_point &when, ::mission *const miss,
+                        overmapbuffer &omap )
     : terrain_type_( omap.ter( over ) )
     , density_( density )
     , when_( when )
@@ -97,6 +99,15 @@ mapgendata::mapgendata( const mapgendata &other,
     mapgendata( other )
 {
     mapgen_args_.merge( mapgen_args );
+}
+
+mapgendata::mapgendata( const mapgendata &other,
+                        const mapgen_arguments &mapgen_args,
+                        const std::set<flag_id> &other_flags ) :
+    mapgendata( other )
+{
+    mapgen_args_.merge( mapgen_args );
+    flags = other_flags;
 }
 
 void mapgendata::set_dir( int dir_in, int val )
@@ -170,7 +181,7 @@ int &mapgendata::dir( int dir_in )
     }
 }
 
-void mapgendata::square_groundcover( const point_bub_ms &p1, const point_bub_ms &p2 ) const
+void mapgendata::square_groundcover( const point_omt_ms &p1, const point_omt_ms &p2 ) const
 {
     m.draw_square_ter( default_groundcover, p1, p2 );
 }
@@ -253,4 +264,9 @@ const oter_id &mapgendata::neighbor_at( direction dir ) const
 
     debugmsg( "Neighbor not supported for direction %d", io::enum_to_string( dir ) );
     return north();
+}
+
+bool mapgendata::has_flag( const flag_id &id ) const
+{
+    return flags.contains( id );
 }

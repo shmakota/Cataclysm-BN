@@ -19,6 +19,7 @@ bool acid_accurate( monster *z );
 bool acid_barf( monster *z );
 bool shockstorm( monster *z );
 bool shocking_reveal( monster *z );
+auto pull_metal_weapon_success_chance( int base_success, int distance ) -> int;
 bool pull_metal_weapon( monster *z );
 bool boomer( monster *z );
 bool boomer_glow( monster *z );
@@ -129,6 +130,8 @@ void rifle( monster *z, Creature *target );
 void frag( monster *z, Creature *target );
 /// Tankbot primary
 void tankgun( monster *z, Creature *target );
+/// ATGM for Beagle
+void atgm( monster *z, Creature *target );
 void flame( monster *z, Creature *target );
 
 bool dodge_check( monster *z, Creature *target );

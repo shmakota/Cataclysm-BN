@@ -20,6 +20,7 @@
 #include "translations.h"
 #include "type_id.h"
 #include "units.h"
+#include "units_angle.h"
 #include "weighted_list.h"
 
 class player;
@@ -86,6 +87,7 @@ enum vpart_bitflags : int {
     VPFLAG_DROPPER,
     VPFLAG_LADDER,
     VPFLAG_POWERED_BY_ENGINE,
+    VPFLAG_TRAP_PROOF,
 
     NUM_VPFLAGS
 };
@@ -168,12 +170,23 @@ struct transform_terrain_data {
     bool diggable;
 };
 
+struct vpart_rotating_light {
+    int arc = 30;
+    int step = 90;
+    int phase = 0;
+    time_duration period = 1_turns;
+    int beams = 2;
+
+    auto arc_width() const -> units::angle;
+    auto beam_count() const -> int;
+    auto beam_spacing() const -> units::angle;
+    auto direction_at( units::angle base_direction, time_point turn ) const -> units::angle;
+};
+
 class vpart_info
 {
     private:
         /** Unique identifier for this part */
-        vpart_id id;
-
         std::optional<vpslot_engine> engine_info;
         std::optional<vpslot_wheel> wheel_info;
         std::optional<vpslot_rotor> rotor_info;
@@ -186,6 +199,10 @@ class vpart_info
         std::optional<vpslot_crafter> crafter_info;
 
     public:
+        vpart_id id;
+
+        bool was_loaded = false;
+
         /** Translated name of a part */
         std::string name() const;
 
@@ -204,6 +221,7 @@ class vpart_info
         nc_color color_broken = c_light_gray;
 
         RGBColorPair default_color = {};
+        std::optional<RGBColor> light_color;
         /**
          * Symbol of part which will be translated as follows:
          * y, u, n, b to NW, NE, SE, SW lines correspondingly
@@ -314,6 +332,9 @@ class vpart_info
         /** seatbelt (str), muffler (%), horn (vol), light (intensity), recharing (power) */
         int bonus = 0;
 
+        /** Optional cone rotation data for lights that sweep instead of emitting continuously. */
+        std::optional<vpart_rotating_light> rotating_light;
+
         /** cargo weight modifier (percentage) */
         int cargo_weight_modifier = 100;
 
@@ -410,12 +431,15 @@ class vpart_info
         static void load_propeller( std::optional<vpslot_propeller> &proptr, const JsonObject &jo );
         static void load_crafter( std::optional<vpslot_crafter> &craftptr, const JsonObject &jo );
         static void load_converter( std::optional<vpslot_converter> &convertptr, const JsonObject &jo );
-        static void load( const JsonObject &jo, const std::string &src );
-        static void finalize();
-        static void check();
+        void load( const JsonObject &jo, const std::string &src );
+        void finalize();
+        void check() const;
+        static void load_vehicle_parts( const JsonObject &jo, const std::string &src );
+        static void finalize_all();
+        static void check_consistency();
         static void reset();
 
-        static const std::map<vpart_id, vpart_info> &all();
+        static const std::vector<vpart_info> &get_all();
 };
 
 struct vehicle_item_spawn {

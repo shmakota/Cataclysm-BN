@@ -64,6 +64,7 @@
 #include "units_utility.h"
 #include "value_ptr.h"
 #include "salvage.h"
+#include "inventory_ui.h"
 
 static const activity_id ACT_EAT_MENU( "ACT_EAT_MENU" );
 static const activity_id ACT_CONSUME_FOOD_MENU( "ACT_CONSUME_FOOD_MENU" );
@@ -184,6 +185,8 @@ static item *inv_internal( player &u, const inventory_selector_preset &preset,
     bool init_selection = false;
     std::string init_filter;
     bool has_init_filter = false;
+    auto init_type = itype_id::NULL_ID();
+    bool has_init_type = false;
 
     const std::vector<activity_id> consuming {
         ACT_EAT_MENU,
@@ -200,6 +203,11 @@ static item *inv_internal( player &u, const inventory_selector_preset &preset,
         init_filter = u.activity->str_values[0];
         has_init_filter = true;
     }
+    if( u.has_activity( consuming ) && u.activity->str_values.size() >= 2 &&
+        !u.activity->str_values[1].empty() ) {
+        init_type = itype_id( u.activity->str_values[1] );
+        has_init_type = true;
+    }
 
     do {
         u.inv_restack( );
@@ -215,11 +223,15 @@ static item *inv_internal( player &u, const inventory_selector_preset &preset,
             inv_s.set_filter( init_filter );
             has_init_filter = false;
         }
-        // Set position after filter to keep cursor at the right position
-        if( init_selection ) {
-            inv_s.select_position( init_pair );
-            init_selection = false;
+        // Set position after filter to keep cursor at the right position.
+        // Stored types guard against restoring a stale row that now holds another item.
+        if( init_selection && has_init_type ) {
+            inv_s.restore_selection( init_pair, init_type );
+        } else if( has_init_type ) {
+            inv_s.select_item_type( init_type );
         }
+        init_selection = false;
+        has_init_type = false;
 
         if( inv_s.empty() ) {
             const std::string msg = none_message.empty()
@@ -243,6 +255,8 @@ static item *inv_internal( player &u, const inventory_selector_preset &preset,
             u.activity->values.push_back( init_pair.second );
             u.activity->str_values.clear();
             u.activity->str_values.emplace_back( inv_s.get_filter() );
+            u.activity->str_values.emplace_back( location != nullptr ? location->typeId().str() :
+                                                 std::string() );
         }
 
         return location;
@@ -443,7 +457,7 @@ item *game_menus::inv::container_for( avatar &you, const item &liquid, int radiu
         }
 
         if( location.where() == item_location_type::character ) {
-            Character *character = g->critter_at<Character>( location.position() );
+            Character *character = g->critter_at<Character>( location.abs_pos() );
             if( character == nullptr ) {
                 debugmsg( "Invalid location supplied to the liquid filter: no character found." );
                 return false;
@@ -460,29 +474,6 @@ item *game_menus::inv::container_for( avatar &you, const item &liquid, int radiu
                          string_format( _( "You don't have a suitable container for carrying %s." ),
                                         liquid.tname() ) );
 }
-
-class pickup_inventory_preset : public inventory_selector_preset
-{
-    public:
-        pickup_inventory_preset( const player &p ) : p( p ) {}
-
-        std::string get_denial( const item *loc ) const override {
-            if( !p.has_item( *loc ) ) {
-                if( loc->made_of( LIQUID ) ) {
-                    return _( "Can't pick up spilt liquids" );
-                } else if( !p.can_pick_volume( *loc ) && p.is_armed() ) {
-                    return _( "Too big to pick up" );
-                } else if( !p.can_pick_weight( *loc, !get_option<bool>( "DANGEROUS_PICKUPS" ) ) ) {
-                    return _( "Too heavy to pick up" );
-                }
-            }
-
-            return std::string();
-        }
-
-    private:
-        const player &p;
-};
 
 class disassemble_inventory_preset : public pickup_inventory_preset
 {
@@ -652,7 +643,7 @@ class comestible_inventory_preset : public inventory_selector_preset
             const item &med = !( *loc ).is_container_empty() && ( *loc ).get_contained().is_medication() &&
                               ( *loc ).get_contained().type->has_use() ? ( *loc ).get_contained() : *loc;
 
-            if( loc->made_of( LIQUID ) && !g->m.has_flag( flag_LIQUIDCONT, loc->position() ) ) {
+            if( loc->made_of( LIQUID ) && !g->m.has_flag( flag_LIQUIDCONT, loc->bub_pos() ) ) {
                 return _( "Can't drink spilt liquids" );
             }
 
@@ -1521,20 +1512,14 @@ class repair_inventory_preset: public inventory_selector_preset
                                  player &character ) :
             actor( actor ), main_tool( main_tool ), character( character ) {
             append_cell( [ this, actor, &character ]( const item * loc ) {
-                const auto comp_needed = std::max<int>( 1,
-                                                        std::ceil( loc->volume() / 250_ml * actor->cost_scaling ) );
-                auto valid_entries = std::set<material_id> {};
-                std::ranges::for_each( actor->materials, [ &valid_entries, &loc ]( const auto & mat ) {
-                    if( loc->made_of( mat ) ) {
-                        valid_entries.emplace( mat );
-                    }
-                } );
+                int comp_needed = actor->get_material_amt_needed( *loc, true );
+                auto valid_entries = actor->get_valid_materials( *loc );
 
                 const auto &crafting_inv = character.crafting_inventory();
                 auto listed_components = std::set<itype_id> {};
                 auto material_list = std::vector<std::string> {};
                 std::ranges::for_each( valid_entries, [ this, &listed_components, &material_list, &crafting_inv,
-                      &comp_needed ]( const auto & entry ) {
+                      comp_needed ]( const auto & entry ) {
                     const auto &component_id = entry.obj().repaired_with();
                     if( listed_components.contains( component_id ) ) {
                         return;
@@ -1554,6 +1539,11 @@ class repair_inventory_preset: public inventory_selector_preset
                 return ret;
             }, _( "MATERIALS AVAILABLE" ) );
 
+            append_cell( [ this, actor ]( const item * loc ) {
+                const auto amt = actor->get_material_amt_needed( *loc, true );
+                return string_format( _( "%d" ), amt );
+            }, _( "NEED" ) );
+
             append_cell( [ this ]( const item * loc ) {
                 const auto chance = get_cached_repair_chance( *loc );
                 return colorize( string_format( "%0.1f%%", 100.0f * chance.first ),
@@ -1569,7 +1559,10 @@ class repair_inventory_preset: public inventory_selector_preset
         }
 
         bool is_shown( const item *loc ) const override {
-            return loc->made_of_any( actor->materials ) && !loc->count_by_charges() && !loc->is_firearm() &&
+            return loc->made_of_any( actor->materials ) && ( !loc->count_by_charges() ||
+                    loc->is_stackable() ) && ( loc->damage() > -1 ||
+                                               ( loc->has_flag( flag_VARSIZE ) && !loc->has_flag( flag_FIT ) ) ) && !loc->count_by_charges() &&
+                   !loc->is_firearm() && !loc->has_flag( flag_NO_REPAIR ) &&
                    &*loc != main_tool;
         }
 
@@ -1706,6 +1699,58 @@ drop_locations game_menus::inv::multidrop( player &p )
         } else {
             return result;
         }
+    }
+}
+
+std::vector<pickup::pick_drop_selection> game_menus::inv::pickup_from_tile( player &p,
+        const tripoint_bub_ms &target )
+{
+    p.inv_restack( );
+
+    pickup_inventory_preset preset( p );
+    inventory_pickup_selector inv_s( p, preset );
+
+    inv_s.set_title( _( "Multipickup" ) );
+    inv_s.set_hint( _( "To pickup x items, type a number before selecting." ) );
+
+    while( true ) {
+        p.inv_restack( );
+        inv_s.clear_items();
+        inv_s.add_map_items( target );
+        inv_s.add_vehicle_items( target );
+
+        if( inv_s.empty() ) {
+            popup( std::string( _( "You have nothing to pickup." ) ), PF_GET_KEY );
+            return std::vector<pickup::pick_drop_selection>();
+        }
+
+        std::vector<pickup::pick_drop_selection> result = inv_s.execute();
+        return result;
+    }
+}
+
+std::vector<pickup::pick_drop_selection> game_menus::inv::pickup_nearby( player &p )
+{
+    p.inv_restack( );
+
+    pickup_inventory_preset preset( p );
+    inventory_pickup_selector inv_s( p, preset );
+
+    inv_s.set_title( _( "Multipickup" ) );
+    inv_s.set_hint( _( "To pickup x items, type a number before selecting." ) );
+
+    while( true ) {
+        p.inv_restack( );
+        inv_s.clear_items();
+        inv_s.add_nearby_items();
+
+        if( inv_s.empty() ) {
+            popup( std::string( _( "You have nothing to pickup." ) ), PF_GET_KEY );
+            return std::vector<pickup::pick_drop_selection>();
+        }
+
+        std::vector<pickup::pick_drop_selection> result = inv_s.execute();
+        return result;
     }
 }
 

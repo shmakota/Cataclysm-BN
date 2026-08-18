@@ -11,6 +11,17 @@
   },
   {
     "type": "overmap_terrain",
+    "id": "lab_filler",
+    "name": "science lab",
+    "sym": "L",
+    "color": "light_blue",
+    "spawns": { "group": "GROUP_LAB", "population": [ 1, 10 ], "chance": 50 },
+    "see_cost": 5,
+    "looks_like": "lab",
+    "flags": [ "NO_ROTATE", "RISK_HIGH" ]
+  },
+  {
+    "type": "overmap_terrain",
     "id": "lab_stairs",
     "name": "science lab",
     "sym": "L",
@@ -36,6 +47,7 @@
     "sym": "L",
     "color": "light_blue",
     "see_cost": 5,
+    "looks_like": "lab",
     "flags": [ "NO_ROTATE" ]
   },
   {
@@ -46,6 +58,7 @@
     "color": "light_blue",
     "spawns": { "group": "GROUP_LAB", "population": [ 1, 10 ], "chance": 50 },
     "see_cost": 5,
+    "looks_like": "lab",
     "flags": [ "NO_ROTATE" ]
   },
   {
@@ -86,6 +99,18 @@
     "color": "light_blue",
     "spawns": { "group": "GROUP_LAB", "population": [ 1, 10 ], "chance": 50 },
     "see_cost": 5,
+    "looks_like": "lab",
+    "flags": [ "NO_ROTATE", "RISK_HIGH" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "id": "ice_lab_filler",
+    "name": "science lab",
+    "sym": "L",
+    "color": "light_blue",
+    "spawns": { "group": "GROUP_LAB", "population": [ 1, 10 ], "chance": 50 },
+    "see_cost": 5,
+    "looks_like": "lab",
     "flags": [ "NO_ROTATE", "RISK_HIGH" ]
   },
   {
@@ -95,6 +120,7 @@
     "sym": "L",
     "color": "blue",
     "see_cost": 5,
+    "looks_like": "lab_stairs",
     "spawns": { "group": "GROUP_LAB", "population": [ 1, 10 ], "chance": 50 },
     "flags": [ "KNOWN_DOWN", "NO_ROTATE" ]
   },
@@ -104,6 +130,7 @@
     "name": "science lab",
     "sym": "L",
     "color": "light_blue",
+    "looks_like": "lab_core",
     "spawns": { "group": "GROUP_LAB", "population": [ 1, 10 ], "chance": 50 },
     "see_cost": 5,
     "flags": [ "NO_ROTATE" ]
@@ -114,6 +141,7 @@
     "name": "science lab",
     "sym": "L",
     "color": "cyan",
+    "looks_like": "lab_finale",
     "spawns": { "group": "GROUP_LAB", "population": [ 4, 12 ], "chance": 90 },
     "see_cost": 5,
     "flags": [ "NO_ROTATE" ]
@@ -121,6 +149,16 @@
   {
     "type": "overmap_terrain",
     "id": "tower_lab",
+    "name": "science lab tower",
+    "sym": "L",
+    "color": "light_blue",
+    "see_cost": 5,
+    "spawns": { "group": "GROUP_LAB", "population": [ 1, 10 ], "chance": 50 },
+    "flags": [ "NO_ROTATE", "RISK_HIGH" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "id": "tower_lab_filler",
     "name": "science lab tower",
     "sym": "L",
     "color": "light_blue",

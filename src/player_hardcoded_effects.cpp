@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <memory>
 
+#include "action_time_scale.h"
 #include "activity_handlers.h"
 #include "avatar.h"
 #include "character.h"
@@ -36,6 +37,7 @@
 #include "teleport.h"
 #include "text_snippets.h"
 #include "translations.h"
+#include "type_id.h"
 #include "weather.h"
 #include "vitamin.h"
 #include <algorithm>
@@ -98,8 +100,6 @@ static const mongroup_id GROUP_NETHER( "GROUP_NETHER" );
 
 static const mtype_id mon_dermatik_larva( "mon_dermatik_larva" );
 
-static const bionic_id bio_infolink( "bio_infolink" );
-
 static const trait_id trait_CHLOROMORPH( "CHLOROMORPH" );
 static const trait_id trait_HEAVYSLEEPER2( "HEAVYSLEEPER2" );
 static const trait_id trait_HIBERNATE( "HIBERNATE" );
@@ -107,10 +107,13 @@ static const trait_id trait_INFRESIST( "INFRESIST" );
 static const trait_id trait_M_IMMUNE( "M_IMMUNE" );
 static const trait_id trait_M_SKIN3( "M_SKIN3" );
 static const trait_id trait_NOPAIN( "NOPAIN" );
-static const trait_id trait_SEESLEEP( "SEESLEEP" );
 static const trait_id trait_SCHIZOPHRENIC( "SCHIZOPHRENIC" );
 static const trait_id trait_THRESH_MYCUS( "THRESH_MYCUS" );
 static const trait_id trait_WATERSLEEP( "WATERSLEEP" );
+
+static const enchantment_flag_id ench_flag_INTERNAL_ALARMCLOCK( "INTERNAL_ALARMCLOCK" );
+static const enchantment_flag_id ench_flag_SLEEP_SIGHT( "SLEEP_SIGHT" );
+static const enchantment_flag_id ench_flag_NO_LIGHT_WAKE( "NO_LIGHT_WAKE" );
 
 static void eff_fun_onfire( player &u, effect &it )
 {
@@ -141,7 +144,7 @@ static void eff_fun_fungus( player &u, effect &it )
             if( one_in( 600 ) ) {
                 u.add_msg_if_player( m_warning, _( "You feel nauseous." ) );
             }
-            if( calendar::once_every( 10_minutes ) ) {
+            if( action_time_scale::once_every_this_tick( 10_minutes ) ) {
                 u.add_msg_if_player( m_warning, _( "You smell and taste mushrooms." ) );
             }
             it.mod_duration( 1_turns );
@@ -271,12 +274,18 @@ static void eff_fun_hallu( player &u, effect &it )
             ///\EFFECT_STR_NPC increases volume of hallucination sounds (NEGATIVE)
 
             ///\EFFECT_INT_NPC decreases volume of hallucination sounds
-            int loudness = 20 + u.str_cur - u.int_cur;
-            loudness = ( loudness > 5 ? loudness : 5 );
-            loudness = ( loudness < 30 ? loudness : 30 );
-            sounds::sound( u.bub_pos(), loudness, sounds::sound_t::speech, _( random_entry_ref( npc_hallu ) ),
-                           false, "speech",
-                           loudness < 15 ? ( u.male ? "NPC_m" : "NPC_f" ) : ( u.male ? "NPC_m_loud" : "NPC_f_loud" ) );
+            int loudness = 60 + u.str_cur - u.int_cur;
+            loudness = std::min( 90, std::max( 30, loudness ) );
+
+            sound_event se;
+            se.origin = u.bub_pos();
+            se.volume = loudness;
+            se.category = sounds::sound_t::speech;
+            se.description = _( random_entry_ref( npc_hallu ) );
+            se.id = "speech";
+            se.variant = loudness < 70 ? ( u.male ? "NPC_m" : "NPC_f" ) : ( u.male ? "NPC_m_loud" :
+                         "NPC_f_loud" );
+            sounds::sound( se );
         }
     } else if( dur == peakTime ) {
         // Visuals start
@@ -794,16 +803,24 @@ void Character::hardcoded_effects( effect &it )
         if( one_in( 5000 ) ) {
             add_msg_if_player( m_bad, _( "A strange sound reverberates around the edges of reality." ) );
             // Comparable to the humming anomaly trap, with a narrower range
-            int volume = rng( 25, 150 );
+            int volume = rng( 40, 125 );
             std::string sfx;
-            if( volume <= 50 ) {
+            if( volume <= 60 ) {
                 sfx = _( "hrmmm" );
             } else if( volume <= 100 ) {
                 sfx = _( "HRMMM" );
             } else {
                 sfx = _( "VRMMMMMM" );
             }
-            sounds::sound( bub_pos(), volume, sounds::sound_t::activity, sfx, false, "humming", "machinery" );
+            sound_event se;
+            se.origin = bub_pos();
+            se.volume = volume;
+            se.category = sounds::sound_t::activity;
+            se.description = sfx;
+            se.id = "humming";
+            se.variant = "machinery";
+
+            sounds::sound( se );
         }
     } else if( id == effect_asthma ) {
         if( has_effect( effect_adrenaline ) || has_effect( effect_datura ) ) {
@@ -999,7 +1016,7 @@ void Character::hardcoded_effects( effect &it )
             } else if( has_effect( effect_antibiotic ) ) {
                 // Normal antibiotic prevents progression
             } else if( has_effect( effect_weak_antibiotic ) ) {
-                if( calendar::once_every( 4_turns ) ) {
+                if( action_time_scale::once_every_this_tick( 4_turns ) ) {
                     // Weak antibiotic slows down to a quarter
                     it.mod_duration( 1_turns );
                 }
@@ -1047,7 +1064,7 @@ void Character::hardcoded_effects( effect &it )
             } else if( has_effect( effect_antibiotic ) ) {
                 // No progression
             } else if( has_effect( effect_weak_antibiotic ) ) {
-                if( calendar::once_every( 4_turns ) ) {
+                if( action_time_scale::once_every_this_tick( 4_turns ) ) {
                     it.mod_duration( 1_turns );
                 }
             } else if( dur > 1_days ) {
@@ -1119,7 +1136,7 @@ void Character::hardcoded_effects( effect &it )
         }
 
         // TODO: Move this to update_needs when NPCs can mutate
-        if( calendar::once_every( 10_minutes ) && ( has_trait( trait_CHLOROMORPH ) ||
+        if( action_time_scale::once_every_this_tick( 10_minutes ) && ( has_trait( trait_CHLOROMORPH ) ||
                 has_trait( trait_M_SKIN3 ) || has_trait( trait_WATERSLEEP ) ) &&
             g->m.is_outside( bub_pos() ) ) {
             if( has_trait( trait_CHLOROMORPH ) ) {
@@ -1140,7 +1157,7 @@ void Character::hardcoded_effects( effect &it )
                     if( get_fatigue() >= 0 ) {
                         mod_fatigue( -5 ); // Local guides need less sleep on fungal soil
                     }
-                    if( calendar::once_every( 1_hours ) ) {
+                    if( action_time_scale::once_every_this_tick( 1_hours ) ) {
                         spores(); // spawn some P O O F Y   B O I S
                     }
                 }
@@ -1153,8 +1170,9 @@ void Character::hardcoded_effects( effect &it )
         bool woke_up = false;
         int tirednessVal = rng( 5, 200 ) + rng( 0, std::abs( get_fatigue() * 2 * 5 ) );
         if( !is_blind() && !has_effect( effect_narcosis ) ) {
-            if( !has_trait(
-                    trait_SEESLEEP ) ) { // People who can see while sleeping are acclimated to the light.
+            // If you can see while sleeping light probably doesn't bother you
+            if( !has_enchantment_flag( ench_flag_SLEEP_SIGHT ) &&
+                !has_enchantment_flag( ench_flag_NO_LIGHT_WAKE ) ) {
                 if( has_trait( trait_HEAVYSLEEPER2 ) && !has_trait( trait_HIBERNATE ) ) {
                     // So you can too sleep through noon
                     if( ( tirednessVal * 1.25 ) < g->m.ambient_light_at( bub_pos() ) && ( get_fatigue() < 10 ||
@@ -1180,7 +1198,7 @@ void Character::hardcoded_effects( effect &it )
                     it.set_duration( 0_turns );
                     woke_up = true;
                 }
-            } else if( has_active_mutation( trait_SEESLEEP ) ) {
+            } else if( has_enchantment_flag( ench_flag_SLEEP_SIGHT ) ) {
                 Creature *hostile_critter = g->is_hostile_very_close();
                 if( hostile_critter != nullptr ) {
                     add_msg_if_player( _( "You see %s approaching!" ),
@@ -1256,7 +1274,7 @@ void Character::hardcoded_effects( effect &it )
     } else if( id == effect_alarm_clock ) {
         if( in_sleep_state() ) {
             const bool asleep = has_effect( effect_sleep );
-            if( has_bionic( bio_infolink ) ) {
+            if( has_enchantment_flag( ench_flag_INTERNAL_ALARMCLOCK ) ) {
                 if( dur == 1_turns ) {
                     if( !asleep ) {
                         add_msg_if_player( _( "Your internal chronometer went off and you haven't slept a wink." ) );
@@ -1281,15 +1299,27 @@ void Character::hardcoded_effects( effect &it )
                     it.mod_duration( 10_minutes );
                 } else if( dur == 2_turns ) {
                     // let the sound code handle the wake-up part
-                    sounds::sound( bub_pos(), 16, sounds::sound_t::alarm, _( "beep-beep-beep!" ), false, "tool",
-                                   "alarm_clock" );
+                    sound_event se;
+                    se.origin = bub_pos();
+                    se.volume = 70;
+                    se.category = sounds::sound_t::alarm;
+                    se.description = _( "beep-beep-beep!" );
+                    se.id = "tool";
+                    se.variant = "alarm_clock";
+                    sounds::sound( se );
                 }
             }
         } else {
             if( dur == 1_turns ) {
                 if( is_avatar() && has_alarm_clock() ) {
-                    sounds::sound( bub_pos(), 16, sounds::sound_t::alarm, _( "beep-beep-beep!" ), false, "tool",
-                                   "alarm_clock" );
+                    sound_event se;
+                    se.origin = bub_pos();
+                    se.volume = 70;
+                    se.category = sounds::sound_t::alarm;
+                    se.description = _( "beep-beep-beep!" );
+                    se.id = "tool";
+                    se.variant = "alarm_clock";
+                    sounds::sound( se );
                     const std::string alarm = _( "Your alarm is going off." );
                     g->cancel_activity_or_ignore_query( distraction_type::alert, alarm );
                     add_msg( _( "Your alarm went off." ) );

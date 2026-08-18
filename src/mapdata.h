@@ -13,6 +13,7 @@
 #include "catalua_type_operators.h"
 #include "color.h"
 #include "coordinates.h"
+#include "hsv_color.h"
 #include "numeric_interval.h"
 #include "poly_serialized.h"
 #include "translations.h"
@@ -67,9 +68,9 @@ struct map_bash_info {
     // (DEPRECATED! TODO: explosion struct) Explosion on destruction
     int explosive = -1;
     // sound volume of breaking terrain/furniture
-    std::optional<int> sound_vol = std::nullopt;
+    std::optional<units::sound> sound_vol = std::nullopt;
     // sound volume on fail
-    std::optional<int> sound_fail_vol = std::nullopt;
+    std::optional<units::sound> sound_fail_vol = std::nullopt;
     // Radius of the tent supported by this tile
     int collapse_radius = 1;
     // cost to bash a field
@@ -146,6 +147,37 @@ struct furn_workbench_info {
 
     bool operator==( const furn_workbench_info &rhs ) const = default;
 };
+struct enchant_info {
+    // Internal id referenced for use in saveload
+    std::string id;
+    // Name to display
+    std::string name;
+    // Resulting enchantment applied
+    enchantment_id to_enchant_with;
+    // Requirements and requirement multiplier
+    std::vector<std::pair<requirement_id, int>> requirements;
+    units::volume volume_per_batch;
+    bool volume_batch_effect;
+    // Skills and levels to do the skill
+    std::map<skill_id, int> required_skills;
+    // Time to complete
+    time_duration time_to_enchant;
+    units::volume volume_per_time;
+    bool volume_time_effect;
+    // Flag to apply to take note it was applied
+    flag_id applied_flag_id;
+    // Data var to add to the item. Along with the max count of the counter for that var
+    std::string count_var;
+    int max_count;
+    // Callbacks
+    std::string can_make;
+    std::string can_use_on;
+
+    void deserialize( JsonIn &jsin );
+
+    bool operator==( const enchant_info &rhs ) const = default;
+};
+
 struct plant_data {
     // What the furniture turns into when it grows or you plant seeds in it
     furn_str_id transform;
@@ -328,6 +360,8 @@ enum ter_bitflags : int {
     TFLAG_FREEZER,
     TFLAG_ELEVATOR,
     TFLAG_NO_MEMORY,
+    TFLAG_ROAD,
+    TFLAG_BASH_TRANSFORM,
     NUM_TERFLAGS
 };
 
@@ -463,6 +497,7 @@ struct map_data_common_t {
         std::array<int, NUM_SEASONS> symbol_;
 
         int light_emitted = 0;
+        std::optional<RGBColor> light_color;
         // The amount of movement points required to pass this terrain by default.
         int movecost = 0;
         // The coverage percentage of a furniture piece of terrain. <30 won't cover from sight.
@@ -484,6 +519,7 @@ struct map_data_common_t {
         std::string prompt;
 
         iexamine_function examine; // What happens when the terrain/furniture is examined
+        std::string examine_action_id;
 
         data_vars::data_set default_vars;
 
@@ -660,6 +696,7 @@ struct furn_t : map_data_common_t {
     cata::value_ptr<activity_data_furn> oxytorch; // Oxytorch action data
 
     cata::value_ptr<furn_workbench_info> workbench;
+    std::vector<enchant_info> enchanter;
 
     cata::value_ptr<plant_data> plant;
 

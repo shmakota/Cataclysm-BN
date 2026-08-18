@@ -655,7 +655,8 @@
       { "item": "aspirin", "prob": 30 },
       { "item": "water_clean", "prob": 30 },
       { "item": "sports_drink", "prob": 30 },
-      { "item": "1st_aid", "prob": 20 }
+      { "item": "1st_aid", "prob": 16 },
+      { "item": "1st_aid_deluxe", "prob": 4 }
     ]
   },
   {
@@ -2011,15 +2012,56 @@
     "id": "pwr_armor",
     "subtype": "distribution",
     "entries": [
-      { "collection": [ { "item": "power_armor_basic" }, { "item": "power_armor_helmet_basic", "prob": 75 } ], "prob": 40 },
+      {
+        "collection": [
+          { "item": "power_armor_exo_2" },
+          { "item": "power_armor_plating_2" },
+          { "item": "power_armor_helmet_basic", "prob": 75 }
+        ],
+        "prob": 40
+      },
       { "item": "power_armor_helmet_basic", "prob": 10 },
       {
-        "collection": [ { "item": "power_armor_light" }, { "item": "power_armor_helmet_light", "prob": 75 } ],
+        "collection": [
+          { "item": "power_armor_exo_2" },
+          { "item": "power_armor_plating_3" },
+          { "item": "power_armor_helmet_light", "prob": 75 }
+        ],
         "prob": 20
       },
       { "item": "power_armor_helmet_light", "prob": 5 },
       {
-        "collection": [ { "item": "power_armor_heavy" }, { "item": "power_armor_helmet_heavy", "prob": 75 } ],
+        "collection": [ { "item": "power_armor_exo_1" }, { "item": "power_armor_plating_1", "prob": 75 } ],
+        "prob": 20
+      },
+      { "item": "power_armor_helmet_heavy", "prob": 5 }
+    ]
+  },
+  {
+    "type": "item_group",
+    "id": "pwr_armor_basic",
+    "subtype": "distribution",
+    "entries": [
+      {
+        "collection": [
+          { "item": "power_armor_exo_1" },
+          { "item": "power_armor_plating_2" },
+          { "item": "power_armor_helmet_basic", "prob": 75 }
+        ],
+        "prob": 40
+      },
+      { "item": "power_armor_helmet_basic", "prob": 10 },
+      {
+        "collection": [
+          { "item": "power_armor_exo_1" },
+          { "item": "power_armor_plating_3" },
+          { "item": "power_armor_helmet_light", "prob": 75 }
+        ],
+        "prob": 20
+      },
+      { "item": "power_armor_helmet_light", "prob": 5 },
+      {
+        "collection": [ { "item": "power_armor_exo_1" }, { "item": "power_armor_plating_1", "prob": 75 } ],
         "prob": 20
       },
       { "item": "power_armor_helmet_heavy", "prob": 5 }
@@ -2196,7 +2238,9 @@
       [ "apron_leather", 2 ],
       [ "tool_belt", 5 ],
       [ "bootsheath", 8 ],
-      [ "sheath", 5 ]
+      [ "sheath", 5 ],
+      [ "chestrig", 5 ],
+      [ "belt_magazine", 5 ]
     ]
   },
   {
@@ -2382,6 +2426,7 @@
       [ "jacket_leather", 12 ],
       [ "jacket_leather_mod", 12 ],
       [ "cuirass_scrap", 12 ],
+      [ "armor_trench", 4 ],
       [ "armor_lamellar", 6 ],
       [ "chainmail_vest", 2 ],
       [ "cuirass_lightplate", 2 ],
@@ -2503,6 +2548,7 @@
       [ "chainmail_hood", 1 ],
       [ "helmet_kabuto", 1 ],
       [ "helmet_scrap", 12 ],
+      [ "helm_trench", 4 ],
       [ "survivor_goggles", 10 ],
       [ "carbon_helmet", 1 ]
     ]
@@ -2512,7 +2558,7 @@
     "id": "survivorzed_extra",
     "items": [
       [ "mask_lsurvivor", 10 ],
-      [ "mask_survivor", 8 ],
+      [ "mask_survivor", 10 ],
       [ "mask_halfsurvivor", 4 ],
       [ "mask_hsurvivor", 6 ],
       [ "mask_sasurvivor", 1 ],
@@ -2539,7 +2585,6 @@
       [ "legrig", 22 ],
       [ "dump_pouch", 6 ],
       [ "mask_gas_xl", 4 ],
-      [ "mask_survivorxl", 2 ],
       [ "survivor_belt_notools", 2 ],
       [ "survivor_light", 24 ],
       [ "shield_wooden", 1 ],
@@ -3105,7 +3150,8 @@
           { "item": "quiver_large", "prob": 15 },
           { "item": "solarpack", "prob": 5 },
           { "item": "ammo_satchel", "prob": 10 },
-          { "item": "chestrig", "prob": 20 },
+          { "item": "chestrig", "prob": 10 },
+          { "item": "belt_magazine", "prob": 10 },
           { "item": "dive_bag", "prob": 50 },
           { "item": "petpack", "prob": 50 }
         ],

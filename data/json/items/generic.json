@@ -59,7 +59,7 @@
     "id": "sunlight",
     "symbol": "?",
     "color": "white",
-    "name": { "str_sp": "sun light" },
+    "name": { "str_sp": "sunlight" },
     "description": "seeing this is a bug",
     "stackable": true,
     "price": "0 cent",
@@ -136,6 +136,21 @@
   },
   {
     "type": "GENERIC",
+    "id": "classified_file_docmission",
+    "name": { "str": "classified lab reports" },
+    "category": "books",
+    "description": "A large stack of papers detailing all manner of classified information regarding the secret labs.",
+    "weight": "400 g",
+    "to_hit": -3,
+    "color": "white",
+    "symbol": ",",
+    "material": [ "paper" ],
+    "looks_like": "record_accounting",
+    "volume": "750 ml",
+    "flags": [ "TRADER_AVOID" ]
+  },
+  {
+    "type": "GENERIC",
     "id": "log_immersion27",
     "copy-from": "file",
     "name": { "str": "INCIDENT REPORT: IMMERSION-27A" },
@@ -157,6 +172,23 @@
     "copy-from": "log_immersion27",
     "name": { "str": "HAADF MICROGRAPH: T-SUBSTRATE" },
     "snippet_category": "HAADF_t-substrate",
+    "extend": { "flags": "SNIPPET_NEEDS_LITERACY" }
+  },
+  {
+    "type": "GENERIC",
+    "id": "physics_anomaly_description",
+    "copy-from": "file",
+    "name": { "str": "CONTAINMENT PROCEDURES: PE-025-X" },
+    "description": "A white piece of paper, with a fancy-looking logo printed on its upper left corner.  It'd probably be very fascinating reading material.",
+    "snippet_category": "physics_anomaly_description",
+    "extend": { "flags": "SNIPPET_NEEDS_LITERACY" }
+  },
+  {
+    "type": "GENERIC",
+    "id": "physics_anomaly_epsilon",
+    "copy-from": "physics_anomaly_description",
+    "name": { "str": "PROCEDURE 025-EPSILON" },
+    "snippet_category": "physics_anomaly_epsilon",
     "extend": { "flags": "SNIPPET_NEEDS_LITERACY" }
   },
   {
@@ -368,7 +400,7 @@
     "color": "light_gray",
     "name": { "str": "cluster of gas sacs", "str_pl": "clusters of gas sacs" },
     "description": "This is a cluster of membranous bubbles, each about the size of a grape, retrieved from inside a mutant insect.  They float like tiny helium balloons, and are likely full of a lighter-than-air gas helping the bug to fly.",
-    "price": 0,
+    "price": "0 USD",
     "stackable": true,
     "material": [ "flesh" ],
     "flags": [ "NO_SALVAGE" ],
@@ -560,20 +592,6 @@
     "to_hit": -3,
     "flags": [ "GENOME_DRIVE" ],
     "category": "valuables"
-  },
-  {
-    "type": "GENERIC",
-    "id": "genome_drive_black_rat",
-    "copy-from": "genome_drive",
-    "name": { "str": "genome drive" },
-    "item_vars": { "specimen_sample": "mon_black_rat", "specimen_sample_progress": "2", "specimen_name": "black rat" }
-  },
-  {
-    "type": "GENERIC",
-    "id": "genome_drive_wolf_mutant_huge",
-    "copy-from": "genome_drive",
-    "name": { "str": "genome drive" },
-    "item_vars": { "specimen_sample": "mon_wolf_mutant_huge", "specimen_sample_progress": "5", "specimen_name": "dire wolf" }
   },
   {
     "type": "GENERIC",
@@ -3186,9 +3204,9 @@
     "id": "broken_secubot",
     "symbol": ",",
     "color": "green",
-    "name": { "str": "broken secubot" },
+    "name": { "str": "broken M16A4 TALON" },
     "category": "scrap_electronics",
-    "description": "A broken secubot, with its casing broken and fluid drained.  Could be gutted for parts.",
+    "description": "A broken TALON UGV, with its casing broken and fluid drained.  Could be gutted for parts.",
     "price": "10 USD",
     "price_postapoc": "10 cent",
     "material": [ "steel", "plastic" ],
@@ -3259,6 +3277,24 @@
     "symbol": ",",
     "color": "green",
     "name": { "str": "broken M202A1 TALON" },
+    "category": "scrap_electronics",
+    "description": "A broken TALON UGV, with its casing broken and fluid drained.  Could be gutted for parts.",
+    "price": "10 USD",
+    "price_postapoc": "10 cent",
+    "material": [ "steel", "plastic" ],
+    "weight": "100 kg",
+    "volume": "65 L",
+    "bashing": 4,
+    "cutting": 4,
+    "to_hit": -3,
+    "flags": [ "TRADER_AVOID", "NO_REPAIR" ]
+  },
+  {
+    "type": "GENERIC",
+    "id": "broken_talon_m249",
+    "symbol": ",",
+    "color": "green",
+    "name": { "str": "broken M249 TALON" },
     "category": "scrap_electronics",
     "description": "A broken TALON UGV, with its casing broken and fluid drained.  Could be gutted for parts.",
     "price": "10 USD",
@@ -3356,6 +3392,15 @@
     "symbol": ",",
     "color": "green",
     "name": { "str": "broken light turret" },
+    "weight": "30 kg",
+    "copy-from": "broken_turret"
+  },
+  {
+    "type": "GENERIC",
+    "id": "broken_robofac_turret_light",
+    "symbol": ",",
+    "color": "green",
+    "name": { "str": "broken Hub 01 light turret" },
     "weight": "30 kg",
     "copy-from": "broken_turret"
   },

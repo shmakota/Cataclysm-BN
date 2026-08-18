@@ -53,7 +53,7 @@
     "initial_charges": 15,
     "charges_per_use": 1,
     "use_action": "DIRECTIONAL_HOLOGRAM",
-    "artifact_data": { "charge_type": "ARTC_TIME" },
+    "relic_data": { "recharge_scheme": [ { "type": "time", "interval": "1 h", "rate": 1 } ] },
     "flags": [ "OVERSIZE", "HOOD", "WATERPROOF", "STURDY", "OUTER", "NO_UNLOAD", "NO_RELOAD" ]
   },
   {
@@ -72,7 +72,7 @@
     "warmth": 30,
     "material_thickness": 3,
     "flags": [ "OVERSIZE", "HOOD", "OUTER", "NO_REPAIR", "SUPER_FANCY", "STURDY", "ALLOWS_TAIL_SNAKE" ],
-    "relic_data": { "passive_effects": [ { "has": "WORN", "condition": "ALWAYS", "values": [ { "value": "BONUS_DODGE", "add": 1 } ] } ] }
+    "relic_data": { "passive_effects": [ { "conditions": [ "WORN" ], "values": [ { "value": "BONUS_DODGE", "add": 1 } ] } ] }
   },
   {
     "id": "q_solarpack",
@@ -81,7 +81,7 @@
     "description": "Personal portable charging system consisting of an array of quantum solar panels neatly folded in a form of a large backpack.  It can be worn as one, and has an integrated cable to plug it into a cable charger system.  Cutting edge technology.",
     "weight": "7500 g",
     "volume": "5 L",
-    "price": 1500000,
+    "price": "15000 USD",
     "bashing": 10,
     "to_hit": -1,
     "material": [ "glass", "steel" ],
@@ -103,7 +103,7 @@
     "description": "Unfolded array of portable quantum solar panels ready to push some power into an active cable charger system.",
     "weight": "7500 g",
     "volume": "15 L",
-    "price": 1500000,
+    "price": "15000 USD",
     "bashing": 4,
     "to_hit": -2,
     "material": [ "glass", "steel" ],
@@ -208,7 +208,7 @@
   },
   {
     "id": "xltac_fullhelmet",
-    "repairs_like": "xlkevlar",
+    "repairs_like": "kevlar",
     "type": "ARMOR",
     "category": "armor",
     "name": { "str": "XL tactical full helmet" },

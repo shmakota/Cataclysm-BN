@@ -60,6 +60,7 @@
 #include "mongroup.h"
 #include "path_info.h"
 #include "point.h"
+#include "profile.h"
 #include "rng.h"
 #include "sdl_wrappers.h"
 #include "sdl_geometry.h"
@@ -322,6 +323,7 @@ static void WinCreate()
                           "Failed to initialize accelerated renderer, falling back to software rendering" ) ) {
             software_renderer = true;
         } else {
+            dbg( DL::Info ) << "Initialized SDL with Renderer: " << SDL_GetRendererName( renderer.get() );
             if( get_option<bool>( "VSYNC" ) ) {
                 SDL_SetRenderVSync( renderer.get(), 1 );
             }
@@ -2789,7 +2791,7 @@ void handle_finger_input( Uint64 ticks )
     float dist = std::sqrt( delta_x * delta_x + delta_y * delta_y ); // in pixel space
     bool handle_diagonals = touch_input_context.is_action_registered( "LEFTUP" );
     bool is_default_mode = touch_input_context.get_category() == "DEFAULTMODE";
-    if( dist > ( get_option<float>( "ANDROID_DEADZONE_RANGE" )*std::max( WindowWidth,
+    if( dist > ( get_option<float>( "ANDROID_DEADZONE_RANGE" ) * std::max( WindowWidth,
                  WindowHeight ) ) ) {
         if( !handle_diagonals ) {
             if( delta_x >= 0 && delta_y >= 0 ) {
@@ -2994,6 +2996,10 @@ static void CheckMessages()
                 // If we're already crouching, make it simple to toggle crouching to off.
                 if( g->u.movement_mode_is( CMM_CROUCH ) ) {
                     actions.insert( ACTION_TOGGLE_CROUCH );
+                }
+                // If we're already prone, make it simple to toggle prone to off.
+                if( g->u.movement_mode_is( CMM_PRONE ) ) {
+                    actions.insert( ACTION_TOGGLE_PRONE );
                 }
 
                 // We're not already running or in combat, so remove cycle walk/run
@@ -3841,14 +3847,22 @@ void catacurses::init_interface()
     // initialize sound set
     load_soundset();
 
-    font = std::make_unique<FontFallbackList>( renderer, format, fl.fontwidth, fl.fontheight,
-            windowsPalette, fl.typeface, fl.fontsize, fl.fontblending );
-    map_font = std::make_unique<FontFallbackList>( renderer, format, fl.map_fontwidth,
-               fl.map_fontheight,
-               windowsPalette, fl.map_typeface, fl.map_fontsize, fl.fontblending );
-    overmap_font = std::make_unique<FontFallbackList>( renderer, format, fl.overmap_fontwidth,
-                   fl.overmap_fontheight,
-                   windowsPalette, fl.overmap_typeface, fl.overmap_fontsize, fl.fontblending );
+    try {
+        font = std::make_unique<FontFallbackList>( renderer, format, fl.fontwidth, fl.fontheight,
+                windowsPalette, fl.typeface, fl.fontsize, fl.fontblending );
+        map_font = std::make_unique<FontFallbackList>( renderer, format, fl.map_fontwidth,
+                   fl.map_fontheight,
+                   windowsPalette, fl.map_typeface, fl.map_fontsize, fl.fontblending );
+        overmap_font = std::make_unique<FontFallbackList>( renderer, format, fl.overmap_fontwidth,
+                       fl.overmap_fontheight,
+                       windowsPalette, fl.overmap_typeface, fl.overmap_fontsize, fl.fontblending );
+    } catch( std::exception &e ) {
+        font.reset();
+        map_font.reset();
+        overmap_font.reset();
+        throw;
+    }
+
     stdscr = newwin( get_terminal_height(), get_terminal_width(), point_zero );
     //newwin calls `new WINDOW`, and that will throw, but not return nullptr.
 
@@ -3942,6 +3956,7 @@ void input_manager::pump_events()
 // is simply a wrapper around this.
 input_event input_manager::get_input_event()
 {
+    ZoneScopedN( "sdl_input_get_input_event" );
     previously_pressed_key = 0;
 
     // standards note: getch is sometimes required to call refresh
@@ -3951,10 +3966,12 @@ input_event input_manager::get_input_event()
     // we can skip it if `needupdate` is false to improve performance during mouse
     // move events.
     if( needupdate ) {
+        ZoneScopedN( "sdl_input_wrefresh" );
         wrefresh( catacurses::stdscr );
     }
 
     if( inputdelay < 0 ) {
+        ZoneScopedN( "sdl_input_wait_blocking" );
         do {
             CheckMessages();
             if( last_input.type != input_event_t::error ) {
@@ -3963,6 +3980,7 @@ input_event input_manager::get_input_event()
             SDL_Delay( 1 );
         } while( last_input.type == input_event_t::error );
     } else if( inputdelay > 0 ) {
+        ZoneScopedN( "sdl_input_wait_timed" );
         Uint64 starttime = SDL_GetTicks();
         Uint64 endtime = 0;
         bool timedout = false;
@@ -3979,6 +3997,7 @@ input_event input_manager::get_input_event()
             }
         } while( !timedout );
     } else {
+        ZoneScopedN( "sdl_input_poll_once" );
         CheckMessages();
     }
 
@@ -4270,6 +4289,11 @@ HWND getWindowHandle()
 const SDL_Renderer_Ptr &get_sdl_renderer()
 {
     return renderer;
+}
+
+auto set_sdl_renderer( SDL_Renderer_Ptr r ) -> void
+{
+    renderer = std::move( r );
 }
 
 const SDL_Window_Ptr &get_sdl_window()

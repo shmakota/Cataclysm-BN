@@ -214,7 +214,7 @@
     "starting_trait": true,
     "valid": false,
     "cancels": [ "MORE_PAIN", "MORE_PAIN2", "MORE_PAIN3" ],
-    "category": [ "MEDICAL" ]
+    "category": [ "MEDICAL", "CHIMERA" ]
   },
   {
     "type": "mutation",
@@ -235,7 +235,8 @@
     "points": 1,
     "description": "Your system is rather tolerant of poisons and toxins, and most will affect you less.",
     "starting_trait": true,
-    "category": [ "INSECT", "SERPENT", "SLIME", "SPIDER", "MEDICAL" ]
+    "category": [ "INSECT", "SERPENT", "SLIME", "SPIDER", "MEDICAL" ],
+    "mut_enchantments": [ { "flags": [ "FOOD_POISON_IMMUNE" ] } ]
   },
   {
     "type": "mutation",
@@ -427,7 +428,17 @@
     "description": "Whether due to a lifetime of exposure or through simple willpower, it's harder for you to become addicted to substances, and easier to rid yourself of these addictions.",
     "starting_trait": true,
     "valid": false,
-    "cancels": [ "ADDICTIVE" ]
+    "cancels": [ "ADDICTIVE" ],
+    "//": "10800 == 3 hours shorter per intensity, 14400 == 4 hours longer per addition",
+    "mut_enchantments": [
+      {
+        "values": [
+          { "value": "ADDICTION_STRENGTH", "multiply": -0.5 },
+          { "value": "ADDICTION_TIME_PER_ADDITION", "add": 14400 },
+          { "value": "ADDICTION_TIME_PER_INTENSITY", "add": 10800 }
+        ]
+      }
+    ]
   },
   {
     "type": "mutation",
@@ -529,12 +540,13 @@
     "//": "Can't change the ID as that breaks save-compatibility.",
     "name": { "str": "Scout" },
     "points": 1,
-    "description": "You're an excellent navigator and your ability to recognize distant landmarks is unmatched.  Your sight radius on the overmap extends beyond the normal range.",
+    "description": "You're an excellent navigator and your ability to recognize distant landmarks is unmatched.  Your sight radius on the overmap extends beyond the normal range, and distant details are easier for you to resolve.",
     "valid": false,
     "starting_trait": true,
     "category": [ "BIRD", "MOUSE" ],
     "cancels": [ "MYOPIC", "UNOBSERVANT" ],
-    "overmap_sight": 5
+    "overmap_sight": 5,
+    "local_detail_sight": 10
   },
   {
     "type": "mutation",
@@ -727,7 +739,8 @@
     "description": "Without glasses, your seeing radius is severely reduced!  However, you are guaranteed to start with a pair of glasses.",
     "starting_trait": true,
     "cancels": [ "URSINE_EYE", "EAGLEEYED", "HYPEROPIC" ],
-    "category": [ "BEAST", "TROGLOBITE", "URSINE" ]
+    "category": [ "BEAST", "TROGLOBITE", "URSINE" ],
+    "mut_enchantments": [ { "flags": [ "NEARSIGHTED" ] } ]
   },
   {
     "type": "mutation",
@@ -780,7 +793,8 @@
     "points": -1,
     "description": "You're quite the heavy sleeper.  Noises are unlikely to wake you up.",
     "changes_to": [ "HEAVYSLEEPER2" ],
-    "category": [ "INSECT", "PLANT", "MEDICAL", "LUPINE" ]
+    "category": [ "INSECT", "PLANT", "MEDICAL", "LUPINE" ],
+    "mut_enchantments": [ { "values": [ { "value": "SLEEP_PAIN_THRESH", "add": 2 }, { "value": "SLEEP_DB_RESIST", "add": 30 } ] } ]
   },
   {
     "type": "mutation",
@@ -845,6 +859,7 @@
     "points": -6,
     "description": "You never learned to read!  Books and computers are off-limits to you.",
     "starting_trait": true,
+    "random_starting_trait": false,
     "valid": false,
     "purifiable": false,
     "cancels": [ "FASTREADER", "SLOWREADER", "PROF_DICEMASTER", "LOVES_BOOKS" ]
@@ -998,7 +1013,8 @@
     "starting_trait": true,
     "social_modifiers": { "intimidate": -2 },
     "category": [ "BIRD", "RAPTOR" ],
-    "cancels": [ "TOUGH" ]
+    "cancels": [ "TOUGH" ],
+    "mut_enchantments": [ { "values": [ { "value": "HEALTH_POINTS_HEAD", "multiply": -0.2 } ] } ]
   },
   {
     "type": "mutation",
@@ -1018,7 +1034,17 @@
     "starting_trait": true,
     "valid": false,
     "category": [ "MEDICAL", "MOUSE", "RABBIT" ],
-    "cancels": [ "NONADDICTIVE" ]
+    "cancels": [ "NONADDICTIVE" ],
+    "//": "-14400 == 4 hours longer per intensity, -3600 == 1 hours shorter per addition",
+    "mut_enchantments": [
+      {
+        "values": [
+          { "value": "ADDICTION_STRENGTH", "multiply": 1 },
+          { "value": "ADDICTION_TIME_PER_ADDITION", "add": -3600 },
+          { "value": "ADDICTION_TIME_PER_INTENSITY", "add": -14400 }
+        ]
+      }
+    ]
   },
   {
     "type": "mutation",
@@ -1145,7 +1171,7 @@
     "description": "You make more noise while walking.",
     "starting_trait": true,
     "cancels": [ "LIGHTSTEP" ],
-    "noise_modifier": 2
+    "mut_enchantments": [ { "values": [ { "value": "NOISE", "add": 12 } ] } ]
   },
   {
     "type": "mutation",
@@ -1360,7 +1386,8 @@
     "description": "Your eyes still bulge, yet your pupils look different somehow.  Water doesn't seem to cause any trouble at all, though.",
     "leads_to": [ "NIGHTVISION3" ],
     "cancels": [ "BIRD_EYE", "LIZ_EYE", "FEL_EYE", "URSINE_EYE", "COMPOUND_EYES", "ELFAEYES" ],
-    "category": [ "CEPHALOPOD" ]
+    "category": [ "CEPHALOPOD" ],
+    "mut_enchantments": [ { "flags": [ "UNDERWATER_SIGHT" ] } ]
   },
   {
     "type": "mutation",
@@ -1409,7 +1436,8 @@
     "prereqs": [ "NIGHTVISION3" ],
     "cancels": [ "LIZ_IR" ],
     "category": [ "INSECT", "TROGLOBITE", "SPIDER" ],
-    "threshreq": [ "THRESH_INSECT", "THRESH_TROGLOBITE", "THRESH_SPIDER" ]
+    "threshreq": [ "THRESH_INSECT", "THRESH_TROGLOBITE", "THRESH_SPIDER" ],
+    "mut_enchantments": [ { "flags": [ "INFRARED_VISION" ] } ]
   },
   {
     "type": "mutation",
@@ -1432,7 +1460,8 @@
     "description": "Your optic nerves and brain have mutated to catch up with your eyes, allowing you to see in the infrared spectrum.",
     "prereqs": [ "LIZ_EYE" ],
     "cancels": [ "ELFA_NV", "ELFA_FNV", "FEL_NV", "INFRARED" ],
-    "category": [ "LIZARD", "SERPENT", "RAPTOR" ]
+    "category": [ "LIZARD", "SERPENT", "RAPTOR" ],
+    "mut_enchantments": [ { "flags": [ "INFRARED_VISION" ] } ]
   },
   {
     "type": "mutation",
@@ -1580,7 +1609,8 @@
     "description": "You have a set of clear lenses which lower over your eyes while underwater, allowing you to see as though you were wearing goggles.  Slightly decreases wet penalties.",
     "prereqs": [ "EYEBULGE" ],
     "category": [ "LIZARD", "FISH" ],
-    "wet_protection": [ { "part": "eyes", "neutral": 1 } ]
+    "wet_protection": [ { "part": "eyes", "neutral": 1 } ],
+    "mut_enchantments": [ { "flags": [ "UNDERWATER_SIGHT" ] } ]
   },
   {
     "type": "mutation",
@@ -1663,7 +1693,8 @@
       { "part": "torso", "ignored": 60 }
     ],
     "armor": [ { "parts": "ALL", "cut": 2, "bash": 3, "bullet": 1 } ],
-    "speed_modifier": 0.8
+    "speed_modifier": 0.8,
+    "mut_enchantments": [ { "values": [ { "value": "BLISTER_COUNT", "add": -20 } ] } ]
   },
   {
     "type": "mutation",
@@ -1691,7 +1722,8 @@
       { "part": "torso", "ignored": 60 }
     ],
     "armor": [ { "parts": "ALL", "cut": 3, "bash": 5, "bullet": 2 } ],
-    "speed_modifier": 0.8
+    "speed_modifier": 0.8,
+    "mut_enchantments": [ { "values": [ { "value": "BLISTER_COUNT", "add": -20 } ] } ]
   },
   {
     "type": "mutation",
@@ -1967,8 +1999,59 @@
     "armor": [ { "parts": "ALL", "physical": 5 } ],
     "category": [ "CHIMERA" ],
     "types": [ "SKIN" ],
+    "changes_to": [ "SUBDERMALARMOR" ],
     "prereqs": [ "PATCHSKIN1" ],
     "flags": [ "FURRY" ]
+  },
+  {
+    "type": "mutation",
+    "id": "SUBDERMALARMOR",
+    "name": { "str": "Keratinous subdermal layer" },
+    "points": 4,
+    "visibility": 1,
+    "ugliness": 1,
+    "purifiable": false,
+    "valid": false,
+    "bodytemp_modifiers": [ 150, 250 ],
+    "bodytemp_sleep": 20,
+    "encumbrance_always": [ [ "torso", 10 ], [ "arm_l", 10 ], [ "arm_r", 10 ], [ "leg_l", 10 ], [ "leg_r", 10 ], [ "head", 10 ] ],
+    "description": "Your chaotic skin has wholly compressed all the different traits of animals into a thin, subdermal layer of armor. Not as good as fur for keeping you warm, but highly protective and you once more can blend in with the hairless apes. Though you are slightly heavier.",
+    "armor": [ { "parts": "ALL", "physical": 12 } ],
+    "passive_mods": { "dex_mod": -2 },
+    "category": [ "CHIMERA" ],
+    "types": [ "SKIN" ],
+    "prevents": [ "DEFORMED", "DEFORMED2", "DEFORMED3", "HOOVES", "UNSTABLE" ],
+    "transform": { "target": "CHIMERAARMOR", "msg_transform": "Your skin morphs into a hideous armor of... Something!", "moves": 100 },
+    "prereqs": [ "PATCHSKIN2" ]
+  },
+  {
+    "type": "mutation",
+    "id": "CHIMERAARMOR",
+    "name": { "str": "Chimera Shell" },
+    "points": 0,
+    "visibility": 10,
+    "ugliness": 80,
+    "purifiable": false,
+    "valid": false,
+    "bodytemp_modifiers": [ 250, 500 ],
+    "bodytemp_sleep": 100,
+    "prevents": [ "DEFORMED", "DEFORMED2", "DEFORMED3", "HOOVES" ],
+    "description": "Your subdermal armor has unfolded, providing a grotesque layer of protection against bullets, blades and human interaction. You shouldn't bother trying to do precise actions though, your hands are I'll suited for those things. Your metabolism has also massively accelerated, burning calories at a fast rate for increased regeneration speed.",
+    "movecost_swim_modifier": 0.8,
+    "restricts_gear": [ "TORSO", "HEAD", "leg_l", "leg_r", "arm_l", "arm_r" ],
+    "allow_soft_gear": true,
+    "metabolism_modifier": 3,
+    "mending_modifier": 2,
+    "healing_awake": 2,
+    "crafting_speed_modifier": 0.5,
+    "construction_speed_modifier": 0.5,
+    "speed_modifier": 1.2,
+    "armor": [ { "parts": "ALL", "physical": 20 } ],
+    "transform": {
+      "target": "SUBDERMALARMOR",
+      "msg_transform": "Your armor retracts, reverting you to your old, inferior look.",
+      "moves": 100
+    }
   },
   {
     "type": "mutation",
@@ -2224,7 +2307,8 @@
       { "part": "hand_r", "ignored": 3 },
       { "part": "torso", "ignored": 20 }
     ],
-    "armor": [ { "parts": "ALL", "cut": 3, "stab": 3, "bullet": 3, "heat": 1 } ]
+    "armor": [ { "parts": "ALL", "cut": 3, "stab": 3, "bullet": 3, "heat": 1 } ],
+    "mut_enchantments": [ { "values": [ { "value": "BLISTER_COUNT", "add": -5 } ] } ]
   },
   {
     "type": "mutation",
@@ -2293,7 +2377,8 @@
     "prereqs": [ "PLANTSKIN", "BARK" ],
     "prereqs2": [ "LEAVES" ],
     "threshreq": [ "THRESH_PLANT" ],
-    "category": [ "PLANT" ]
+    "category": [ "PLANT" ],
+    "mut_enchantments": [ { "values": [ { "value": "CROWD_CRUSH_RESIST", "add": 4 } ] } ]
   },
   {
     "type": "mutation",
@@ -2662,7 +2747,8 @@
     "points": 1,
     "description": "Your body is unusually inhospitable to parasitic lifeforms.  You will never become infested with internal parasites.",
     "starting_trait": true,
-    "category": [ "ELFA", "CHIMERA", "MEDICAL", "SLIME" ]
+    "category": [ "ELFA", "CHIMERA", "MEDICAL", "SLIME" ],
+    "mut_enchantments": [ { "flags": [ "FOOD_PARASITE_IMMUNE" ] } ]
   },
   {
     "type": "mutation",
@@ -2865,7 +2951,8 @@
     "points": 2,
     "description": "Your digestive system is specialized to allow you to consume decaying material.  You can eat rotten food, albeit for less nutrition than usual.",
     "cancels": [ "HERBIVORE", "RUMINANT" ],
-    "category": [ "TROGLOBITE", "CHIMERA" ]
+    "category": [ "TROGLOBITE", "CHIMERA" ],
+    "mut_enchantments": [ { "flags": [ "EAT_ROTTEN", "EAT_ROTTEN_MORALE" ] } ]
   },
   {
     "type": "mutation",
@@ -2880,7 +2967,8 @@
     "threshreq": [ "THRESH_PLANT" ],
     "cancels": [ "HERBIVORE", "CARNIVORE", "GRAZER" ],
     "leads_to": [ "CHLOROMORPH" ],
-    "category": [ "PLANT" ]
+    "category": [ "PLANT" ],
+    "mut_enchantments": [ { "flags": [ "EAT_ROTTEN", "EAT_ROTTEN_MORALE", "ONLY_EAT_ROTTEN" ] } ]
   },
   {
     "type": "mutation",
@@ -2944,7 +3032,8 @@
     "prereqs": [ "POISRESIST" ],
     "threshreq": [ "THRESH_CHIMERA", "THRESH_RAT", "THRESH_MOUSE", "THRESH_SERPENT" ],
     "category": [ "RAT", "CHIMERA", "MOUSE", "SERPENT" ],
-    "kcal_scale": 0.15
+    "kcal_scale": 0.15,
+    "mut_enchantments": [ { "flags": [ "FOOD_POISON_IMMUNE" ] } ]
   },
   {
     "type": "mutation",
@@ -2970,6 +3059,7 @@
     "mixed_effect": true,
     "description": "Your fangs have grown extremely large and incredibly sharp.  They make it impossible to wear mouthgear and difficult to eat… but leave nasty wounds when you bite.",
     "types": [ "TEETH" ],
+    "prevents": [ "MOUTH_FLAPS" ],
     "prereqs": [ "FANGS" ],
     "threshreq": [ "THRESH_FELINE", "THRESH_CHIMERA" ],
     "category": [ "FELINE", "CHIMERA" ],
@@ -3099,7 +3189,8 @@
     "starts_active": true,
     "restricts_gear": [ "head" ],
     "allowed_items": [ "ALLOWS_HORNS" ],
-    "allow_soft_gear": true
+    "allow_soft_gear": true,
+    "mut_enchantments": [ { "values": [ { "value": "GROUNDED_CREATURE_SIGHT", "max": 5 } ] } ]
   },
   {
     "type": "mutation",
@@ -4211,7 +4302,8 @@
     "prereqs2": [ "AMORPHOUS" ],
     "threshreq": [ "THRESH_SLIME" ],
     "category": [ "SLIME" ],
-    "passive_mods": { "per_mod": -8 }
+    "passive_mods": { "per_mod": -8 },
+    "mut_enchantments": [ { "values": [ { "value": "FLASH_PROTECTION", "max": 3 } ] } ]
   },
   {
     "type": "mutation",
@@ -4228,7 +4320,8 @@
     "prereqs2": [ "AMORPHOUS" ],
     "threshreq": [ "THRESH_SLIME" ],
     "category": [ "SLIME" ],
-    "passive_mods": { "per_mod": 5 }
+    "passive_mods": { "per_mod": 5 },
+    "mut_enchantments": [ { "flags": [ "UNDERWATER_SIGHT" ], "values": [ { "value": "FLASH_PROTECTION", "max": 8 } ] } ]
   },
   {
     "type": "mutation",
@@ -4817,7 +4910,7 @@
     "bodytemp_modifiers": [ 0, 4000 ],
     "description": "You consume three times as much food as the average human to maintain your inefficient body.  All the excess heat it generates could let you survive a snowstorm naked.",
     "prereqs": [ "HUNGER2" ],
-    "leads_to": [ "EATHEALTH" ],
+    "changes_to": [ "EATHEALTH" ],
     "types": [ "METABOLISM" ],
     "category": [ "CHIMERA" ],
     "metabolism_modifier": 2
@@ -4875,7 +4968,8 @@
     "description": "You could probably sleep through a firefight.",
     "valid": false,
     "prereqs": [ "HEAVYSLEEPER" ],
-    "category": [ "BEAST", "LUPINE" ]
+    "category": [ "BEAST", "LUPINE" ],
+    "mut_enchantments": [ { "values": [ { "value": "SLEEP_PAIN_THRESH", "add": 5 }, { "value": "SLEEP_DB_RESIST", "add": 50 } ] } ]
   },
   {
     "type": "mutation",
@@ -5127,8 +5221,7 @@
     "name": { "str": "Genetic Chaos" },
     "points": -4,
     "description": "Your body alters itself rapidly, and without your intervention or conscious control.",
-    "prereqs": [ "UNSTABLE", "MUT_JUNKIE" ],
-    "category": [ "CHIMERA" ]
+    "prereqs": [ "UNSTABLE", "MUT_JUNKIE" ]
   },
   {
     "type": "mutation",
@@ -5167,7 +5260,7 @@
     "points": 2,
     "visibility": 7,
     "ugliness": 6,
-    "description": "Your body is coated with a fine slime.  Protects from long-term effects of acid, though not short-term ones.  Greatly increases wet benefits.",
+    "description": "Your body is coated with a fine slime.  Protects from long-term effects of acid, though not short-term ones. It also protects from other sources of slime.  Greatly increases wet benefits.",
     "leads_to": [ "SLIME_HANDS" ],
     "changes_to": [ "VISCOUS" ],
     "category": [ "FISH", "SLIME", "TROGLOBITE", "CEPHALOPOD" ],
@@ -5182,7 +5275,8 @@
       { "part": "hand_l", "neutral": 2, "good": 3 },
       { "part": "hand_r", "neutral": 2, "good": 3 },
       { "part": "torso", "neutral": 14, "good": 26 }
-    ]
+    ],
+    "mut_enchantments": [ { "immune_fields": [ "fd_slime" ] } ]
   },
   {
     "type": "mutation",
@@ -5244,7 +5338,8 @@
     "active": true,
     "cost": 40,
     "hunger": true,
-    "thirst": true
+    "thirst": true,
+    "mut_enchantments": [ { "values": [ { "value": "CROWD_CRUSH_RESIST", "add": 8 } ] } ]
   },
   {
     "type": "mutation",
@@ -5800,7 +5895,8 @@
     "category": [ "CEPHALOPOD" ],
     "wet_protection": [ { "part": "torso", "ignored": 26 } ],
     "restricts_gear": [ "torso" ],
-    "armor": [ { "parts": "torso", "bash": 6, "cut": 14, "bullet": 5 } ]
+    "armor": [ { "parts": "torso", "bash": 6, "cut": 14, "bullet": 5 } ],
+    "mut_enchantments": [ { "values": [ { "value": "CARRY_STORAGE", "add": 4000 } ] } ]
   },
   {
     "type": "mutation",
@@ -5820,7 +5916,11 @@
     "wet_protection": [ { "part": "torso", "ignored": 26 } ],
     "active": true,
     "restricts_gear": [ "torso" ],
-    "armor": [ { "parts": "torso", "bash": 9, "cut": 17, "bullet": 5 } ]
+    "armor": [ { "parts": "torso", "bash": 9, "cut": 17, "bullet": 5 } ],
+    "mut_enchantments": [
+      { "conditions": [ "INACTIVE" ], "values": [ { "value": "CARRY_STORAGE", "add": 6000 } ] },
+      { "conditions": [ "ACTIVE" ], "values": [ { "value": "CROWD_CRUSH_RESIST", "add": 8 } ] }
+    ]
   },
   {
     "type": "mutation",
@@ -6294,7 +6394,8 @@
     "category": [ "FISH" ],
     "threshreq": [ "THRESH_FISH" ],
     "armor": [ { "parts": "eyes", "cut": 3, "bash": 1 } ],
-    "active": true
+    "active": true,
+    "mut_enchantments": [ { "flags": [ "UNDERWATER_SIGHT", "SLEEP_SIGHT" ] } ]
   },
   {
     "type": "mutation",
@@ -6333,7 +6434,8 @@
     "points": 2,
     "description": "A network of jelly-filled electroreceptors, like that of a shark, have grown throughout your face and nose.  They are very sensitive to magnetic fields, allowing you to see robots and creatures charged with electricity through walls, but being shocked will seriously mess you up.",
     "category": [ "FISH" ],
-    "mixed_effect": true
+    "mixed_effect": true,
+    "mut_enchantments": [ { "flags": [ "ELECTROSENSE" ] } ]
   },
   {
     "type": "mutation",
@@ -6751,6 +6853,15 @@
   },
   {
     "type": "mutation",
+    "id": "DEBUG_INFINITE_SPEED",
+    "name": { "str": "Debug Infinite Speed" },
+    "points": 99,
+    "valid": false,
+    "description": "The only problem with being faster than light is that you always live in darkness.",
+    "debug": true
+  },
+  {
+    "type": "mutation",
     "id": "DEBUG_CLOAK",
     "name": { "str": "Debug Invisibility" },
     "points": 99,
@@ -6783,7 +6894,8 @@
     "points": 99,
     "valid": false,
     "description": "Be vewwy vewwy quiet.  We're hunting bugs.",
-    "debug": true
+    "debug": true,
+    "mut_enchantments": [ { "flags": [ "SILENT" ] } ]
   },
   {
     "type": "mutation",
@@ -6904,7 +7016,8 @@
     "points": -8,
     "description": "Whether from personal choice or childhood trauma, using ranged weapons is off-limits to you, even if your life depended on it.",
     "starting_trait": true,
-    "cancels": [ "GUNSHY" ],
+    "random_starting_trait": false,
+    "cancels": [ "GUNSHY", "CARRY_PERMIT" ],
     "valid": false
   },
   {
@@ -6914,7 +7027,8 @@
     "points": -4,
     "description": "Whether from personal choice or childhood trauma, using firearms is completely off-limits to you, even if your life depended on it.  Other ranged weapons, however, are totally fine.",
     "starting_trait": true,
-    "cancels": [ "BRAWLER" ],
+    "random_starting_trait": false,
+    "cancels": [ "BRAWLER", "CARRY_PERMIT" ],
     "valid": false
   },
   {
@@ -6934,6 +7048,7 @@
     "points": -8,
     "description": "Whether from personal choice or childhood trauma, traveling with vehicles is off-limits to you, even if your life depended on it.",
     "starting_trait": true,
+    "random_starting_trait": false,
     "valid": false,
     "purifiable": false
   },
@@ -7023,5 +7138,52 @@
     "valid": false,
     "purifiable": false,
     "profession": true
+  },
+  {
+    "type": "mutation",
+    "id": "CARRY_PERMIT",
+    "name": { "str": "Carry Permit" },
+    "points": 1,
+    "starting_trait": true,
+    "description": "You prepared for trouble as best as you could, though it might not be enough for the end of the world.  In addition to any weapons your profession might start with, you start with a randomly-selected common pistol and some spare mags.  (Note: What you see in character creation does not reflect what it will select at game start.)",
+    "cancels": [ "BRAWLER", "GUNSHY" ],
+    "valid": false,
+    "purifiable": false
+  },
+  {
+    "type": "mutation",
+    "id": "BLIND",
+    "name": { "str": "Blind" },
+    "points": -12,
+    "description": "You're totally blind, requiring you to cautiously feel out your surroundings.  Prevents crafting and construction aside from simple tasks that can be done blindfolded, and hinders many other actions as well.",
+    "starting_trait": true,
+    "random_starting_trait": false,
+    "valid": false,
+    "//": "Has both because `prevents` has no impact on character creation.",
+    "cancels": [
+      "NIGHTVISION",
+      "NIGHTVISION2",
+      "NIGHTVISION3",
+      "ELFA_NV",
+      "ELFA_FNV",
+      "FEL_NV",
+      "URSINE_EYE",
+      "EAGLEEYED",
+      "MYOPIC",
+      "HYPEROPIC"
+    ],
+    "prevents": [
+      "NIGHTVISION",
+      "NIGHTVISION2",
+      "NIGHTVISION3",
+      "ELFA_NV",
+      "ELFA_FNV",
+      "FEL_NV",
+      "URSINE_EYE",
+      "EAGLEEYED",
+      "MYOPIC",
+      "HYPEROPIC"
+    ],
+    "mut_enchantments": [ { "flags": [ "BLIND" ] } ]
   }
 ]

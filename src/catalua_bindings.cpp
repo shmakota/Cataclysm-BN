@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <ctime>
 #include <chrono>
 
@@ -8,6 +9,7 @@
 #include "catalua_luna_doc.h"
 #include "catalua_luna.h"
 
+#include "action.h"
 #include "artifact.h"
 #include "bodypart.h"
 #include "calendar.h"
@@ -19,6 +21,7 @@
 #include "enums.h"
 #include "field_type.h"
 #include "game.h"
+#include "hsv_color.h"
 #include "itype.h"
 #include "line.h"
 #include "map.h"
@@ -40,6 +43,7 @@
 #include "units_angle.h"
 #include "units_energy.h"
 #include "units_mass.h"
+#include "units/sound.h"
 #include "units_volume.h"
 #include "vitamin.h"
 
@@ -125,14 +129,29 @@ void cata::detail::reg_units( sol::state &lua )
                 luna::no_constructor
             );
 
-        luna::set_fx( ut, "from_milliliter", &units::from_milliliter<int> );
-        luna::set_fx( ut, "from_liter", &units::from_liter<int> );
-        luna::set_fx( ut, "to_milliliter", &units::to_milliliter<int> );
+        luna::set_fx( ut, "from_milliliter", &units::from_milliliter<std::int64_t> );
+        luna::set_fx( ut, "from_liter", &units::from_liter<std::int64_t> );
+        luna::set_fx( ut, "to_milliliter", &units::to_milliliter<std::int64_t> );
         luna::set_fx( ut, "to_liter", &units::to_liter );
 
         luna::set_fx( ut, sol::meta_function::equal_to, &units::volume::operator== );
         luna::set_fx( ut, sol::meta_function::less_than, &units::volume::operator< );
         luna::set_fx( ut, sol::meta_function::less_than_or_equal_to, &units::volume::operator<= );
+    }
+    {
+        sol::usertype<units::sound> ut =
+            luna::new_usertype<units::sound>(
+                lua,
+                luna::no_bases,
+                luna::no_constructor
+            );
+
+        luna::set_fx( ut, "from_decibel", &units::from_decibel<int> );
+        luna::set_fx( ut, "to_decibel", &units::to_decibel<int> );
+
+        luna::set_fx( ut, sol::meta_function::equal_to, &units::sound::operator== );
+        luna::set_fx( ut, sol::meta_function::less_than, &units::sound::operator< );
+        luna::set_fx( ut, sol::meta_function::less_than_or_equal_to, &units::sound::operator<= );
     }
 }
 
@@ -264,6 +283,7 @@ void cata::detail::reg_technique( sol::state &lua )
         luna::set( ut, "knockback_dist", &ma_technique::knockback_dist );
         luna::set( ut, "knockback_spread", &ma_technique::knockback_spread );
         luna::set( ut, "powerful_knockback", &ma_technique::powerful_knockback );
+        luna::set( ut, "controlled_knockback", &ma_technique::controlled_knockback );
         luna::set( ut, "crit_tec", &ma_technique::crit_tec );
         luna::set( ut, "crit_ok", &ma_technique::crit_ok );
         luna::set( ut, "knockback_follow", &ma_technique::knockback_follow );
@@ -456,10 +476,33 @@ void cata::detail::reg_colors( sol::state &lua )
     }
 
     luna::finalize_enum( et );
+    {
+        sol::usertype<RGBColor> ut =
+            luna::new_usertype<RGBColor>(
+                lua,
+                luna::no_bases,
+                luna::no_constructor
+            );
+
+        luna::set( ut, "name", &RGBColor::friendly_name );
+
+        DOC( "RGB Color Getters." );
+        luna::userlib lib = luna::begin_lib( lua, "rgb_colors" );
+
+        DOC( "Get RGB Color from string" );
+        luna::set_fx( lib, "try_parse", &RGBColor::try_parse );
+        DOC( "Get random RGB Color from fuzzy match string" );
+        luna::set_fx( lib, "get_random", &RGBColor::random_named );
+        DOC( "Get RGBColor -> string mapping" );
+        luna::set_fx( lib, "get_all_named_colors", &RGBColor::get_all_named_colors );
+
+        luna::finalize_lib( lib );
+    }
 }
 
 void cata::detail::reg_enums( sol::state &lua )
 {
+    reg_enum<action_id>( lua );
     reg_enum<add_type>( lua );
     reg_enum<Attitude>( lua );
     reg_enum<body_part>( lua );
@@ -597,6 +640,12 @@ void cata::detail::reg_hooks_examples( sol::state &lua )
     DOC_PARAMS( "params" );
     luna::set_fx( lib, "on_try_monster_interaction", []( const sol::table & ) {} );
 
+    DOC( "Called when the player swaps control to an npc.  " );
+    DOC( "The hook receives a table with keys:  " );
+    DOC( "* `npc` (NPC): The NPC being controlled.  " );
+    DOC_PARAMS( "params" );
+    luna::set_fx( lib, "on_control_npc", []( const sol::table & ) {} );
+
     DOC( "Called just before the dialogue window opens and the first topic is chosen.  " );
     DOC( "The hook receives a table with keys:  " );
     DOC( "* `npc` (NPC): The NPC speaking  " );
@@ -693,6 +742,16 @@ void cata::detail::reg_hooks_examples( sol::state &lua )
     DOC( "Return false to block the move." );
     DOC_PARAMS( "params" );
     luna::set_fx( lib, "on_monster_try_move", []( const sol::table & ) {} );
+
+    DOC( "Called before the player uses elevator controls.  " );
+    DOC( "All registered callbacks run; if any returns false, elevator use is blocked.  " );
+    DOC( "The hook receives a table with keys:  " );
+    DOC( "* `player` (Player)  " );
+    DOC( "* `pos` (TripointBubMs)  " );
+    DOC( "* `om_terrain` (string)  " );
+    DOC( "Return false to block elevator use." );
+    DOC_PARAMS( "params" );
+    luna::set_fx( lib, "on_elevator_try_use", []( const sol::table & ) {} );
 
     DOC( "Called after on_player_try_move or on_npc_try_move regardless of whether the specific hook vetoed.  " );
     DOC( "All registered callbacks run; if any returns false, movement is blocked.  " );
@@ -863,11 +922,26 @@ void cata::detail::reg_hooks_examples( sol::state &lua )
 
     DOC( "Called right after mapgen has completed.  " );
     DOC( "The hook receives a table with keys:  " );
-    DOC( "* `map` (Map): The tinymap that represents 24x24 area (2x2 submaps, or 1x1 omt).  " );
+    DOC( "* `map` (MapgenConstructor): The OMT-local mapgen surface.  " );
     DOC( "* `omt` (TripointAbsOmt): The absolute overmap terrain position.  " );
     DOC( "* `when` (TimePoint): The current time (for time-based effects).  " );
     DOC_PARAMS( "params" );
     luna::set_fx( lib, "on_mapgen_postprocess", []( const sol::table & ) {} );
+
+    DOC( "Called right after mission has started.  " );
+    DOC( "The hook receives a table with keys:  " );
+    DOC( "* `mission_type` (mission_type): The type of the mission.  " );
+    DOC( "* `mission` (mission): The mission instance.  " );
+    DOC_PARAMS( "params" );
+    luna::set_fx( lib, "on_mission_start", []( const sol::table & ) {} );
+
+    DOC( "Called right after mission has ended.  " );
+    DOC( "The hook receives a table with keys:  " );
+    DOC( "* `mission_type` (mission_type): The type of the mission.  " );
+    DOC( "* `mission` (mission): The mission instance.  " );
+    DOC( "* `success` (bool): Successful if true else failed.  " );
+    DOC_PARAMS( "params" );
+    luna::set_fx( lib, "on_mission_end", []( const sol::table & ) {} );
 
     luna::finalize_lib( lib );
 }

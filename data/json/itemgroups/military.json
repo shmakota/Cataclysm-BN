@@ -88,7 +88,7 @@
       { "group": "everyday_m27iar_military", "prob": 10, "charges": [ 0, 30 ] },
       { "group": "everyday_h&k416a5_military", "prob": 5, "charges": [ 0, 30 ] },
       { "group": "everyday_scar_h_military", "prob": 5, "charges": [ 0, 30 ] },
-      { "item": "m16a4", "prob": 5, "charges": [ 0, 30 ] }
+      { "item": "m16a4", "prob": 5, "charges": [ 0, 30 ], "contents-group": "military_accessories_standard" }
     ]
   },
   {
@@ -141,7 +141,7 @@
     "subtype": "distribution",
     "entries": [
       { "group": "everyday_m110a1", "prob": 75, "charges": [ 0, 20 ] },
-      { "group": "everyday_m2010", "prob": 20, "charges": [ 0, 5 ] },
+      { "group": "everyday_m2010_military", "prob": 20, "charges": [ 0, 5 ] },
       { "group": "everyday_m107a1", "prob": 5, "charges": [ 0, 10 ] }
     ]
   },
@@ -151,9 +151,9 @@
     "//": "Mostly LMGs but allows the occasional GPMG too",
     "subtype": "distribution",
     "entries": [
-      { "group": "everyday_m249", "prob": 75, "charges": [ 0, 100 ] },
+      { "group": "everyday_m249_military", "prob": 75, "charges": [ 0, 100 ] },
       { "group": "everyday_m27iar_fire_support", "prob": 15, "charges": [ 0, 100 ] },
-      { "group": "everyday_m240", "prob": 10, "charges": [ 0, 100 ] }
+      { "group": "everyday_m240_military", "prob": 10, "charges": [ 0, 100 ] }
     ]
   },
   {
@@ -207,9 +207,18 @@
     "id": "infantry_medical_gear",
     "subtype": "collection",
     "entries": [
-      { "item": "1st_aid", "prob": 80 },
+      { "distribution": [ { "item": "1st_aid", "prob": 80 }, { "item": "1st_aid_deluxe", "prob": 20 } ], "prob": 80 },
       { "item": "quikclot", "prob": 70 },
-      { "collection": [ { "item": "morphine" }, { "item": "syringe" } ], "prob": 40 }
+      { "collection": [ { "item": "morphine" }, { "item": "syringe" } ], "prob": 40 },
+      {
+        "distribution": [
+          { "item": "rx12_injector", "charges": [ 0, 2 ], "prob": 10 },
+          { "item": "ampoule", "charges": 2, "prob": 40 },
+          { "item": "rx11_stimpack", "charges": [ 0, 5 ], "prob": 10 },
+          { "item": "stimpack_ammo", "charges": 5, "prob": 40 }
+        ],
+        "prob": 5
+      }
     ]
   },
   {
@@ -218,7 +227,12 @@
     "subtype": "collection",
     "entries": [
       {
-        "distribution": [ { "item": "holo_sight", "prob": 50 }, { "item": "acog_scope", "prob": 30 }, { "item": "red_dot_sight", "prob": 20 } ]
+        "distribution": [
+          { "item": "hybrid_sight", "prob": 50 },
+          { "item": "holo_sight", "prob": 30 },
+          { "item": "acog_scope", "prob": 10 },
+          { "item": "red_dot_sight", "prob": 10 }
+        ]
       },
       { "distribution": [ { "item": "grip", "prob": 70 }, { "item": "m203", "prob": 30 } ] },
       { "item": "offset_sights", "prob": 30 },
@@ -233,10 +247,12 @@
     "subtype": "distribution",
     "entries": [
       { "item": "holo_sight", "prob": 100 },
+      { "item": "hybrid_sight", "prob": 100 },
       { "item": "acog_scope", "prob": 100 },
       { "item": "red_dot_sight", "prob": 100 },
       { "item": "pistol_grip", "prob": 100 },
       { "item": "m203", "prob": 50 },
+      { "item": "40x53mm_conversion_kit", "prob": 25 },
       { "item": "cheek_pad", "prob": 100 },
       { "item": "masterkey", "prob": 100 },
       { "item": "laser_sight", "prob": 100 },
@@ -348,6 +364,7 @@
       { "item": "m320_mod", "prob": 10 },
       { "item": "ugl_buttstock", "prob": 10 },
       { "item": "mgl", "prob": 6 },
+      { "item": "40x53mm_conversion_kit", "prob": 3 },
       { "item": "rm802", "prob": 6 },
       { "item": "suppressor", "prob": 15 },
       { "item": "shot_suppressor", "prob": 1 },
@@ -366,6 +383,7 @@
       { "item": "smokebomb", "prob": 5 },
       { "item": "tazer", "prob": 3 },
       { "item": "c4", "prob": 5 },
+      { "item": "c4_breaching", "prob": 3 },
       { "item": "hk_g80", "prob": 2 },
       { "item": "12mm", "prob": 2 },
       { "item": "flamethrower", "prob": 1 },
@@ -649,7 +667,8 @@
       { "item": "neccowafers", "prob": 30 },
       { "item": "can_beans", "prob": 40 },
       { "item": "pork_beans", "prob": 40 },
-      { "item": "1st_aid", "prob": 35 },
+      { "item": "1st_aid", "prob": 28 },
+      { "item": "1st_aid_deluxe", "prob": 7 },
       { "item": "saline", "prob": 10 },
       { "item": "con_milk", "prob": 10 },
       { "item": "milk_UHT", "prob": 25 },
@@ -747,7 +766,8 @@
       { "item": "25mm_hei", "prob": 2 },
       { "item": "belt25mm", "contents-group": "25mm_ammo", "prob": 3 },
       { "item": "105mm_heat", "prob": 1 },
-      { "item": "105mm_ap", "prob": 1 }
+      { "item": "105mm_ap", "prob": 1 },
+      { "item": "m6_asw", "prob": 5 }
     ]
   },
   {
@@ -764,6 +784,7 @@
       [ "bot_mininuke_hack", 1 ],
       [ "bot_secubot", 10 ],
       [ "bot_talon_m202a1", 10 ],
+      [ "bot_talon_m249", 10 ],
       [ "bot_dispatch_military", 5 ],
       [ "bot_turret_longrange", 5 ],
       [ "bot_turret_antimateriel", 1 ],
@@ -959,9 +980,21 @@
     "type": "item_group",
     "subtype": "distribution",
     "entries": [
-      { "item": "atgm_heat", "prob": 25 },
-      { "item": "belt25mm", "contents-group": "25mm_ammo", "prob": 25 },
-      { "item": "aerial_bomb", "prob": 50 }
+      { "item": "atgm_heat", "prob": 15 },
+      { "item": "belt25mm", "contents-group": "25mm_ammo", "prob": 20 },
+      { "item": "aerial_bomb", "prob": 40 },
+      { "item": "hellfire_heat", "prob": 20 },
+      { "item": "hellfire_ninja", "prob": 5 }
+    ]
+  },
+  {
+    "id": "helipad_heavy_munitions",
+    "type": "item_group",
+    "subtype": "distribution",
+    "entries": [
+      { "item": "belt25mm", "contents-group": "25mm_ammo", "prob": 30 },
+      { "item": "hellfire_heat", "prob": 60 },
+      { "item": "hellfire_ninja", "prob": 10 }
     ]
   }
 ]

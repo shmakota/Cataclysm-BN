@@ -11,6 +11,7 @@
 #include "item_group.h"
 #include "hsv_color.h"
 #include "point.h"
+#include "type_id.h"
 #include "visitable.h"
 #include "location_ptr.h"
 
@@ -124,7 +125,7 @@ struct vehicle_part {
          * @param pos Position of this part for item::process
          * @param e_heater Engine has a heater and is on
          */
-        void process_contents( const tripoint_bub_ms &pos, bool e_heater );
+        void process_contents( const tripoint_bub_ms &pos, bool e_heater, int turns = 1 );
 
         /**
          *  Try adding @param liquid to tank optionally limited by @param qty
@@ -195,6 +196,9 @@ struct vehicle_part {
 
         /** Is this part a reactor? */
         bool is_reactor() const;
+
+        /** Does this part provide always-on electrical power? */
+        auto is_perpetual_power_source() const -> bool;
 
         /** is this part currently unable to retain to fluid/charge?
          *  this doesn't take into account whether or not the part has any contents
@@ -310,7 +314,7 @@ struct vehicle_part {
     public:
 
         // POWER_DRAW_LINKED_PORTAL: portal tap link state (persisted per-part instance).
-        std::string portal_tap_dim_id;
+        dimension_id portal_tap_dim_id;
         tripoint_abs_ms portal_tap_pos;
         bool portal_tap_linked = false;
         /** Get part definition common to all parts of this type */
@@ -351,4 +355,3 @@ struct vehicle_part {
         void set_color( const RGBColorPair &color ) { set_color( color.bg, color.fg ); }
         void set_color( const RGBColor &bg, const RGBColor &fg );
 };
-

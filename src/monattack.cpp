@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "action_time_scale.h"
 #include "avatar.h"
 #include "ballistics.h"
 #include "bionics.h"
@@ -48,6 +49,7 @@
 #include "iuse_actor.h"
 #include "line.h"
 #include "map.h"
+#include "map/utils/map_functions.h"
 #include "map_iterator.h"
 #include "mapdata.h"
 #include "martialarts.h"
@@ -102,8 +104,10 @@ static const efftype_id effect_darkness( "darkness" );
 static const efftype_id effect_dazed( "dazed" );
 static const efftype_id effect_deaf( "deaf" );
 static const efftype_id effect_dermatik( "dermatik" );
+static const efftype_id effect_drone_marker( "drone_marker" );
 static const efftype_id effect_downed( "downed" );
 static const efftype_id effect_dragging( "dragging" );
+static const efftype_id effect_eyebot_depleted( "eyebot_depleted" );
 static const efftype_id effect_fearparalyze( "fearparalyze" );
 static const efftype_id effect_fungus( "fungus" );
 static const efftype_id effect_glowing( "glowing" );
@@ -328,6 +332,23 @@ static std::unique_ptr<npc> make_fake_npc( monster *z, int str, int dex, int int
     return tmp;
 }
 
+namespace
+{
+constexpr auto shriek_stun_hearing_protection_threshold = 40;
+
+auto has_shriek_stun_hearing_protection( const Creature &target ) -> bool
+{
+    if( target.is_immune_effect( effect_deaf ) ) {
+        return true;
+    }
+
+    const auto *const character = target.as_character();
+    return character != nullptr && character->get_char_hearing_protection() +
+           character->get_char_hearing_protection( true ) >= shriek_stun_hearing_protection_threshold;
+}
+
+} // namespace
+
 bool mattack::none( monster * )
 {
     return true;
@@ -460,8 +481,16 @@ bool mattack::shriek( monster *z )
 
     // It takes a while
     z->moves -= 240;
-    sounds::sound( z->bub_pos(), 50, sounds::sound_t::alert, _( "a terrible shriek!" ), false, "shout",
-                   "shriek" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 120;
+    se.category = sounds::sound_t::alert;
+    se.description = _( "a terrible shriek!" );
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.id = "shout";
+    se.variant = "shriek";
+    sounds::sound( se );
     return true;
 }
 
@@ -483,8 +512,16 @@ bool mattack::shriek_alert( monster *z )
     }
 
     z->moves -= 150;
-    sounds::sound( z->bub_pos(), 120, sounds::sound_t::alert, _( "a piercing wail!" ), false, "shout",
-                   "wail" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 120;
+    se.category = sounds::sound_t::alert;
+    se.description = _( "a piercing wail!" );
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.id = "shout";
+    se.variant = "wail";
+    sounds::sound( se );
     z->add_effect( effect_shrieking, 1_minutes );
 
     return true;
@@ -528,7 +565,7 @@ bool mattack::shriek_stun( monster *z )
         if( target == nullptr ) {
             continue;
         }
-        if( one_in( dist / 2 ) && !( target->is_immune_effect( effect_deaf ) ) ) {
+        if( one_in( dist / 2 ) && !has_shriek_stun_hearing_protection( *target ) ) {
             target->add_effect( effect_dazed, rng( 1_minutes, 2_minutes ), bodypart_str_id::NULL_ID(),
                                 rng( 1, ( 15 - dist ) / 3 ) );
         }
@@ -549,9 +586,16 @@ bool mattack::howl( monster *z )
 
     // It takes a while
     z->moves -= 200;
-    sounds::sound( z->bub_pos(), 35, sounds::sound_t::alert, _( "an ear-piercing howl!" ), false,
-                   "shout",
-                   "howl" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 100;
+    se.category = sounds::sound_t::alert;
+    se.description = _( "an ear-piercing howl!" );
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.id = "shout";
+    se.variant = "howl";
+    sounds::sound( se );
 
     // TODO: Make this use mon's faction when those are in
     if( z->friendly != 0 ) {
@@ -584,8 +628,16 @@ bool mattack::rattle( monster *z )
 
     // It takes a very short while
     z->moves -= 20;
-    sounds::sound( z->bub_pos(), 10, sounds::sound_t::alarm, _( "a sibilant rattling sound!" ), false,
-                   "misc", "rattling" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 60;
+    se.category = sounds::sound_t::alert;
+    se.description = _( "a sibilant rattling sound!" );
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.id = "misc";
+    se.variant = "rattling";
+    sounds::sound( se );
 
     return true;
 }
@@ -608,8 +660,16 @@ bool mattack::acid( monster *z )
     }
     // It takes a while
     z->moves -= 300;
-    sounds::sound( z->bub_pos(), 4, sounds::sound_t::combat, _( "a spitting noise." ), false, "misc",
-                   "spitting" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 60;
+    se.category = sounds::sound_t::combat;
+    se.description = _( "a spitting noise." );
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.id = "misc";
+    se.variant = "spitting";
+    sounds::sound( se );
 
     projectile proj;
     proj.speed = 10;
@@ -766,7 +826,8 @@ bool mattack::shockstorm( monster *z )
         add_msg( msg_type, _( "A bolt of electricity arcs towards %s!" ), target->disp_name() );
     }
     if( !g->u.is_deaf() ) {
-        sfx::play_variant_sound( "fire_gun", "bio_lightning", sfx::get_heard_volume( z->bub_pos() ) );
+        sfx::play_variant_sound( "fire_gun", "bio_lightning", sfx::get_heard_volume( z->bub_pos(), 95 ),
+                                 true );
     }
     tripoint_bub_ms tarp( target->bub_pos().x() + rng( -1, 1 ) + rng( -1, 1 ),
                           target->bub_pos().y() + rng( -1, 1 ) + rng( -1, 1 ),
@@ -794,6 +855,16 @@ bool mattack::shocking_reveal( monster *z )
     return true;
 }
 
+auto mattack::pull_metal_weapon_success_chance( const int base_success, const int distance ) -> int
+{
+    // Approximate magnetic force falloff: close pulls keep the old chance, then weaken by
+    // distance squared.
+    constexpr auto unattenuated_distance = 2;
+    const auto effective_distance = std::max( distance, unattenuated_distance );
+    return std::clamp( base_success * unattenuated_distance * unattenuated_distance /
+                       ( effective_distance * effective_distance ), 0, 100 );
+}
+
 bool mattack::pull_metal_weapon( monster *z )
 {
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -814,8 +885,14 @@ bool mattack::pull_metal_weapon( monster *z )
     }
 
     // Can't see/reach target, no attack
-    if( !z->sees( *target ) || !g->m.clear_path( z->bub_pos(), target->bub_pos(),
-            max_distance, 1, 100 ) ) {
+    if( !z->sees( *target ) || !map_funcs::physical_clear_path( {
+    .m = g->m,
+    .from = z->bub_pos(),
+        .to = target->bub_pos(),
+        .range = max_distance,
+        .cost_min = 1,
+        .cost_max = 100,
+    } ) ) {
         return false;
     }
     player *foe = dynamic_cast< player * >( target );
@@ -836,6 +913,8 @@ bool mattack::pull_metal_weapon( monster *z )
                 ///\EFFECT_MELEE increases resistance to pull_metal_weapon special attack
                 success = std::max( 100 - ( 6 * ( foe->str_cur - 6 ) ) - ( 6 * wp_skill ), 0 );
             }
+            success = pull_metal_weapon_success_chance( success,
+                      rl_dist( z->bub_pos(), target->bub_pos() ) );
             auto m_type = foe == &g->u ? m_bad : m_neutral;
             if( rng( 1, 100 ) <= success ) {
                 target->add_msg_player_or_npc( m_type, _( "%s is pulled away from your hands!" ),
@@ -1652,8 +1731,17 @@ bool mattack::spit_sap( monster *z )
 
 bool mattack::triffid_heartbeat( monster *z )
 {
-    sounds::sound( z->bub_pos(), 14, sounds::sound_t::movement, _( "thu-THUMP." ), true, "misc",
-                   "heartbeat" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 70;
+    se.category = sounds::sound_t::movement;
+    se.description = _( "thu-THUMP." );
+    se.movement_noise = true;
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.id = "misc";
+    se.variant = "heartbeat";
+    sounds::sound( se );
     z->moves -= 300;
     if( z->friendly != 0 ) {
         return true;
@@ -1718,7 +1806,16 @@ bool mattack::fungus( monster *z )
     z->moves -= 200;
 
     //~ the sound of a fungus releasing spores
-    sounds::sound( z->bub_pos(), 10, sounds::sound_t::combat, _( "Pouf!" ), false, "misc", "puff" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 60;
+    se.category = sounds::sound_t::combat;
+    se.description = _( "Pouf!" );
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.id = "misc";
+    se.variant = "puff";
+    sounds::sound( se );
     if( g->u.sees( *z ) ) {
         add_msg( m_warning, _( "Spores are released from the %s!" ), z->name() );
     }
@@ -1751,7 +1848,16 @@ bool mattack::fungus_advanced( monster *z )
     z->moves -= 200;
 
     //~ the sound of a fungus releasing spores
-    sounds::sound( z->bub_pos(), 10, sounds::sound_t::combat, _( "Pouf!" ), false, "misc", "puff" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 60;
+    se.category = sounds::sound_t::combat;
+    se.description = _( "Pouf!" );
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.id = "misc";
+    se.variant = "puff";
+    sounds::sound( se );
     if( g->u.sees( *z ) ) {
         add_msg( m_warning, _( "Spores are released from the %s!" ), z->name() );
     }
@@ -1811,7 +1917,16 @@ bool mattack::fungus_corporate( monster *z )
 bool mattack::fungus_haze( monster *z )
 {
     //~ That spore sound again
-    sounds::sound( z->bub_pos(), 10, sounds::sound_t::combat, _( "Pouf!" ), true, "misc", "puff" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 60;
+    se.category = sounds::sound_t::combat;
+    se.description = _( "Pouf!" );
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.id = "misc";
+    se.variant = "puff";
+    sounds::sound( se );
     if( g->u.sees( *z ) ) {
         add_msg( m_info, _( "The %s pulses, and fresh fungal material bursts forth." ), z->name() );
     }
@@ -1845,18 +1960,45 @@ bool mattack::fungus_big_blossom( monster *z )
             add_msg( m_warning, _( "The %s suddenly inhales!" ), z->name() );
         }
         //~Sound of a giant fungal blossom inhaling
-        sounds::sound( z->bub_pos(), 20, sounds::sound_t::combat, _( "WOOOSH!" ), true, "misc", "inhale" );
+        sound_event in;
+        in.origin = z->bub_pos();
+        in.volume = 80;
+        in.category = sounds::sound_t::combat;
+        in.description = _( "WOOOSH!" );
+        in.from_monster = true;
+        in.monfaction = z->faction.id();
+        in.id = "misc";
+        in.variant = "inhale";
+        sounds::sound( in );
         if( u_see ) {
             add_msg( m_bad, _( "The %s discharges an immense flow of spores, smothering the flames!" ),
                      z->name() );
         }
         //~Sound of a giant fungal blossom blowing out the dangerous fire!
-        sounds::sound( z->bub_pos(), 20, sounds::sound_t::combat, _( "POUFF!" ), true, "misc", "exhale" );
+        sound_event se;
+        se.origin = z->bub_pos();
+        se.volume = 80;
+        se.category = sounds::sound_t::combat;
+        se.description = _( "POUFF!" );
+        se.from_monster = true;
+        se.monfaction = z->faction.id();
+        se.id = "misc";
+        se.variant = "exhale";
+        sounds::sound( se );
         return true;
     } else {
         // No fire detected, routine haze-emission
         //~ That spore sound, much louder
-        sounds::sound( z->bub_pos(), 15, sounds::sound_t::combat, _( "POUF." ), true, "misc", "puff" );
+        sound_event se;
+        se.origin = z->bub_pos();
+        se.volume = 70;
+        se.category = sounds::sound_t::combat;
+        se.description = _( "POUF" );
+        se.from_monster = true;
+        se.monfaction = z->faction.id();
+        se.id = "misc";
+        se.variant = "puff";
+        sounds::sound( se );
         if( u_see ) {
             add_msg( m_info, _( "The %s pulses, and fresh fungal material bursts forth!" ), z->name() );
         }
@@ -2754,11 +2896,6 @@ bool mattack::ranged_pull( monster *z )
             if( foe->in_vehicle ) {
                 here.unboard_vehicle( foe->bub_pos() );
             }
-
-            if( target->is_player() && ( pt.x() < g_half_mapsize_x || pt.y() < g_half_mapsize_y ||
-                                         pt.x() >= g_half_mapsize_x + SEEX || pt.y() >= g_half_mapsize_y + SEEY ) ) {
-                g->update_map( pt.x(), pt.y() );
-            }
         }
 
         target->setpos( pt );
@@ -2899,11 +3036,6 @@ bool mattack::grab_drag( monster *z )
         z->move_to( target_square );
         if( !g->is_empty( zpt ) ) { //Cancel the grab if the space is occupied by something
             return false;
-        }
-        if( target->is_player() && ( zpt.x() < g_half_mapsize_x ||
-                                     zpt.y() < g_half_mapsize_y ||
-                                     zpt.x() >= g_half_mapsize_x + SEEX || zpt.y() >= g_half_mapsize_y + SEEY ) ) {
-            g->update_map( zpt.x(), zpt.y() );
         }
         if( foe != nullptr ) {
             if( foe->in_vehicle ) {
@@ -3052,20 +3184,27 @@ bool mattack::nurse_check_up( monster *z )
     if( found_target ) {
 
         // First we offer the check up then we wait to the player to come close
+        sound_event se;
+        se.origin = z->bub_pos();
+        se.volume = 60;
+        se.category = sounds::sound_t::electronic_speech;
+
+        se.from_monster = true;
+        se.monfaction = z->faction.id();
         if( !z->has_effect( effect_countdown ) ) {
-            sounds::sound( z->bub_pos(), 8, sounds::sound_t::electronic_speech,
-                           string_format(
-                               _( "a soft robotic voice say, \"Come here and stand still for a few minutes, I'll give you a check-up.\"" ) ) );
+            se.description = string_format(
+                                 _( "a soft robotic voice say, \"Come here and stand still for a few minutes, I'll give you a check-up.\"" ) );
+            sounds::sound( se );
             z->add_effect( effect_countdown, 30_minutes );
         } else if( rl_dist( target->bub_pos(), z->bub_pos() ) > 1 ) {
             // Giving them some encouragement
-            sounds::sound( z->bub_pos(), 8, sounds::sound_t::electronic_speech,
-                           string_format(
-                               _( "a soft robotic voice say, \"Come on.  I don't bite, I promise it won't hurt one bit.\"" ) ) );
+            se.description = string_format(
+                                 _( "a soft robotic voice say, \"Come on.  I don't bite, I promise it won't hurt one bit.\"" ) );
+            sounds::sound( se );
         } else {
-            sounds::sound( z->bub_pos(), 8, sounds::sound_t::electronic_speech,
-                           string_format(
-                               _( "a soft robotic voice say, \"Here we go.  Just hold still.\"" ) ) );
+            se.description = string_format(
+                                 _( "a soft robotic voice say, \"Here we go.  Just hold still.\"" ) );
+            sounds::sound( se );
             if( target == &g->u ) {
                 add_msg( m_good, _( "You get a medical check-up." ) );
             }
@@ -3104,10 +3243,17 @@ bool mattack::nurse_assist( monster *z )
     if( found_target ) {
         if( target->is_wearing( itype_badge_doctor ) ||
             z->attitude_to( *target ) == Attitude::A_FRIENDLY ) {
-            sounds::sound( z->bub_pos(), 8, sounds::sound_t::electronic_speech,
-                           string_format(
-                               _( "a soft robotic voice say, \"Welcome doctor %s.  I'll be your assistant today.\"" ),
-                               Name::generate( target->male ) ) );
+            sound_event se;
+            se.origin = z->bub_pos();
+            se.volume = 60;
+            se.category = sounds::sound_t::electronic_speech;
+            se.description = string_format(
+                                 _( "a soft robotic voice say, \"Welcome doctor %s.  I'll be your assistant today.\"" ),
+                                 Name::generate( target->male ) );
+            se.from_monster = true;
+            se.monfaction = z->faction.id();
+
+            sounds::sound( se );
             target->add_effect( effect_assisted, 20_turns, bodypart_str_id::NULL_ID(), 12 );
             return true;
         }
@@ -3189,16 +3335,22 @@ bool mattack::nurse_operate( monster *z )
             for( auto critter : g->m.get_creatures_in_radius( target->bub_pos(), 1 ) ) {
                 monster *mon = dynamic_cast<monster *>( critter );
                 if( mon != nullptr && mon != z ) {
+                    sound_event se;
+                    se.origin = z->bub_pos();
+                    se.volume = 60;
+                    se.category = sounds::sound_t::electronic_speech;
+                    se.from_monster = true;
+                    se.monfaction = z->faction.id();
                     if( mon->type->id != mon_defective_robot_nurse ) {
-                        sounds::sound( z->bub_pos(), 8, sounds::sound_t::electronic_speech,
-                                       string_format(
-                                           _( "a soft robotic voice say, \"Unhand this patient immediately!  If you keep interfering with the procedure I'll be forced to call law enforcement.\"" ) ) );
+                        se.description = string_format(
+                                             _( "a soft robotic voice say, \"Unhand this patient immediately!  If you keep interfering with the procedure I'll be forced to call law enforcement.\"" ) );
+                        sounds::sound( se );
                         // Try to push the perpetrator away
                         z->push_to( mon->bub_pos(), 6, 0 );
                     } else {
-                        sounds::sound( z->bub_pos(), 8, sounds::sound_t::electronic_speech,
-                                       string_format(
-                                           _( "a soft robotic voice say, \"Greetings kinbot.  Please take good care of this patient.\"" ) ) );
+                        se.description = string_format(
+                                             _( "a soft robotic voice say, \"Greetings kinbot.  Please take good care of this patient.\"" ) );
+                        sounds::sound( se );
                         z->anger = 0;
                         // Situation is under control no need to intervene;
                         return false;
@@ -3221,6 +3373,11 @@ bool mattack::nurse_operate( monster *z )
 }
 bool mattack::check_money_left( monster *z )
 {
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.category = sounds::sound_t::electronic_speech;
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
     if( !z->has_effect( effect_paid ) ) {
         if( z->friendly == -1 &&
             z->has_effect( effect_pet ) ) { // if the pet effect runs out we're no longer friends
@@ -3235,154 +3392,225 @@ bool mattack::check_money_left( monster *z )
             }
 
             const SpeechBubble &speech_no_time = get_speech( "mon_grocerybot_friendship_done" );
-            sounds::sound( z->bub_pos(), speech_no_time.volume,
-                           sounds::sound_t::electronic_speech, speech_no_time.text );
+            se.volume = speech_no_time.volume;
+            se.description = speech_no_time.text.translated();
+            sounds::sound( se );
             z->remove_effect( effect_pet );
             return true;
         }
     } else {
         const time_duration time_left = z->get_effect_dur( effect_paid );
         if( time_left < 1_minutes ) {
-            if( calendar::once_every( 20_seconds ) ) {
+            if( action_time_scale::once_every_this_tick( 20_seconds ) ) {
                 const SpeechBubble &speech_time_low = get_speech( "mon_grocerybot_running_out_of_friendship" );
-                sounds::sound( z->bub_pos(), speech_time_low.volume,
-                               sounds::sound_t::electronic_speech, speech_time_low.text );
+                se.volume = speech_time_low.volume;
+                se.description = speech_time_low.text.translated();
+                sounds::sound( se );
             }
         }
     }
     if( z->friendly == -1 && !z->has_effect( effect_paid ) ) {
-        if( calendar::once_every( 3_hours ) ) {
+        if( action_time_scale::once_every_this_tick( 3_hours ) ) {
             const SpeechBubble &speech_override_start = get_speech( "mon_grocerybot_hacked" );
-            sounds::sound( z->bub_pos(), speech_override_start.volume,
-                           sounds::sound_t::electronic_speech, speech_override_start.text );
+            se.volume = speech_override_start.volume;
+            se.description = speech_override_start.text.translated();
+            sounds::sound( se );
         }
     }
     return false;
 }
 bool mattack::photograph( monster *z )
 {
-    if( !within_visual_range( z, 6 ) ) {
-        return false;
+    // Non-friendly bots only do something interesting if they're a police bot
+    // Todo: possibly allow non-friendly military bots to alert other bots to the player's position?
+    if( !z->friendly ) {
+        // We're a police bot, but we're either too far away from the player, or we already summoned backup
+        if( z->has_flag( MF_POLICE_EYEBOT ) && ( !within_visual_range( z, 6 ) ||
+                z->has_effect( effect_eyebot_depleted ) ) ) {
+            return false;
+        } else if( !z->has_flag( MF_POLICE_EYEBOT ) ) {
+            return false;
+        }
     }
 
     // Badges should NOT be swappable between roles.
     // Hence separate checking.
     // If you are in fact listed as a police officer
-    if( g->u.has_trait( trait_PROF_POLICE ) ) {
-        // And you're wearing your badge
-        if( g->u.is_wearing( itype_badge_deputy ) ) {
-            if( one_in( 3 ) ) {
-                add_msg( m_info, _( "The %s flashes a LED and departs.  Human officer on scene." ),
-                         z->name() );
-                z->no_corpse_quiet = true;
-                z->no_extra_death_drops = true;
-                z->die( nullptr );
-                return false;
-            } else {
-                add_msg( m_info,
-                         _( "The %s acknowledges you as an officer responding, but hangs around to watch." ),
-                         z->name() );
-                add_msg( m_info, _( "Probably some now-obsolete Internal Affairs subroutine…" ) );
-                return true;
+    if( !z->friendly && z->has_flag( MF_POLICE_EYEBOT ) ) {
+        if( g->u.has_trait( trait_PROF_POLICE ) ) {
+            // And you're wearing your badge
+            if( g->u.is_wearing( itype_badge_deputy ) ) {
+                if( one_in( 3 ) ) {
+                    add_msg( m_info, _( "The %s flashes a LED and departs.  Human officer on scene." ),
+                             z->name() );
+                    z->no_corpse_quiet = true;
+                    z->no_extra_death_drops = true;
+                    z->die( nullptr );
+                    return false;
+                } else {
+                    add_msg( m_info,
+                             _( "The %s acknowledges you as an officer responding, but hangs around to watch." ),
+                             z->name() );
+                    add_msg( m_info, _( "Probably some now-obsolete Internal Affairs subroutine…" ) );
+                    return true;
+                }
             }
         }
-    }
 
-    if( g->u.has_trait( trait_PROF_PD_DET ) ) {
-        // And you have your shield on
-        if( g->u.is_wearing( itype_badge_detective ) ) {
-            if( one_in( 4 ) ) {
-                add_msg( m_info, _( "The %s flashes a LED and departs.  Human officer on scene." ),
-                         z->name() );
-                z->no_corpse_quiet = true;
-                z->no_extra_death_drops = true;
-                z->die( nullptr );
-                return false;
-            } else {
-                add_msg( m_info,
-                         _( "The %s acknowledges you as an officer responding, but hangs around to watch." ),
-                         z->name() );
-                add_msg( m_info, _( "Ops used to do that in case you needed backup…" ) );
-                return true;
+        if( g->u.has_trait( trait_PROF_PD_DET ) ) {
+            // And you have your shield on
+            if( g->u.is_wearing( itype_badge_detective ) ) {
+                if( one_in( 4 ) ) {
+                    add_msg( m_info, _( "The %s flashes a LED and departs.  Human officer on scene." ),
+                             z->name() );
+                    z->no_corpse_quiet = true;
+                    z->no_extra_death_drops = true;
+                    z->die( nullptr );
+                    return false;
+                } else {
+                    add_msg( m_info,
+                             _( "The %s acknowledges you as an officer responding, but hangs around to watch." ),
+                             z->name() );
+                    add_msg( m_info, _( "Ops used to do that in case you needed backup…" ) );
+                    return true;
+                }
+            }
+        } else if( g->u.has_trait( trait_PROF_SWAT ) ) {
+            // And you're wearing your badge
+            if( g->u.is_wearing( itype_badge_swat ) ) {
+                if( one_in( 3 ) ) {
+                    add_msg( m_info, _( "The %s flashes a LED and departs.  SWAT's working the area." ),
+                             z->name() );
+                    z->no_corpse_quiet = true;
+                    z->no_extra_death_drops = true;
+                    z->die( nullptr );
+                    return false;
+                } else {
+                    add_msg( m_info, _( "The %s acknowledges you as SWAT onsite, but hangs around to watch." ),
+                             z->name() );
+                    add_msg( m_info, _( "Probably some now-obsolete Internal Affairs subroutine…" ) );
+                    return true;
+                }
+            }
+        } else if( g->u.has_trait( trait_PROF_CYBERCO ) ) {
+            // And you're wearing your badge
+            if( g->u.is_wearing( itype_badge_cybercop ) ) {
+                if( one_in( 3 ) ) {
+                    add_msg( m_info, _( "The %s winks a LED and departs.  One machine to another?" ),
+                             z->name() );
+                    z->no_corpse_quiet = true;
+                    z->no_extra_death_drops = true;
+                    z->die( nullptr );
+                    return false;
+                } else {
+                    add_msg( m_info,
+                             _( "The %s acknowledges you as an officer responding, but hangs around to watch." ),
+                             z->name() );
+                    add_msg( m_info, _( "Apparently yours aren't the only systems kept alive post-apocalypse." ) );
+                    return true;
+                }
             }
         }
-    } else if( g->u.has_trait( trait_PROF_SWAT ) ) {
-        // And you're wearing your badge
-        if( g->u.is_wearing( itype_badge_swat ) ) {
-            if( one_in( 3 ) ) {
-                add_msg( m_info, _( "The %s flashes a LED and departs.  SWAT's working the area." ),
-                         z->name() );
-                z->no_corpse_quiet = true;
-                z->no_extra_death_drops = true;
-                z->die( nullptr );
-                return false;
-            } else {
-                add_msg( m_info, _( "The %s acknowledges you as SWAT onsite, but hangs around to watch." ),
-                         z->name() );
-                add_msg( m_info, _( "Probably some now-obsolete Internal Affairs subroutine…" ) );
-                return true;
-            }
-        }
-    } else if( g->u.has_trait( trait_PROF_CYBERCO ) ) {
-        // And you're wearing your badge
-        if( g->u.is_wearing( itype_badge_cybercop ) ) {
-            if( one_in( 3 ) ) {
-                add_msg( m_info, _( "The %s winks a LED and departs.  One machine to another?" ),
-                         z->name() );
-                z->no_corpse_quiet = true;
-                z->no_extra_death_drops = true;
-                z->die( nullptr );
-                return false;
-            } else {
-                add_msg( m_info,
-                         _( "The %s acknowledges you as an officer responding, but hangs around to watch." ),
-                         z->name() );
-                add_msg( m_info, _( "Apparently yours aren't the only systems kept alive post-apocalypse." ) );
-                return true;
-            }
-        }
-    }
 
-    if( g->u.has_trait( trait_PROF_FED ) ) {
-        // And you're wearing your badge
-        if( g->u.is_wearing( itype_badge_marshal ) ) {
-            add_msg( m_info, _( "The %s flashes a LED and departs.  The Feds got this." ), z->name() );
-            z->no_corpse_quiet = true;
-            z->no_extra_death_drops = true;
-            z->die( nullptr );
+        if( g->u.has_trait( trait_PROF_FED ) ) {
+            // And you're wearing your badge
+            if( g->u.is_wearing( itype_badge_marshal ) ) {
+                add_msg( m_info, _( "The %s flashes a LED and departs.  The Feds got this." ), z->name() );
+                z->no_corpse_quiet = true;
+                z->no_extra_death_drops = true;
+                z->die( nullptr );
+                return false;
+            }
+        }
+        if( g->u.primary_weapon().typeId() == itype_e_handcuffs ) {
+            // Ignore arrested suspects.
             return false;
         }
     }
 
-    if( z->friendly || g->u.primary_weapon().typeId() == itype_e_handcuffs ) {
-        // Friendly (hacked?) bot ignore the player. Arrested suspect ignored too.
-        // TODO: might need to be revisited when it can target npcs.
-        return false;
-    }
-    z->moves -= 150;
-    add_msg( m_warning, _( "The %s takes your picture!" ), z->name() );
-    // TODO: Make the player known to the faction
-    std::string cname = _( "…database connection lost!" );
-    if( one_in( 6 ) ) {
-        cname = Name::generate( g->u.male );
-    } else if( one_in( 3 ) ) {
-        cname = g->u.name;
-    }
-    sounds::sound( z->bub_pos(), 15, sounds::sound_t::alert,
-                   string_format( _( "a robotic voice boom, \"Citizen %s!\"" ), cname ), false, "speech",
-                   z->type->id.str() );
 
-    if( g->u.primary_weapon().is_gun() ) {
-        sounds::sound( z->bub_pos(), 15, sounds::sound_t::alert, _( "\"Drop your gun!  Now!\"" ) );
-    } else if( g->u.is_armed() ) {
-        sounds::sound( z->bub_pos(), 15, sounds::sound_t::alert, _( "\"Drop your weapon!  Now!\"" ) );
-    }
-    const SpeechBubble &speech = get_speech( z->type->id.str() );
-    sounds::sound( z->bub_pos(), speech.volume, sounds::sound_t::alert, speech.text.translated() );
-    g->timed_events.add( TIMED_EVENT_ROBOT_ATTACK, calendar::turn + rng( 15_turns, 30_turns ), 0,
-                         g->u.abs_sm_pos() );
+    if( z->friendly ) {
+        if( g->u.sees( *z ) ) {
+            add_msg( m_good, _( "The %s scans the surrounding area." ), z->name() );
+        }
 
-    return true;
+        for( monster &target : g->all_monsters() ) {
+            if( z->sees( target ) && rl_dist_fast( target.bub_pos(), z->bub_pos() ) <= 25 &&
+                target.attitude_to( g->u ) == Attitude::A_HOSTILE ) {
+                target.add_effect( effect_drone_marker, rng( 15_turns, 30_turns ) );
+            }
+        }
+        return true;
+
+    } else if( z->has_flag( MF_POLICE_EYEBOT ) && !z->has_effect( effect_eyebot_depleted ) ) {
+        z->moves -= 150;
+        add_msg( m_warning, _( "The %s takes your picture!" ), z->name() );
+        // TODO: Make the player known to the faction
+        std::string cname = _( "…database connection lost!" );
+        if( one_in( 6 ) ) {
+            cname = Name::generate( g->u.male );
+        } else if( one_in( 3 ) ) {
+            cname = g->u.name;
+        }
+        {
+            sound_event se;
+            se.origin = z->bub_pos();
+            se.volume = 80;
+            se.category = sounds::sound_t::alert;
+            se.description = string_format( _( "a robotic voice boom, \"Citizen %s!\"" ), cname );
+            se.movement_noise = false;
+            se.from_monster = true;
+            se.monfaction = z->faction.id();
+            se.id = "shout";
+            se.variant = z->type->id.str();
+            sounds::sound( se );
+        }
+
+        if( g->u.primary_weapon().is_gun() ) {
+            sound_event se;
+            se.origin = z->bub_pos();
+            se.volume = 80;
+            se.category = sounds::sound_t::alert;
+            se.description = _( "\"Drop your gun! Now!\"" );
+            se.movement_noise = false;
+            se.from_monster = true;
+            se.monfaction = z->faction.id();
+            se.id = "shout";
+            se.variant = z->type->id.str();
+            sounds::sound( se );
+        } else if( g->u.is_armed() ) {
+            sound_event se;
+            se.origin = z->bub_pos();
+            se.volume = 80;
+            se.category = sounds::sound_t::alert;
+            se.description = _( "\"Drop your weapon! Now!\"" );
+            se.movement_noise = false;
+            se.from_monster = true;
+            se.monfaction = z->faction.id();
+            se.id = "shout";
+            se.variant = z->type->id.str();
+            sounds::sound( se );
+        }
+        {
+            const SpeechBubble &speech = get_speech( z->type->id.str() );
+            sound_event se;
+            se.origin = z->bub_pos();
+            se.volume = speech.volume;
+            se.category = sounds::sound_t::alert;
+            se.description = speech.text.translated();
+            se.from_monster = true;
+            se.monfaction = z->faction.id();
+            se.id = "speech";
+            se.variant = z->type->id.str();
+            sounds::sound( se );
+        }
+        g->timed_events.add( TIMED_EVENT_ROBOT_ATTACK, calendar::turn + rng( 15_turns, 30_turns ), 0,
+                             g->u.abs_sm_pos() );
+        z->add_effect( effect_eyebot_depleted, 1_turns );
+        return true;
+    }
+    // Fallback
+    return false;
 }
 
 bool mattack::tazer( monster *z )
@@ -3451,10 +3679,18 @@ void mattack::rifle( monster *z, Creature *target )
     tmp->set_skill_level( skill_gun, 6 );
     // No need to aim
     tmp->recoil = 0;
-
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
     if( target == &g->u ) {
         if( !z->has_effect( effect_targeted ) ) {
-            sounds::sound( z->bub_pos(), 8, sounds::sound_t::alarm, _( "beep-beep." ), false, "misc", "beep" );
+            se.volume = 60;
+            se.description = _( "beep-beep." );
+            se.id = "misc";
+            se.variant = "beep";
+            se.category = sounds::sound_t::alarm;
+            sounds::sound( se );
             z->add_effect( effect_targeted, 8_turns );
             z->moves -= 100;
             return;
@@ -3465,11 +3701,19 @@ void mattack::rifle( monster *z, Creature *target )
 
     if( z->ammo[ammo_type] <= 0 ) {
         if( one_in( 3 ) ) {
-            sounds::sound( z->bub_pos(), 2, sounds::sound_t::combat, _( "a chk!" ), false, "fire_gun",
-                           "empty" );
+            se.volume = 50;
+            se.description = _( "a chk!" );
+            se.id = "fire_gun";
+            se.variant = "empty";
+            se.category = sounds::sound_t::combat;
+            sounds::sound( se );
         } else if( one_in( 4 ) ) {
-            sounds::sound( z->bub_pos(), 6, sounds::sound_t::combat,  _( "boop!" ), false, "fire_gun",
-                           "empty" );
+            se.volume = 60;
+            se.description = _( "boop!" );
+            se.id = "fire_gun";
+            se.variant = "empty";
+            se.category = sounds::sound_t::combat;
+            sounds::sound( se );
         }
         return;
     }
@@ -3501,6 +3745,11 @@ void mattack::frag( monster *z, Creature *target ) // This is for the bots, not 
                   z->name() );
         z->ammo[ammo_type] = 200;
     }
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.faction = faction_id( "no_faction" );
 
     if( target == &g->u ) {
         if( !z->has_effect( effect_targeted ) ) {
@@ -3513,8 +3762,12 @@ void mattack::frag( monster *z, Creature *target ) // This is for the bots, not 
             }
             // Effect removed in game.cpp, duration doesn't much matter
             g->u.add_effect( effect_laserlocked, 3_turns );
-            sounds::sound( z->bub_pos(), 10, sounds::sound_t::electronic_speech, _( "Targeting." ),
-                           false, "speech", z->type->id.str() );
+            se.volume = 60;
+            se.category = sounds::sound_t::electronic_speech;
+            se.description = _( "Targeting." );
+            se.id = "speech";
+            se.variant = z->type->id.str();
+            sounds::sound( se );
             z->add_effect( effect_targeted, 5_turns );
             z->moves -= 150;
             // Should give some ability to get behind cover,
@@ -3531,11 +3784,16 @@ void mattack::frag( monster *z, Creature *target ) // This is for the bots, not 
     z->moves -= 150;
 
     if( z->ammo[ammo_type] <= 0 ) {
+        se.id = "fire_gun";
+        se.variant = "empty";
+        se.category = sounds::sound_t::combat;
+        se.volume = 60;
         if( one_in( 3 ) ) {
-            sounds::sound( z->bub_pos(), 2, sounds::sound_t::combat, _( "a chk!" ), false, "fire_gun",
-                           "empty" );
+            se.description = _( "a chk!" );
+            sounds::sound( se );
         } else if( one_in( 4 ) ) {
-            sounds::sound( z->bub_pos(), 6, sounds::sound_t::combat, _( "boop!" ), false, "fire_gun", "empty" );
+            se.description = _( "boop!" );
+            sounds::sound( se );
         }
         return;
     }
@@ -3573,13 +3831,23 @@ void mattack::tankgun( monster *z, Creature *target )
     if( dist > 50 ) {
         return;
     }
+    sound_event se;
+    se.origin = z->bub_pos();
 
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.faction = faction_id( "no_faction" );
+    se.category = sounds::sound_t::combat;
     if( !z->has_effect( effect_targeted ) ) {
         //~ There will be a 120mm HEAT shell sent at high speed to your location next turn.
         target->add_msg_if_player( m_warning, _( "You're not sure why you've got a laser dot on you…" ) );
         //~ Sound of a tank turret swiveling into place
-        sounds::sound( z->bub_pos(), 10, sounds::sound_t::combat, _( "whirrrrrclick." ), false, "misc",
-                       "servomotor" );
+        se.volume = 65;
+        se.description = _( "whirrrrrclick." );
+        se.id = "misc";
+        se.variant = "servomotor";
+
+        sounds::sound( se );
         z->add_effect( effect_targeted, 1_minutes );
         target->add_effect( effect_laserlocked, 1_minutes );
         z->moves -= 200;
@@ -3598,12 +3866,15 @@ void mattack::tankgun( monster *z, Creature *target )
     z->moves -= 150;
 
     if( z->ammo[ammo_type] <= 0 ) {
+        se.id = "fire_gun";
+        se.variant = "empty";
+        se.volume = 60;
         if( one_in( 3 ) ) {
-            sounds::sound( z->bub_pos(), 2, sounds::sound_t::combat, _( "a chk!" ), false, "fire_gun",
-                           "empty" );
+            se.description = _( "a chk!" );
+            sounds::sound( se );
         } else if( one_in( 4 ) ) {
-            sounds::sound( z->bub_pos(), 6, sounds::sound_t::combat, _( "clank!" ), false, "fire_gun",
-                           "empty" );
+            se.description = ( "clank!" );
+            sounds::sound( se );
         }
         return;
     }
@@ -3612,6 +3883,80 @@ void mattack::tankgun( monster *z, Creature *target )
     }
 
     detached_ptr<item> gun = item::spawn( "TANK" );
+    gun->ammo_set( ammo_type, z->ammo[ ammo_type ] );
+    tmp->set_primary_weapon( std::move( gun ) );
+    int burst = std::max( tmp->primary_weapon().gun_get_mode( gun_mode_id( "AUTO" ) ).qty, 1 );
+
+    z->ammo[ ammo_type ] -= ranged::fire_gun( *tmp, target->bub_pos(),
+                            burst ) * tmp->primary_weapon().ammo_required();
+}
+
+void mattack::atgm( monster *z, Creature *target )
+{
+    if( z->type->monster_weapon && z->has_effect( effect_monster_disarmed ) ) {
+        return;
+    }
+    const itype_id ammo_type( "atgm_heat" );
+    // Make sure our ammo isn't weird.
+    if( z->ammo[ammo_type] > 4 ) {
+        debugmsg( "Generated too much ammo (%d) for %s in mattack::atgm", z->ammo[ammo_type],
+                  z->name() );
+        z->ammo[ammo_type] = 4;
+    }
+
+    int dist = rl_dist( z->bub_pos(), target->bub_pos() );
+    if( dist > 50 ) {
+        return;
+    }
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.from_monster = true;
+    se.monfaction = z->faction->id;
+    se.category = sounds::sound_t::combat;
+    if( !z->has_effect( effect_targeted ) ) {
+        //~ There will be a ATGM HEAT sent at high speed to your location next turn.
+        target->add_msg_if_player( m_warning, _( "You're not sure why you've got a laser dot on you…" ) );
+        //~ Sound of a atgm tube uncovering swiveling into place
+        se.description = _( "whirrrrrclick." );
+        se.id = "misc";
+        se.variant = "servomotor";
+        se.volume = 75;
+        sounds::sound( se );
+        z->add_effect( effect_targeted, 1_minutes );
+        target->add_effect( effect_laserlocked, 1_minutes );
+        z->moves -= 200;
+        // Should give some ability to get behind cover,
+        // even though it's patently unrealistic.
+        return;
+    }
+    std::unique_ptr<npc> tmp = make_fake_npc( z, 12, 8, 8, 8 );
+    tmp->set_skill_level( skill_launcher, 1 );
+    tmp->set_skill_level( skill_gun, 1 );
+    // No need to aim
+    tmp->recoil = 0;
+    // It takes a while
+    z->moves -= 150;
+
+    if( z->ammo[ammo_type] <= 0 ) {
+        se.id = "fire_gun";
+        se.variant = "empty";
+        if( one_in( 3 ) ) {
+            se.description = _( "a chk!" );
+            se.volume = 50;
+            sounds::sound( se );
+
+        } else if( one_in( 4 ) ) {
+            se.description = _( "clank!" );
+            se.volume = 60;
+            sounds::sound( se );
+        }
+        return;
+    }
+    if( g->u.sees( *z ) ) {
+        add_msg( m_warning, _( "The %s's ATGM tube fires!" ), z->name() );
+    }
+
+    detached_ptr<item> gun = item::spawn( "atgm_launcher" );
     gun->ammo_set( ammo_type, z->ammo[ ammo_type ] );
     tmp->set_primary_weapon( std::move( gun ) );
     int burst = std::max( tmp->primary_weapon().gun_get_mode( gun_mode_id( "AUTO" ) ).qty, 1 );
@@ -3672,7 +4017,7 @@ bool mattack::searchlight( monster *z )
     }
 
     //battery charge from the generator is enough for some time of work
-    if( calendar::once_every( 10_minutes ) ) {
+    if( action_time_scale::once_every_this_tick( 10_minutes ) ) {
 
         bool generator_ok = false;
 
@@ -3874,8 +4219,7 @@ void mattack::flame( monster *z, Creature *target )
             // TODO: Z
             if( here.hit_with_fire( tripoint_bub_ms( i.xy(), z->bub_pos().z() ) ) ) {
                 if( g->u.sees( i ) ) {
-                    add_msg( _( "The tongue of flame hits the %s!" ),
-                             here.tername( i.xy() ) );
+                    add_msg( _( "The tongue of flame hits the %s!" ), here.tername( i ) );
                 }
                 return;
             }
@@ -3903,19 +4247,17 @@ void mattack::flame( monster *z, Creature *target )
             } else {
                 intervening.y() = prev_point.y();
             }
-            if( here.hit_with_fire( tripoint_bub_ms( intervening.xy(), z->bub_pos().z() ) ) ) {
+            if( here.hit_with_fire( intervening ) ) {
                 if( g->u.sees( i ) ) {
-                    add_msg( _( "The tongue of flame hits the %s!" ),
-                             here.tername( intervening.xy() ) );
+                    add_msg( _( "The tongue of flame hits the %s!" ), here.tername( intervening ) );
                 }
                 return;
             }
         }
         // break out of attack if flame hits a wall
-        if( here.hit_with_fire( tripoint_bub_ms( i.xy(), z->bub_pos().z() ) ) ) {
+        if( here.hit_with_fire( i ) ) {
             if( g->u.sees( i ) ) {
-                add_msg( _( "The tongue of flame hits the %s!" ),
-                         here.tername( i.xy() ) );
+                add_msg( _( "The tongue of flame hits the %s!" ), here.tername( i ) );
             }
             return;
         }
@@ -3945,22 +4287,34 @@ bool mattack::copbot( monster *z )
     }
 
     if( rl_dist( z->bub_pos(), target->bub_pos() ) > 2 || foe == nullptr || !z->sees( *target ) ) {
+        sound_event se;
+        se.origin = z->bub_pos();
+        se.category = sounds::sound_t::alert;
+        se.from_monster = true;
+        se.monfaction = z->faction.id();
+        se.faction = faction_id( "no_faction" );
         if( one_in( 3 ) ) {
+            se.id = "speech";
+            se.variant = z->type->id.str();
+            se.volume = 80;
             if( sees_u ) {
                 if( foe->unarmed_attack() ) {
-                    sounds::sound( z->bub_pos(), 18, sounds::sound_t::alert,
-                                   _( "a robotic voice boom, \"Citizen, Halt!\"" ), false, "speech", z->type->id.str() );
+                    se.description = ( "a robotic voice boom, \"Citizen, Halt!\"" );
+                    sounds::sound( se );
                 } else if( !cuffed ) {
-                    sounds::sound( z->bub_pos(), 18, sounds::sound_t::alert,
-                                   _( "a robotic voice boom, \"Please put down your weapon.\"" ), false, "speech", z->type->id.str() );
+                    se.description = _( "a robotic voice boom, \"Please put down your weapon.\"" );
+                    sounds::sound( se );
                 }
             } else {
-                sounds::sound( z->bub_pos(), 18, sounds::sound_t::alert,
-                               _( "a robotic voice boom, \"Come out with your hands up!\"" ), false, "speech", z->type->id.str() );
+                se.description = _( "a robotic voice boom, \"Come out with your hands up!\"" );
+                sounds::sound( se );
             }
         } else {
-            sounds::sound( z->bub_pos(), 18, sounds::sound_t::alarm,
-                           _( "a police siren, whoop WHOOP" ), false, "environment", "police_siren" );
+            se.id = "environment";
+            se.variant = "police_siren";
+            se.description = _( "a police siren, whoop WHOOP" );
+            se.volume = 100;
+            sounds::sound( se );
         }
         return true;
     }
@@ -4136,6 +4490,11 @@ bool mattack::multi_robot( monster *z )
                 frag( z, target );
             }
             break;
+        case 5:
+            if( dist <= 50 ) {
+                atgm( z, target );
+            }
+            break;
         default:
             // Weak stuff, shouldn't bother with
             return false;
@@ -4181,8 +4540,16 @@ bool mattack::ratking( monster *z )
 
 bool mattack::generator( monster *z )
 {
-    sounds::sound( z->bub_pos(), 100, sounds::sound_t::activity, "hmmmm" );
-    if( calendar::once_every( 1_minutes ) && z->get_hp() < z->get_hp_max() ) {
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 90;
+    se.category = sounds::sound_t::activity;
+    se.description = "hmmmm";
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.faction = faction_id( "no_faction" );
+    sounds::sound( se );
+    if( action_time_scale::once_every_this_tick( 1_minutes ) && z->get_hp() < z->get_hp_max() ) {
         z->heal( 1 );
     }
 
@@ -4441,8 +4808,16 @@ bool mattack::flesh_golem( monster *z )
         if( one_in( 12 ) ) {
             z->moves -= 200;
             // It doesn't "nearly deafen you" when it roars from the other side of bubble
-            sounds::sound( z->bub_pos(), 80, sounds::sound_t::alert, _( "a terrifying roar!" ), false, "shout",
-                           "roar" );
+            sound_event se;
+            se.origin = z->bub_pos();
+            se.volume = 120;
+            se.category = sounds::sound_t::alert;
+            se.description = _( "a terrifying roar!" );
+            se.from_monster = true;
+            se.monfaction = z->faction.id();
+            se.id = "shout";
+            se.variant = "roar";
+            sounds::sound( se );
             return true;
         }
         return false;
@@ -4501,9 +4876,9 @@ bool mattack::absorb_meat( monster *z )
             if( current_item_material == material_id( "flesh" ) ||
                 current_item_material == material_id( "hflesh" ) ) {
                 //We have something meaty! Calculate how much it will heal the monster
-                const int ml_of_meat = units::to_milliliter<int>( current_item->volume() );
-                const int total_charges = current_item->count();
-                const int ml_per_charge = ml_of_meat / total_charges;
+                const auto ml_of_meat = units::to_milliliter( current_item->volume() );
+                const auto total_charges = current_item->count();
+                const auto ml_per_charge = ml_of_meat / total_charges;
                 //We have a max size of meat here to avoid absorbing whole corpses.
                 if( ml_per_charge > max_meat_absorbed * 1000 ) {
                     add_msg( m_info, _( "The %1$s quivers hungrily in the direction of the %2$s." ), z->name(),
@@ -4732,15 +5107,31 @@ bool mattack::longswipe( monster *z )
 static void parrot_common( monster *parrot )
 {
     const SpeechBubble &speech = get_speech( parrot->type->id.str() );
-    sounds::sound( parrot->bub_pos(), speech.volume, sounds::sound_t::speech, speech.text.translated(),
-                   false, "speech", parrot->type->id.str() );
+    sound_event se;
+    se.origin = parrot->bub_pos();
+    se.volume = speech.volume;
+    se.category = sounds::sound_t::speech;
+    se.description = speech.text.translated();
+    se.from_monster = true;
+    se.monfaction = parrot->faction.id();
+    se.id = "speech";
+    se.variant = parrot->type->id.str();
+    sounds::sound( se );
 }
 
 bool mattack::parrot( monster *z )
 {
     if( z->has_effect( effect_shrieking ) ) {
-        sounds::sound( z->bub_pos(), 120, sounds::sound_t::alert, _( "a piercing wail!" ), false, "shout",
-                       "wail" );
+        sound_event se;
+        se.origin = z->bub_pos();
+        se.volume = 120;
+        se.category = sounds::sound_t::alert;
+        se.description = _( "a piercing wail!" );
+        se.from_monster = true;
+        se.monfaction = z->faction.id();
+        se.id = "shout";
+        se.variant = "wail";
+        sounds::sound( se );
         z->moves -= 40;
         return false;
     } else if( one_in( 20 ) ) {
@@ -4889,8 +5280,10 @@ bool mattack::thrown_by_judo( monster *z )
         ///\EFFECT_DEX increases chance judo-throwing a monster
 
         ///\EFFECT_UNARMED increases chance of judo-throwing monster, vs their melee skill
-        if( ( ( foe->dex_cur + foe->get_skill_level( skill_unarmed ) ) > ( z->type->melee_skill + rng( 0,
-                3 ) ) ) ) {
+        const auto unarmed_skill = foe->get_skill_level( skill_unarmed );
+        const auto size_penalty = static_cast<int>( z->type->size ) * 2;
+        if( ( foe->dex_cur + unarmed_skill ) > ( z->type->melee_skill + size_penalty + rng( 0,
+                3 ) ) ) {
             target->add_msg_if_player( m_good, _( "but you grab its arm and flip it to the ground!" ) );
 
             // most of the time, when not isolated
@@ -4905,10 +5298,9 @@ bool mattack::thrown_by_judo( monster *z )
                 foe->check_dead_state();
             }
             // Monster is down,
-            z->add_effect( effect_downed, 5_turns );
-            const int min_damage = 10 + foe->get_skill_level( skill_unarmed );
-            const int max_damage = 20 + foe->get_skill_level( skill_unarmed );
-            // Deal moderate damage
+            z->add_effect( effect_downed, 3_turns );
+            const auto min_damage = 3 + unarmed_skill / 2;
+            const auto max_damage = 8 + unarmed_skill;
             const auto damage = rng( min_damage, max_damage );
             z->apply_damage( foe, bodypart_id( "torso" ), damage );
             z->check_dead_state();
@@ -4933,7 +5325,7 @@ bool mattack::riotbot( monster *z )
 
     player *foe = dynamic_cast<player *>( target );
 
-    if( calendar::once_every( 1_minutes ) ) {
+    if( action_time_scale::once_every_this_tick( 1_minutes ) ) {
         for( const tripoint_bub_ms &dest : here.points_in_radius( z->bub_pos(), 4 ) ) {
             if( here.passable( dest ) &&
                 here.clear_path( z->bub_pos(), dest, 3, 1, 100 ) ) {
@@ -4941,17 +5333,24 @@ bool mattack::riotbot( monster *z )
             }
         }
     }
-
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
     //already arrested?
     //and yes, if the player has no hands, we are not going to arrest him.
     if( foe != nullptr &&
         ( foe->primary_weapon().typeId() == itype_e_handcuffs || !foe->has_two_arms() ) ) {
         z->anger = 0;
 
-        if( calendar::once_every( 25_turns ) ) {
-            sounds::sound( z->bub_pos(), 10, sounds::sound_t::electronic_speech,
-                           _( "Halt and submit to arrest, citizen!  The police will be here any moment." ), false, "speech",
-                           z->type->id.str() );
+        if( action_time_scale::once_every_this_tick( 25_turns ) ) {
+            se.volume = 70;
+            se.category = sounds::sound_t::electronic_speech;
+            se.description = _( "Halt and submit to arrest, citizen!  The police will be here any moment." );
+            se.id = "speech";
+            se.variant = z->type->id.str();
+
+            sounds::sound( se );
         }
 
         return true;
@@ -4967,9 +5366,12 @@ bool mattack::riotbot( monster *z )
     //we need empty hands to arrest
     if( foe == &g->u && !foe->is_armed() ) {
 
-        sounds::sound( z->bub_pos(), 15, sounds::sound_t::electronic_speech,
-                       _( "Please stay in place, citizen, do not make any movements!" ), false, "speech",
-                       z->type->id.str() );
+        se.volume = 70;
+        se.category = sounds::sound_t::electronic_speech;
+        se.description = _( "Please stay in place, citizen, do not make any movements!" );
+        se.id = "speech";
+        se.variant = z->type->id.str();
+        sounds::sound( se );
 
         //we need to come closer and arrest
         if( !is_adjacent( z, foe, false ) ) {
@@ -5033,15 +5435,15 @@ bool mattack::riotbot( monster *z )
                 add_msg( _( "The robot puts handcuffs on you." ) );
             }
 
-            sounds::sound( z->bub_pos(), 5, sounds::sound_t::electronic_speech,
-                           _( "You are under arrest, citizen.  You have the right to remain silent.  If you do not remain silent, anything you say may be used against you in a court of law." ),
-                           false, "speech", z->type->id.str() );
-            sounds::sound( z->bub_pos(), 5, sounds::sound_t::electronic_speech,
-                           _( "You have the right to an attorney.  If you cannot afford an attorney, one will be provided at no cost to you.  You may have your attorney present during any questioning." ) );
-            sounds::sound( z->bub_pos(), 5, sounds::sound_t::electronic_speech,
-                           _( "If you do not understand these rights, an officer will explain them in greater detail when taking you into custody." ) );
-            sounds::sound( z->bub_pos(), 5, sounds::sound_t::electronic_speech,
-                           _( "Do not attempt to flee or to remove the handcuffs, citizen.  That can be dangerous to your health." ) );
+            se.volume = 60;
+            se.category = sounds::sound_t::electronic_speech;
+            // Casting out a a whole bunch of sounds in sequence is less desireable than just one sound with a long description.
+            se.description =
+                _( "You are under arrest, citizen.  You have the right to remain silent.  If you do not remain silent, anything you say may be used against you in a court of law. You have the right to an attorney.  If you cannot afford an attorney, one will be provided at no cost to you.  You may have your attorney present during any questioning. If you do not understand these rights, an officer will explain them in greater detail when taking you into custody. Do not attempt to flee or to remove the handcuffs, citizen.  That can be dangerous to your health." );
+
+            se.id = "speech";
+            se.variant = z->type->id.str();
+            sounds::sound( se );
 
             z->moves -= 300;
 
@@ -5086,9 +5488,13 @@ bool mattack::riotbot( monster *z )
         return true;
     }
 
-    if( calendar::once_every( 5_turns ) ) {
-        sounds::sound( z->bub_pos(), 25, sounds::sound_t::electronic_speech,
-                       _( "Empty your hands and hold your position, citizen!" ), false, "speech", z->type->id.str() );
+    if( action_time_scale::once_every_this_tick( 5_turns ) ) {
+        se.volume = 80;
+        se.category = sounds::sound_t::electronic_speech;
+        se.description = _( "Empty your hands and hold your position, citizen!" );
+        se.id = "speech";
+        se.variant = z->type->id.str();
+        sounds::sound( se );
     }
 
     if( dist > 5 && dist < 18 && one_in( 10 ) ) {
@@ -5107,7 +5513,12 @@ bool mattack::riotbot( monster *z )
                                      target->bub_pos().z() };
 
         //~ Sound of a riotbot using its blinding flash
-        sounds::sound( z->bub_pos(), 3, sounds::sound_t::combat, _( "fzzzzzt" ), false, "misc", "flash" );
+        se.volume = 50;
+        se.category = sounds::sound_t::combat;
+        se.description = _( "fzzzzzt" );
+        se.id = "misc";
+        se.variant = "flash";
+        sounds::sound( se );
 
         std::vector<tripoint_bub_ms> traj = line_to( z->bub_pos(), dest, 0, 0 );
         auto prev_point = z->bub_pos();
@@ -5307,13 +5718,21 @@ bool mattack::tindalos_teleport( monster *z )
 bool mattack::flesh_tendril( monster *z )
 {
     Creature *target = z->attack_target();
-
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.category = sounds::sound_t::alert;
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.faction = faction_id( "no_faction" );
     if( target == nullptr || !z->sees( *target ) ) {
         if( one_in( 70 ) ) {
             add_msg( _( "The floor trembles underneath your feet." ) );
             z->moves -= 200;
-            sounds::sound( z->bub_pos(), 60, sounds::sound_t::alert, _( "a deafening roar!" ), false, "shout",
-                           "roar" );
+            se.volume = 120;
+            se.description = _( "a deafening roar!" );
+            se.id = "shout";
+            se.variant = "roar";
+            sounds::sound( se );
         }
         return false;
     }
@@ -5342,8 +5761,11 @@ bool mattack::flesh_tendril( monster *z )
         //it pulls you towards itself and then knocks you away
         bool pulled = ranged_pull( z );
         if( pulled && one_in( 4 ) ) {
-            sounds::sound( z->bub_pos(), 60, sounds::sound_t::alarm, _( "a deafening roar!" ), false, "shout",
-                           "roar" );
+            se.volume = 120;
+            se.description = _( "a deafening roar!" );
+            se.id = "shout";
+            se.variant = "roar";
+            sounds::sound( se );
         }
         return pulled;
     }
@@ -6085,8 +6507,17 @@ bool mattack::doot( monster *z )
             continue;
         }
     }
-    sounds::sound( z->bub_pos(), 200, sounds::sound_t::music, _( "DOOT." ), false, "music_instrument",
-                   "trumpet" );
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.volume = 140;
+    se.category = sounds::sound_t::music;
+    se.description = _( "DOOT." );
+    se.from_monster = true;
+    se.monfaction = z->faction.id();
+    se.faction = faction_id( "no_faction" );
+    se.id = "music_instrument";
+    se.variant = "trumpet";
+    sounds::sound( se );
     return true;
 }
 

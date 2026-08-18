@@ -171,7 +171,7 @@ detached_ptr<item> vehicle_part::properties_to_item() const
                 }
                 if( !has_flag( targets_grid ) ) {
                     map &here = get_map();
-                    const auto local_pos = here.abs_to_bub( target.first );
+                    const auto local_pos = abs_to_bub( target.first );
                     if( !here.veh_at( local_pos ) ) {
                         // That vehicle ain't there no more.
                         tmp->set_flag( flag_NO_DROP );
@@ -268,7 +268,7 @@ double vehicle_part::damage_percent() const
 /** parts are considered broken at zero health */
 bool vehicle_part::is_broken() const
 {
-    return base->count_by_charges() ? false : base->damage() >= base->max_damage();
+    return base->damage() >= base->max_damage();
 }
 
 bool vehicle_part::is_unavailable( const bool carried ) const
@@ -424,7 +424,7 @@ double vehicle_part::consume_energy( const itype_id &ftype, double energy_j )
         }
         //TODO!: push up
         item &fuel_consumed = *item::spawn_temporary( ftype, calendar::turn, charges_to_use );
-        return energy_p_mL * units::to_milliliter<int>( fuel_consumed.volume( true ) );
+        return energy_p_mL * units::to_milliliter( fuel_consumed.volume( true ) );
     }
     return 0.0;
 }
@@ -467,7 +467,7 @@ bool vehicle_part::can_reload( const item *obj ) const
     return ammo_remaining() < ammo_capacity();
 }
 
-void vehicle_part::process_contents( const tripoint_bub_ms &pos, const bool e_heater )
+void vehicle_part::process_contents( const tripoint_bub_ms &pos, const bool e_heater, int turns )
 {
     // for now we only care about processing food containers since things like
     // fuel don't care about temperature yet
@@ -484,7 +484,9 @@ void vehicle_part::process_contents( const tripoint_bub_ms &pos, const bool e_he
             flag = temperature_flag::TEMP_FREEZER;
         }
 
-        base = item::process( base.release(), nullptr, pos, false, flag );
+        for( int i = 0; i < turns; i++ ) {
+            base = item::process( base.release(), nullptr, pos, false, flag );
+        }
     }
 }
 
@@ -607,6 +609,11 @@ bool vehicle_part::is_battery() const
 bool vehicle_part::is_reactor() const
 {
     return info().has_flag( VPFLAG_REACTOR );
+}
+
+auto vehicle_part::is_perpetual_power_source() const -> bool
+{
+    return info().has_flag( "PERPETUAL" ) && info().epower > 0;
 }
 
 bool vehicle_part::is_leaking() const

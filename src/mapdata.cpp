@@ -29,6 +29,7 @@
 #include "translations.h"
 #include "trap.h"
 #include "type_id.h"
+#include "type_id_implement.h"
 
 static const std::string flag_TRANSPARENT( "TRANSPARENT" );
 
@@ -118,101 +119,8 @@ auto parse_fluid_grid_role( const std::string &role ) -> std::optional<fluid_gri
 
 } // namespace
 
-/** @relates int_id */
-template<>
-bool int_id<ter_t>::is_valid() const
-{
-    return terrain_data.is_valid( *this );
-}
-
-/** @relates int_id */
-template<>
-const ter_t &int_id<ter_t>::obj() const
-{
-    return terrain_data.obj( *this );
-}
-
-/** @relates int_id */
-template<>
-const string_id<ter_t> &int_id<ter_t>::id() const
-{
-    return terrain_data.convert( *this );
-}
-
-/** @relates int_id */
-template<>
-int_id<ter_t> string_id<ter_t>::id() const
-{
-    return terrain_data.convert( *this, t_null );
-}
-
-/** @relates int_id */
-template<>
-int_id<ter_t>::int_id( const string_id<ter_t> &id ) : _id( id.id() )
-{
-}
-
-/** @relates string_id */
-template<>
-const ter_t &string_id<ter_t>::obj() const
-{
-    return terrain_data.obj( *this );
-}
-
-/** @relates string_id */
-template<>
-bool string_id<ter_t>::is_valid() const
-{
-    return terrain_data.is_valid( *this );
-}
-
-/** @relates int_id */
-template<>
-bool int_id<furn_t>::is_valid() const
-{
-    return furniture_data.is_valid( *this );
-}
-
-/** @relates int_id */
-template<>
-const furn_t &int_id<furn_t>::obj() const
-{
-    return furniture_data.obj( *this );
-}
-
-/** @relates int_id */
-template<>
-const string_id<furn_t> &int_id<furn_t>::id() const
-{
-    return furniture_data.convert( *this );
-}
-
-/** @relates string_id */
-template<>
-bool string_id<furn_t>::is_valid() const
-{
-    return furniture_data.is_valid( *this );
-}
-
-/** @relates string_id */
-template<>
-const furn_t &string_id<furn_t>::obj() const
-{
-    return furniture_data.obj( *this );
-}
-
-/** @relates string_id */
-template<>
-int_id<furn_t> string_id<furn_t>::id() const
-{
-    return furniture_data.convert( *this, f_null );
-}
-
-/** @relates int_id */
-template<>
-int_id<furn_t>::int_id( const string_id<furn_t> &id ) : _id( id.id() )
-{
-}
+IMPLEMENT_STRING_AND_INT_IDS( ter_t, terrain_data );
+IMPLEMENT_STRING_AND_INT_IDS( furn_t, furniture_data );
 
 static const std::unordered_map<std::string, ter_bitflags> ter_bitflags_map = { {
         { "DESTROY_ITEM",             TFLAG_DESTROY_ITEM },   // add/spawn_item*()
@@ -271,6 +179,8 @@ static const std::unordered_map<std::string, ter_bitflags> ter_bitflags_map = { 
         { "FREEZER",                  TFLAG_FREEZER },        // This is an active freezer.
         { "ELEVATOR",                 TFLAG_ELEVATOR },       // This is an elevator.
         { "NO_MEMORY",                TFLAG_NO_MEMORY },      // This should not be added to map memory
+        { "ROAD",                     TFLAG_ROAD },           // Some floors have this flag, as do some passable transformation of otherwise impassible terrain/furniture. Very notably, open doors.
+        { "BASH_TRANSFORM",           TFLAG_BASH_TRANSFORM }, // Bashing this terrain/furniture but failing to destroy it has a chance to transform it, if it's capable of transforming.
     }
 };
 
@@ -305,9 +215,9 @@ static void load_map_bash_tent_centers( const JsonArray &ja, std::vector<furn_st
     }
 }
 
-static void correct_if_magic( std::optional<int> &val )
+static void correct_if_magic( std::optional<units::sound> &val )
 {
-    if( val && *val < 0 ) {
+    if( val && *val < 0_dB ) {
         val.reset();
     }
 }
@@ -315,7 +225,7 @@ static void correct_if_magic( std::optional<int> &val )
 map_bash_info::map_bash_info() : str_min( -1 ), str_max( -1 ),
     str_min_blocked( -1 ), str_max_blocked( -1 ),
     str_min_supported( -1 ), str_max_supported( -1 ),
-    explosive( 0 ), sound_vol( -1 ), sound_fail_vol( -1 ),
+    explosive( 0 ), sound_vol( -1_dB ), sound_fail_vol( -1_dB ),
     collapse_radius( 1 ), destroy_only( false ), bash_below( false ),
     drop_group( "EMPTY_GROUP" ),
     ter_set( ter_str_id::NULL_ID() ), furn_set( furn_str_id::NULL_ID() ) {}
@@ -1359,8 +1269,14 @@ std::string enum_to_string<season_type>( season_type data )
 
 void map_data_common_t::load( const JsonObject &jo, const std::string &src )
 {
-    if( jo.has_member( "examine_action" ) ) {
-        examine = iexamine_function_from_string( jo.get_string( "examine_action" ) );
+    const auto examine_action = jo.get_string( "examine_action", "" );
+    examine_action_id.clear();
+
+    if( examine_action.rfind( "lua:", 0 ) == 0 ) {
+        examine_action_id = examine_action.substr( 4 );
+        examine = iexamine_function_from_string( "lua_examine" );
+    } else if( !examine_action.empty() ) {
+        examine = iexamine_function_from_string( examine_action );
     } else if( !was_loaded ) {
         examine = iexamine_function_from_string( "none" );
     }
@@ -1394,6 +1310,7 @@ void map_data_common_t::load( const JsonObject &jo, const std::string &src )
     mandatory( jo, was_loaded, "description", description );
     optional( jo, was_loaded, "message", message );
     optional( jo, was_loaded, "prompt", prompt );
+    assign( jo, "light_color", light_color, is_json_check_strict( src ) );
 
     assign( jo, "flags", flags );
     assign( jo, "default_vars", default_vars );
@@ -1567,6 +1484,12 @@ void ter_t::check() const
     check_decon_items( deconstruct, id.str(), true );
     check_pry_items( pry, id.str(), true );
 
+    if( examine == iexamine_function_from_string( "locked_object_pickable" ) &&
+        lockpick_result.is_null() ) {
+        throw JsonError(
+            string_format( "Terrain %s has iexamine `locked_object_pickable`, without a non-null `lockpick_result`",
+                           id.str(), lockpick_result.str() ) );
+    }
     if( !transforms_into.is_valid() ) {
         debugmsg( "invalid transforms_into %s for %s", transforms_into.c_str(), id.c_str() );
     }
@@ -1758,6 +1681,7 @@ void furn_t::load( const JsonObject &jo, const std::string &src )
 
     optional( jo, was_loaded, "workbench", workbench );
     optional( jo, was_loaded, "plant_data", plant );
+    optional( jo, was_loaded, "enchanter_info", enchanter );
     assign( jo, "surgery_skill_multiplier", surgery_skill_multiplier );
 
     if( jo.has_member( "active" ) ) {

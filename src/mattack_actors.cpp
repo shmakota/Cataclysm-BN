@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "ammo_effect.h"
+#include "assign.h"
 #include "avatar.h"
 #include "calendar.h"
 #include "creature.h"
@@ -407,7 +408,7 @@ bool melee_actor::call( monster &z ) const
 
     if( hitspread < 0 ) {
         auto msg_type = target->is_avatar() ? m_warning : m_info;
-        sfx::play_variant_sound( "mon_bite", "bite_miss", sfx::get_heard_volume( z.bub_pos() ),
+        sfx::play_variant_sound( "mon_bite", "bite_miss", sfx::get_heard_volume( z.bub_pos(), 50 ),
                                  sfx::get_heard_angle( z.bub_pos() ) );
         target->add_msg_player_or_npc( msg_type, miss_msg_u, miss_msg_npc, z.name() );
         return true;
@@ -432,7 +433,7 @@ bool melee_actor::call( monster &z ) const
     if( damage_total > 0 ) {
         on_damage( z, *target, dealt_damage );
     } else {
-        sfx::play_variant_sound( "mon_bite", "bite_miss", sfx::get_heard_volume( z.bub_pos() ),
+        sfx::play_variant_sound( "mon_bite", "bite_miss", sfx::get_heard_volume( z.bub_pos(), 50 ),
                                  sfx::get_heard_angle( z.bub_pos() ) );
         target->add_msg_player_or_npc( m_neutral, no_dmg_msg_u, no_dmg_msg_npc, z.name(),
                                        body_part_name_accusative( bp_hit ) );
@@ -446,7 +447,7 @@ bool melee_actor::call( monster &z ) const
 void melee_actor::on_damage( monster &z, Creature &target, dealt_damage_instance &dealt ) const
 {
     if( target.is_player() ) {
-        sfx::play_variant_sound( "mon_bite", "bite_hit", sfx::get_heard_volume( z.bub_pos() ),
+        sfx::play_variant_sound( "mon_bite", "bite_hit", sfx::get_heard_volume( z.bub_pos(), 60 ),
                                  sfx::get_heard_angle( z.bub_pos() ) );
         sfx::do_player_death_hurt( dynamic_cast<player &>( target ), false );
     }
@@ -512,7 +513,17 @@ void gun_actor::load_internal( const JsonObject &obj, const std::string & )
 {
     obj.read( "gun_type", gun_type, true );
 
-    obj.read( "ammo_type", ammo_type );
+    ammo_types.clear();
+    if( obj.has_array( "ammo_type" ) ) {
+        for( JsonValue ammo_entry : obj.get_array( "ammo_type" ) ) {
+            const auto ammo_id = itype_id( ammo_entry.get_string() );
+            if( !std::ranges::contains( ammo_types, ammo_id ) ) {
+                ammo_types.push_back( ammo_id );
+            }
+        }
+    } else if( obj.has_string( "ammo_type" ) ) {
+        ammo_types.push_back( itype_id( obj.get_string( "ammo_type" ) ) );
+    }
 
     if( obj.has_array( "fake_skills" ) ) {
         for( JsonArray cur : obj.get_array( "fake_skills" ) ) {
@@ -564,7 +575,8 @@ void gun_actor::load_internal( const JsonObject &obj, const std::string & )
         targeting_sound = _( "Beep." );
     }
 
-    obj.read( "targeting_volume", targeting_volume );
+    assign( obj, "targeting_volume", targeting_volume );
+    assign( obj, "targeting_volume_dB", targeting_volume );
 
     obj.read( "laser_lock", laser_lock );
 
@@ -593,8 +605,8 @@ namespace
 
 auto find_target_vehicle( monster &z, int range ) -> std::optional<tripoint_bub_ms>
 {
-    const auto is_different_plane = []( const wrapped_vehicle & v, const monster & m ) -> bool {
-        return !fov_3d && v.pos.z() != m.bub_pos().z();
+    const auto is_different_plane = []( const wrapped_vehicle & /*v*/, const monster & /*m*/ ) -> bool {
+        return false;
     };
 
     map &here = get_map();
@@ -727,9 +739,15 @@ bool gun_actor::try_target( monster &z, Creature &target ) const
                                   !target.has_effect( effect_was_laserlocked );
 
     if( not_targeted || not_laser_locked ) {
-        if( targeting_volume > 0 && !targeting_sound.empty() ) {
-            sounds::sound( z.bub_pos(), targeting_volume, sounds::sound_t::alarm,
-                           _( targeting_sound ) );
+        if( targeting_volume > 0_dB && !targeting_sound.empty() ) {
+            sound_event se;
+            se.origin = z.bub_pos();
+            se.volume = units::to_decibel( targeting_volume );
+            se.category = sounds::sound_t::alarm;
+            se.description = _( targeting_sound );
+            se.from_monster = true;
+            se.monfaction = z.faction.id();
+            sounds::sound( se );
         }
         if( not_targeted ) {
             z.add_effect( effect_targeted, time_duration::from_turns( targeting_timeout ) );
@@ -764,14 +782,23 @@ void gun_actor::shoot( monster &z, const tripoint_bub_ms &target, const gun_mode
     detached_ptr<item> gun = item::spawn( gun_type );
     gun->gun_set_mode( mode );
 
-    itype_id ammo = ammo_type ? ammo_type : gun->ammo_default();
+    const auto ammo_slot = !ammo_types.empty() ? ammo_types.front() : gun->ammo_default();
+    const auto loaded_ammo = z.loaded_ammo_for_slot( ammo_slot );
+    const auto ammo = loaded_ammo.is_empty() ? ammo_slot : loaded_ammo;
     if( ammo ) {
         gun->ammo_set( ammo, z.ammo[ammo] );
     }
 
     if( !gun->ammo_sufficient() ) {
         if( !no_ammo_sound.empty() ) {
-            sounds::sound( z.bub_pos(), 10, sounds::sound_t::combat, _( no_ammo_sound ) );
+            sound_event se;
+            se.origin = z.bub_pos();
+            se.volume = 60;
+            se.category = sounds::sound_t::combat;
+            se.description = _( no_ammo_sound );
+            se.from_monster = true;
+            se.monfaction = z.faction.id();
+            sounds::sound( se );
         }
         return;
     }

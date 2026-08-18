@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "activity_time_cadence.h"
+#include "action_time_scale.h"
 #include "assign.h"
 #include "avatar.h"
 #include "bodypart.h"
@@ -49,8 +51,6 @@
 
 static const activity_id ACT_WAIT_WEATHER( "ACT_WAIT_WEATHER" );
 
-static const bionic_id bio_sunglasses( "bio_sunglasses" );
-
 static const efftype_id effect_glare( "glare" );
 static const efftype_id effect_sleep( "sleep" );
 static const efftype_id effect_snow_glare( "snow_glare" );
@@ -65,6 +65,8 @@ static const trait_id trait_FEATHERS( "FEATHERS" );
 static const flag_id json_flag_RAIN_PROTECT( "RAIN_PROTECT" );
 static const flag_id json_flag_RAINPROOF( "RAINPROOF" );
 static const flag_id json_flag_SUN_GLASSES( "SUN_GLASSES" );
+
+static const enchantment_flag_id ench_flag_ANTIGLARE( "ANTIGLARE" );
 
 /**
  * \defgroup Weather "Weather and its implications."
@@ -94,7 +96,7 @@ void glare( const weather_type_id &w )
     //General prepequisites for glare
     if( !is_player_outside() || !g->is_in_sunlight( g->u.bub_pos() ) || g->u.in_sleep_state() ||
         g->u.worn_with_flag( json_flag_SUN_GLASSES ) ||
-        g->u.has_bionic( bio_sunglasses ) ||
+        g->u.has_enchantment_flag( ench_flag_ANTIGLARE ) ||
         g->u.is_blind() ) {
         return;
     }
@@ -404,7 +406,7 @@ void weather_effect::wet_player( int amount )
         return;
     }
     // Coarse correction to get us back to previously intended soaking rate.
-    if( !calendar::once_every( 6_seconds ) ) {
+    if( !action_time_scale::once_every_this_tick( 6_seconds ) ) {
         return;
     }
     std::map<bodypart_id, std::vector<const item *>> clothing_map;
@@ -488,7 +490,8 @@ void weather_effect::morale( int intensity, int bonus, int bonus_max, time_durat
                              const std::string &morale_id_str,
                              const std::string &morale_msg, int morale_msg_frequency, game_message_type message_type )
 {
-    if( !( calendar::once_every( time_duration::from_seconds( intensity ) ) && is_player_outside() ) ) {
+    if( !( action_time_scale::once_every_this_tick( time_duration::from_seconds( intensity ) ) &&
+           is_player_outside() ) ) {
         return;
     }
 
@@ -516,7 +519,8 @@ void weather_effect::effect( int intensity, time_duration duration,
                              game_message_type message_type,
                              std::string precipitation_name, std::vector<std::tuple<std::string, int>> protection_data )
 {
-    if( !( calendar::once_every( time_duration::from_seconds( intensity ) ) && is_player_outside() ) ) {
+    if( !( action_time_scale::once_every_this_tick( time_duration::from_seconds( intensity ) ) &&
+           is_player_outside() ) ) {
         return;
     }
 
@@ -1146,7 +1150,7 @@ void weather_manager::update_weather()
     lightning_active = false;
     // Check weather every few turns, instead of every turn.
     // TODO: predict when the weather changes and use that time.
-    nextweather = calendar::turn + 5_minutes;
+    nextweather = calendar::turn + activity_time_cadence::weather_refresh();
     if( weather_id != old_weather && weather_id->dangerous &&
         g->get_levz() >= 0 && get_map().is_outside( g->u.bub_pos() )
         && !g->u.has_activity( ACT_WAIT_WEATHER ) ) {

@@ -1,5 +1,6 @@
 #include "itype.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 #include "catalua_icallback_actor.h"
@@ -51,12 +52,12 @@ itype::~itype() = default;
 
 int itype::damage_min() const
 {
-    return count_by_charges() ? 0 : damage_min_;
+    return count_by_charges() && !is_stackable() ? 0 : damage_min_;
 }
 
 int itype::damage_max() const
 {
-    return count_by_charges() ? 0 : damage_max_;
+    return count_by_charges() && !is_stackable() ? 0 : damage_max_;
 }
 
 std::string itype::get_item_type_string() const
@@ -101,6 +102,11 @@ bool itype::count_by_charges() const
     return stackable_ || ammo || comestible;
 }
 
+bool itype::is_stackable() const
+{
+    return stackable_;
+}
+
 int itype::charges_default() const
 {
     if( tool ) {
@@ -140,7 +146,14 @@ int itype::charges_per_volume( const units::volume &vol ) const
         // TODO: items should not have 0 volume at all!
         return item::INFINITE_CHARGES;
     }
-    return ( count_by_charges() ? stack_size : 1 ) * vol / volume;
+    const auto effective_stack_size = count_by_charges() ? stack_size : 1;
+    if( effective_stack_size > 0 && vol > units::volume_max / effective_stack_size ) {
+        return item::INFINITE_CHARGES;
+    }
+    const auto result = vol * static_cast<decltype( units::to_milliliter( vol ) )>(
+                            effective_stack_size ) / volume;
+    return static_cast<int>( std::min( result,
+                                       static_cast<decltype( result )>( item::INFINITE_CHARGES ) ) );
 }
 
 // Members of iuse struct, which is slowly morphing into a class.
