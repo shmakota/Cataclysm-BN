@@ -5651,7 +5651,7 @@ auto jump_over_tile_has_stumble_risk( const map &here,
     return here.has_flag( "WINDOW", jumped_tile ) || here.has_furn( jumped_tile );
 }
 
-auto jump_over_tile_bashes_window( const map &here,
+auto jump_over_tile_bashes_window( const map &here, const player &p,
                                    const tripoint_bub_ms &jumped_tile ) -> bool
 {
     if( !here.impassable( jumped_tile ) || !here.has_flag( "WINDOW", jumped_tile ) ||
@@ -5664,9 +5664,10 @@ auto jump_over_tile_bashes_window( const map &here,
         return false;
     }
 
-    return bash.ter_set->movecost > 0 ||
-           bash.ter_set->has_flag( TFLAG_THIN_OBSTACLE ) ||
-           bash.ter_set->has_flag( TFLAG_SMALL_PASSAGE );
+    return ( bash.ter_set->movecost > 0 ||
+             bash.ter_set->has_flag( TFLAG_THIN_OBSTACLE ) ||
+             bash.ter_set->has_flag( TFLAG_SMALL_PASSAGE ) ) &&
+           here.bash_rating( p.get_str(), jumped_tile ) > 0;
 }
 
 auto bash_window_for_jump( map &here, const player &p,
@@ -5675,9 +5676,9 @@ auto bash_window_for_jump( map &here, const player &p,
     const auto bash = bash_params{
         .strength = std::max( p.get_str(), 1 ),
         .silent = false,
-        .destroy = true,
+        .destroy = false,
         .bash_floor = false,
-        .roll = 1.0f,
+        .roll = static_cast<float>( rng_float( 0, 1.0f ) ),
         .bashing_from_above = false,
         .caused_by_player = p.is_avatar(),
     };
@@ -5787,7 +5788,7 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
     auto &here = get_map();
     const auto jumped_tile = abs_to_bub( jump_state.examp );
     if( here.impassable( jumped_tile ) &&
-        !jump_over_tile_bashes_window( here, jumped_tile ) ) {
+        !jump_over_tile_bashes_window( here, p, jumped_tile ) ) {
         if( show_messages ) {
             add_msg( m_warning, _( "You cannot jump through the %s." ),
                      here.obstacle_name( jumped_tile ) );
@@ -5870,23 +5871,24 @@ auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
     auto &here = get_map();
     const auto jumped_tile = abs_to_bub( jump_state.examp );
     const auto jumped_obstacle_name = here.name( jumped_tile );
-    const auto bashed_window = jump_over_tile_bashes_window( here, jumped_tile );
+    const auto bashed_window = jump_over_tile_bashes_window( here, p, jumped_tile );
     if( bashed_window && !confirm_crash_through_window( p, jumped_obstacle_name ) ) {
         return false;
     }
     const auto stumbled = ( bashed_window || jump_over_tile_has_stumble_risk( here, jumped_tile ) ) &&
                           jump_over_tile_stumble_roll( p );
+    p.mod_moves( -move_cost );
+    p.mod_stamina( -stamina_cost, false );
     if( bashed_window ) {
-        add_msg( m_info, _( "You crash through the %s." ), jumped_obstacle_name );
         if( !bash_window_for_jump( here, p, jumped_tile ) ) {
+            add_msg( m_warning, _( "You fail to crash through the %s." ), jumped_obstacle_name );
             return false;
         }
+        add_msg( m_info, _( "You crash through the %s." ), jumped_obstacle_name );
         maybe_cut_from_smashing_window( p, jumped_obstacle_name );
     } else {
         add_msg( m_info, _( "You leap across." ) );
     }
-    p.mod_moves( -move_cost );
-    p.mod_stamina( -stamina_cost, false );
     p.setpos( jump_state.dest );
     if( stumbled ) {
         add_msg( m_bad, _( "You misjudge the leap past %s and crash to the ground." ),

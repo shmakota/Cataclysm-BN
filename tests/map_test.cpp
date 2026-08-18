@@ -294,6 +294,15 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
         CHECK(here.ter(middle) == ter_id("t_window_frame"));
     }
 
+    SECTION("cannot jump through reinforced boarded windows") {
+        here.ter_set(middle, ter_id("t_window_reinforced"));
+        reset_jumping_avatar(g->u, origin, 20);
+
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
+    }
+
     SECTION("jumping through a closed window can cut exposed body parts") {
         auto took_damage = false;
         for (const auto attempt : std::views::iota(0, 16)) {
