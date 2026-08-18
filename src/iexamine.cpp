@@ -5613,7 +5613,7 @@ static constexpr auto jump_over_tile_stamina_burn_ratio = 7;
 auto jump_over_tile_carried_weight_percentage( const player &p ) -> int
 {
     const auto carried_weight_grams = units::to_gram( p.weight_carried() );
-    const auto carry_capacity_grams = std::max( units::to_gram( p.weight_capacity() ), 1L );
+    const auto carry_capacity_grams = units::to_gram( std::max( p.weight_capacity(), 1_gram ) );
     return std::clamp( static_cast<int>( carried_weight_grams * 100 / carry_capacity_grams ), 0, 100 );
 }
 
