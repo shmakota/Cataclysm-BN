@@ -37,13 +37,13 @@ namespace {
 static const auto effect_in_pit = efftype_id("in_pit");
 static const auto skill_dodge = skill_id("dodge");
 
-auto burden_jumping_player( avatar &you, const float burden_proportion ) -> void
-{
-    const auto target_weight_grams = static_cast<int>( you.weight_capacity() * burden_proportion / 1_gram );
-    const auto current_weight_grams = static_cast<int>( you.weight_carried() / 1_gram );
-    const auto weight_to_add = std::max( 0, target_weight_grams - current_weight_grams );
-    if( weight_to_add > 0 ) {
-        you.i_add( item::spawn( "test_platinum_bit", calendar::turn, weight_to_add ) );
+auto burden_jumping_player(avatar& you, const float burden_proportion) -> void {
+    const auto target_weight_grams = static_cast<int>(
+        you.weight_capacity() * burden_proportion / 1_gram);
+    const auto current_weight_grams = static_cast<int>(you.weight_carried() / 1_gram);
+    const auto weight_to_add = std::max(0, target_weight_grams - current_weight_grams);
+    if (weight_to_add > 0) {
+        you.i_add(item::spawn("test_platinum_bit", calendar::turn, weight_to_add));
     }
 }
 
@@ -225,7 +225,7 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
     }
 
     SECTION("can jump over a low obstacle") {
-        here.ter_set( middle, ter_id( "t_railing" ) );
+        here.ter_set(middle, ter_id("t_railing"));
 
         const auto moves_before = g->u.moves;
         CHECK(iexamine::can_jump_over_tile(g->u, middle));
@@ -244,72 +244,72 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
     }
 
     SECTION("cannot jump over impassable furniture") {
-        here.furn_set( middle, furn_id( "f_bookcase" ) );
+        here.furn_set(middle, furn_id("f_bookcase"));
 
-        CHECK_FALSE( iexamine::can_jump_over_tile( g->u, middle ) );
-        CHECK_FALSE( iexamine::jump_over_tile( g->u, middle ) );
-        CHECK( g->u.bub_pos() == origin );
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
     }
 
     SECTION("cannot jump over creatures our size or larger") {
-        here.ter_set( middle, ter_id( "t_floor" ) );
-        auto &blocking_creature = spawn_test_monster( "mon_zombie", middle );
-        REQUIRE( blocking_creature.get_size() >= g->u.get_size() );
+        here.ter_set(middle, ter_id("t_floor"));
+        auto& blocking_creature = spawn_test_monster("mon_zombie", middle);
+        REQUIRE(blocking_creature.get_size() >= g->u.get_size());
 
-        CHECK_FALSE( iexamine::can_jump_over_tile( g->u, middle ) );
-        CHECK_FALSE( iexamine::jump_over_tile( g->u, middle ) );
-        CHECK( g->u.bub_pos() == origin );
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
     }
 
     SECTION("can jump over creatures smaller than us") {
-        here.ter_set( middle, ter_id( "t_floor" ) );
-        auto &blocking_creature = spawn_test_monster( "mon_dog", middle );
-        REQUIRE( blocking_creature.get_size() < g->u.get_size() );
+        here.ter_set(middle, ter_id("t_floor"));
+        auto& blocking_creature = spawn_test_monster("mon_dog", middle);
+        REQUIRE(blocking_creature.get_size() < g->u.get_size());
 
-        CHECK( iexamine::can_jump_over_tile( g->u, middle ) );
-        REQUIRE( iexamine::jump_over_tile( g->u, middle ) );
-        CHECK( g->u.bub_pos() == landing );
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
     }
 
     SECTION("can jump while carrying more than a quarter of capacity") {
-        burden_jumping_player( g->u, 0.3f );
+        burden_jumping_player(g->u, 0.3f);
 
-        CHECK( iexamine::can_jump_over_tile( g->u, middle ) );
-        REQUIRE( iexamine::jump_over_tile( g->u, middle ) );
-        CHECK( g->u.bub_pos() == landing );
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
     }
 
     SECTION("jumping burns stamina and heavier carried loads burn more") {
-        const auto jump_stamina_burn = [&]( const float burden_proportion ) {
-            clear_character( g->u, false );
-            g->u.setpos( origin );
+        const auto jump_stamina_burn = [&](const float burden_proportion) {
+            clear_character(g->u, false);
+            g->u.setpos(origin);
             g->u.str_cur = 8;
             g->u.moves = 1000;
-            g->u.set_stamina( g->u.get_stamina_max() );
-            burden_jumping_player( g->u, burden_proportion );
+            g->u.set_stamina(g->u.get_stamina_max());
+            burden_jumping_player(g->u, burden_proportion);
 
             const auto stamina_before = g->u.get_stamina();
-            CHECK( iexamine::can_jump_over_tile( g->u, middle ) );
-            REQUIRE( iexamine::jump_over_tile( g->u, middle ) );
+            CHECK(iexamine::can_jump_over_tile(g->u, middle));
+            REQUIRE(iexamine::jump_over_tile(g->u, middle));
             return stamina_before - g->u.get_stamina();
         };
 
-        const auto unburdened_burn = jump_stamina_burn( 0.0f );
-        const auto burdened_burn = jump_stamina_burn( 0.2f );
+        const auto unburdened_burn = jump_stamina_burn(0.0f);
+        const auto burdened_burn = jump_stamina_burn(0.2f);
 
-        CHECK( unburdened_burn > 0 );
-        CHECK( burdened_burn > unburdened_burn );
+        CHECK(unburdened_burn > 0);
+        CHECK(burdened_burn > unburdened_burn);
     }
 
     SECTION("warns when too weak to jump") {
         g->u.str_cur = 3;
         Messages::clear_messages();
 
-        CHECK_FALSE( iexamine::can_start_jump_over_tile( g->u, true ) );
+        CHECK_FALSE(iexamine::can_start_jump_over_tile(g->u, true));
 
-        const auto recent_messages = Messages::recent_messages( 1 );
-        REQUIRE( recent_messages.size() == 1 );
-        CHECK( recent_messages.front().second == "You are too weak to jump over an obstacle." );
+        const auto recent_messages = Messages::recent_messages(1);
+        REQUIRE(recent_messages.size() == 1);
+        CHECK(recent_messages.front().second == "You are too weak to jump over an obstacle.");
     }
 }
 
