@@ -5670,6 +5670,13 @@ auto jump_over_tile_bashes_window( const map &here, const player &p,
            here.bash_rating( p.get_str(), jumped_tile ) > 0;
 }
 
+auto jump_over_tile_can_cross_impassable( const map &here, const player &p,
+        const tripoint_bub_ms &jumped_tile ) -> bool
+{
+    return here.has_flag( flag_CLIMB_SIMPLE, jumped_tile ) ||
+           jump_over_tile_bashes_window( here, p, jumped_tile );
+}
+
 auto bash_window_for_jump( map &here, const player &p,
                            const tripoint_bub_ms &jumped_tile ) -> bool
 {
@@ -5788,7 +5795,7 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
     auto &here = get_map();
     const auto jumped_tile = abs_to_bub( jump_state.examp );
     if( here.impassable( jumped_tile ) &&
-        !jump_over_tile_bashes_window( here, p, jumped_tile ) ) {
+        !jump_over_tile_can_cross_impassable( here, p, jumped_tile ) ) {
         if( show_messages ) {
             add_msg( m_warning, _( "You cannot jump through the %s." ),
                      here.obstacle_name( jumped_tile ) );

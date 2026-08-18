@@ -268,6 +268,14 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
         CHECK(g->u.bub_pos() == origin);
     }
 
+    SECTION("can jump over CLIMB_SIMPLE furniture") {
+        here.furn_set(middle, furn_id("f_barricade_road"));
+
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+    }
+
     SECTION("cannot jump through walls") {
         here.ter_set(middle, ter_id("t_wall"));
 
