@@ -186,6 +186,7 @@ struct field_type {
         bool display_field = false;
         bool moppable = false;
         nc_color tint = c_unset;
+        std::optional<RGBColor> tint_rgb;
         field_type_id wandering_field;
         std::string looks_like;
 
@@ -219,6 +220,9 @@ struct field_type {
         }
         nc_color get_tint() const {
             return tint;
+        }
+        auto get_tint_rgb() const -> std::optional<RGBColor> {
+            return tint_rgb;
         }
         int get_move_cost( int level = 0 ) const {
             return get_intensity_level( level ).move_cost;

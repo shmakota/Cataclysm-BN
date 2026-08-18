@@ -119,7 +119,10 @@ TEST_CASE("common_liquids_define_spill_fields", "[item][liquid][field]") {
     CHECK(item::spawn_temporary("plut_slurry")->type->spill_field
           == field_type_id("fd_plutonium_slurry"));
     CHECK(field_type_id("fd_water").obj().get_tint() == c_blue);
+    CHECK(field_type_id("fd_water").obj().get_tint_rgb() == RGBColor::try_parse("blue"));
     CHECK(field_type_id("fd_sewage").obj().get_tint() == c_cyan);
+    CHECK(field_type_id("test_fd_rgb_tint").obj().get_tint() == c_unset);
+    CHECK(field_type_id("test_fd_rgb_tint").obj().get_tint_rgb() == RGBColor::try_parse("#123456"));
     CHECK(item::spawn_temporary("soapy_water")->ammo_type() == ammotype("water"));
     CHECK(field_type_id("fd_soapy_water").obj().get_intensity_level().field_effects.size() == 1);
     CHECK(field_type_id("fd_soapy_water").obj().get_intensity_level().field_effects.front().id

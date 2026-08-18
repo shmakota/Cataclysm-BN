@@ -80,6 +80,26 @@ namespace
 
 generic_factory<field_type> all_field_types( "field types" );
 
+auto load_field_tint( const JsonObject &jo, const std::string &member,
+                      nc_color &tint, std::optional<RGBColor> &tint_rgb ) -> void
+{
+    if( !jo.has_member( member ) ) {
+        return;
+    }
+
+    if( jo.has_string( member ) ) {
+        const auto tint_string = jo.get_string( member );
+        tint = color_from_string( tint_string, report_color_error::no );
+        tint_rgb = RGBColor::try_parse( tint_string );
+        return;
+    }
+
+    auto parsed_tint = RGBColor{};
+    jo.read( member, parsed_tint );
+    tint = c_unset;
+    tint_rgb = parsed_tint;
+}
+
 } // namespace
 
 IMPLEMENT_STRING_AND_INT_IDS( field_type, all_field_types );
@@ -226,7 +246,9 @@ void field_type::load( const JsonObject &jo, const std::string & )
     optional( jo, was_loaded, "display_items", display_items, true );
     optional( jo, was_loaded, "display_field", display_field, false );
     optional( jo, was_loaded, "moppable", moppable, false );
-    assign( jo, "tint", tint );
+    tint = c_unset;
+    tint_rgb.reset();
+    load_field_tint( jo, "tint", tint, tint_rgb );
     optional( jo, was_loaded, "wandering_field", wandering_field_id, "fd_null" );
 
     optional( jo, was_loaded, "bash", bash_info );

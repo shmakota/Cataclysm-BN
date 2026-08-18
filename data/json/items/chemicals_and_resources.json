@@ -1255,7 +1255,7 @@
     "container": "bottle_glass",
     "spill_field": "fd_industrial_lubricant",
     "description": "A viscous liquid used as an industrial lubricant.",
-    "volume": "1 ml",
+    "volume": "250 ml",
     "ammo_type": "components",
     "phase": "liquid"
   },

@@ -550,6 +550,7 @@ void map::creature_in_field( Creature &critter )
 {
     static const auto effect_downed = efftype_id( "downed" );
     static const auto flag_NOSLIP = flag_id( "NOSLIP" );
+    static const auto ench_flag_NOSLIP = enchantment_flag_id( "NOSLIP" );
     static const auto body_part_foot_l = bodypart_id( "foot_l" );
     static const auto body_part_foot_r = bodypart_id( "foot_r" );
 
@@ -613,7 +614,8 @@ void map::creature_in_field( Creature &critter )
             if( field_fx.get_id() == effect_downed ) {
                 if( Character *const character = critter.as_character();
                     character != nullptr &&
-                    ( character->worn_with_flag( flag_NOSLIP, body_part_foot_l ) ||
+                    ( character->has_enchantment_flag( ench_flag_NOSLIP ) ||
+                      character->worn_with_flag( flag_NOSLIP, body_part_foot_l ) ||
                       character->worn_with_flag( flag_NOSLIP, body_part_foot_r ) ) ) {
                     continue;
                 }
