@@ -5645,22 +5645,10 @@ auto get_jump_over_tile_state( const player &p,
     };
 }
 
-auto is_jumpable_window_terrain( const ter_id &terrain ) -> bool
-{
-    static const auto jumpable_window_terrains = std::array{
-        t_window, t_window_taped, t_window_domestic, t_window_domestic_taped,
-        t_window_open, t_window_alarm, t_window_alarm_taped,
-        t_window_no_curtains, t_window_no_curtains_open, t_window_no_curtains_taped,
-        t_window_stained_green, t_window_stained_red, t_window_stained_blue
-    };
-    namespace ranges = std::ranges;
-    return ranges::contains( jumpable_window_terrains, terrain );
-}
-
 auto jump_over_tile_has_stumble_risk( const map &here,
                                       const tripoint_bub_ms &jumped_tile ) -> bool
 {
-    return is_jumpable_window_terrain( here.ter( jumped_tile ) ) || here.has_furn( jumped_tile );
+    return here.has_flag( "WINDOW", jumped_tile ) || here.has_furn( jumped_tile );
 }
 
 auto jump_over_tile_stumble_roll( const player &p ) -> bool
@@ -5711,8 +5699,7 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
     auto &buffer = p.get_mapbuffer();
     auto &here = get_map();
     const auto jumped_tile = abs_to_bub( jump_state.examp );
-    if( here.impassable( jumped_tile ) &&
-        !is_jumpable_window_terrain( here.ter( jumped_tile ) ) ) {
+    if( here.impassable( jumped_tile ) ) {
         if( show_messages ) {
             add_msg( m_warning, _( "You cannot jump through the %s." ),
                      here.obstacle_name( jumped_tile ) );

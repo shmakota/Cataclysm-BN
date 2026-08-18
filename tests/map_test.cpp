@@ -269,14 +269,12 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
         CHECK(g->u.bub_pos() == origin);
     }
 
-    SECTION("can jump through a window but may end up downed") {
+    SECTION("cannot jump through a closed window") {
         here.ter_set(middle, ter_id("t_window"));
-        g->u.dex_cur = 1;
 
-        CHECK(iexamine::can_jump_over_tile(g->u, middle));
-        REQUIRE(iexamine::jump_over_tile(g->u, middle));
-        CHECK(g->u.bub_pos() == landing);
-        CHECK(g->u.has_effect(effect_downed));
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
     }
 
     SECTION("can trip and end up downed when jumping over furniture") {
