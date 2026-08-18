@@ -5608,7 +5608,7 @@ struct jump_over_tile_state {
 
 static constexpr auto jump_over_tile_base_move_cost = 200;
 static constexpr auto jump_over_tile_min_strength = 4;
-static constexpr auto jump_over_tile_stamina_burn_ratio = 7;
+static constexpr auto jump_over_tile_stamina_burn_ratio = 14;
 static const auto dashing_effect = efftype_id( "dashing" );
 static const auto effect_downed = efftype_id( "downed" );
 
@@ -5726,9 +5726,35 @@ auto maybe_cut_from_smashing_window( player &p,
     }
 
     const auto bp = random_entry( exposed_bodyparts );
+    const auto damaged_bp = bp->main_part.id();
     if( p.deal_damage( nullptr, bp, damage_instance( DT_CUT, rng( 1, 10 ) ) ).total_damage() > 0 ) {
         add_msg( m_bad, _( "You smash through the %1$s and cut your %2$s on the broken glass!" ),
-                 obstacle_name, body_part_name_accusative( bp ) );
+                 obstacle_name, body_part_name_accusative( damaged_bp ) );
+    }
+}
+
+auto maybe_cut_from_sharp_jump_terrain( player &p, map &here,
+                                        const tripoint_bub_ms &sharp_tile ) -> void
+{
+    if( !here.has_flag( "SHARP", sharp_tile ) || here.veh_at( sharp_tile ) ) {
+        return;
+    }
+
+    if( one_in( 3 ) || x_in_y( 1 + p.dex_cur / 2.0, 40 ) ||
+        ( p.mutation_value( "movecost_obstacle_modifier" ) <= 0.5f && !one_in( 4 ) ) ||
+        ( p.has_trait( trait_id( "THICKSKIN" ) ) && one_in( 8 ) ) ) {
+        return;
+    }
+
+    const auto bp = p.get_random_body_part();
+    const auto damaged_bp = bp->main_part.id();
+    if( p.deal_damage( nullptr, bp, damage_instance( DT_CUT, rng( 1, 10 ) ) ).total_damage() > 0 ) {
+        add_msg( m_bad, _( "You cut your %1$s on the %2$s as you leap over it!" ),
+                 body_part_name_accusative( damaged_bp ),
+                 here.has_flag_ter( "SHARP", sharp_tile ) ? here.tername( sharp_tile ) : here.furnname( sharp_tile ) );
+        if( one_in( 2 ) && !p.is_immune_effect( effect_bleed ) ) {
+            p.add_effect( effect_bleed, rng( 2_minutes, 5_minutes ), bp.id() );
+        }
     }
 }
 
@@ -5748,6 +5774,18 @@ auto jump_over_tile_stumble_roll( const player &p ) -> bool
     return one_in( std::max( climb, 1 ) );
 }
 
+auto apply_jump_stumble_fall_damage( player &p ) -> void
+{
+    static const auto stumble_bps = std::array{
+        bodypart_id( "hand_l" ), bodypart_id( "hand_r" ),
+        bodypart_id( "leg_l" ), bodypart_id( "leg_r" ),
+    };
+
+    for( const auto &bp : stumble_bps ) {
+        p.deal_damage( nullptr, bp, damage_instance( DT_BASH, rng( 1, 2 ) ) );
+    }
+}
+
 auto confirm_dangerous_jump_landing( const player &p,
                                      const tripoint_abs_ms &dest ) -> bool
 {
@@ -5755,16 +5793,7 @@ auto confirm_dangerous_jump_landing( const player &p,
         return true;
     }
 
-    if( get_option<std::string>( "DANGEROUS_TERRAIN_WARNING_PROMPT" ) == "IGNORE" ) {
-        return true;
-    }
-
-    const auto harmful_stuff = g->get_dangerous_tile( abs_to_bub( dest ) );
-    if( harmful_stuff.empty() || p.has_effect( dashing_effect ) ) {
-        return true;
-    }
-
-    return query_yn( _( "Really jump into %s?" ), enumerate_as_string( harmful_stuff ) );
+    return g->prompt_dangerous_tile( abs_to_bub( dest ), _( "Really jump into %s?" ), false );
 }
 
 auto confirm_crash_through_window( const player &p,
@@ -5895,12 +5924,14 @@ auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
         maybe_cut_from_smashing_window( p, jumped_obstacle_name );
     } else {
         add_msg( m_info, _( "You leap across." ) );
+        maybe_cut_from_sharp_jump_terrain( p, here, jumped_tile );
     }
     p.setpos( jump_state.dest );
     if( stumbled ) {
         add_msg( m_bad, _( "You misjudge the leap past %s and crash to the ground." ),
                  jumped_obstacle_name );
-        p.add_effect( effect_downed, 2_turns, bodypart_str_id::NULL_ID(), 0, true );
+        apply_jump_stumble_fall_damage( p );
+        p.add_effect( effect_downed, rng( 2_turns, 3_turns ), bodypart_str_id::NULL_ID(), 0, true );
     }
     here.creature_on_trap( p, false );
     return true;

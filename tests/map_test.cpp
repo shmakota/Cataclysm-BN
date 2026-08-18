@@ -20,6 +20,7 @@
 #include "messages.h"
 #include "monster.h"
 #include "npc.h"
+#include "options.h"
 #include "options_helpers.h"
 #include "player_helpers.h"
 #include "state_helpers.h"
@@ -36,6 +37,7 @@
 namespace {
 
 static const auto effect_in_pit = efftype_id("in_pit");
+static const auto effect_bleed = efftype_id("bleed");
 static const auto effect_downed = efftype_id("downed");
 static const auto skill_dodge = skill_id("dodge");
 
@@ -212,6 +214,33 @@ TEST_CASE("moving_between_adjacent_pit_traps") {
     }
 }
 
+TEST_CASE("moving through a sharp window frame can cause bleeding") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto origin = tripoint_bub_ms(60, 60, 0);
+    const auto destination = origin + tripoint_rel_ms::east();
+    const auto dangerous_prompt = override_option("DANGEROUS_TERRAIN_WARNING_PROMPT", "IGNORE");
+    here.ter_set(origin, ter_id("t_floor"));
+    here.furn_set(origin, furn_id("f_null"));
+    here.ter_set(destination, ter_id("t_window_frame"));
+    here.furn_set(destination, furn_id("f_null"));
+
+    auto started_bleeding = false;
+    for (const auto attempt : std::views::iota(0, 64)) {
+        (void)attempt;
+        reset_jumping_avatar(g->u, origin, 2);
+
+        REQUIRE(g->walk_move(destination, false));
+        if (g->u.has_effect(effect_bleed)) {
+            started_bleeding = true;
+            break;
+        }
+    }
+
+    CHECK(started_bleeding);
+}
+
 TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][movement][jump]") {
     clear_all_state();
 
@@ -330,6 +359,67 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
         CHECK(took_damage);
     }
 
+    SECTION("jumping over sharp terrain can cut exposed body parts") {
+        auto took_damage = false;
+        for (const auto attempt : std::views::iota(0, 16)) {
+            (void)attempt;
+            here.ter_set(middle, ter_id("t_fence_barbed"));
+            reset_jumping_avatar(g->u, origin, 2);
+
+            const auto hp_before = g->u.get_hp();
+            CHECK(iexamine::can_jump_over_tile(g->u, middle));
+            REQUIRE(iexamine::jump_over_tile(g->u, middle));
+            if (g->u.get_hp() < hp_before) {
+                took_damage = true;
+                break;
+            }
+        }
+
+        CHECK(took_damage);
+    }
+
+    SECTION("jumping over sharp terrain can cause bleeding") {
+        auto started_bleeding = false;
+        for (const auto attempt : std::views::iota(0, 32)) {
+            (void)attempt;
+            here.ter_set(middle, ter_id("t_fence_barbed"));
+            reset_jumping_avatar(g->u, origin, 2);
+
+            CHECK(iexamine::can_jump_over_tile(g->u, middle));
+            REQUIRE(iexamine::jump_over_tile(g->u, middle));
+            if (g->u.has_effect(effect_bleed)) {
+                started_bleeding = true;
+                break;
+            }
+        }
+
+        CHECK(started_bleeding);
+    }
+
+    SECTION("jumping through a closed window with only hands exposed damages an arm") {
+        auto took_arm_damage = false;
+        for (const auto attempt : std::views::iota(0, 16)) {
+            (void)attempt;
+            here.ter_set(middle, ter_id("t_window"));
+            reset_jumping_avatar(g->u, origin, 2);
+            REQUIRE_FALSE(g->u.wear_item(item::spawn("longshirt"), false));
+            REQUIRE_FALSE(g->u.wear_item(item::spawn("jeans"), false));
+
+            const auto arm_hp_before = g->u.get_part_hp_cur(bodypart_id("arm_l")) +
+                                       g->u.get_part_hp_cur(bodypart_id("arm_r"));
+            CHECK(iexamine::can_jump_over_tile(g->u, middle));
+            REQUIRE(iexamine::jump_over_tile(g->u, middle));
+            const auto arm_hp_after = g->u.get_part_hp_cur(bodypart_id("arm_l")) +
+                                      g->u.get_part_hp_cur(bodypart_id("arm_r"));
+            if (arm_hp_after < arm_hp_before) {
+                took_arm_damage = true;
+                break;
+            }
+        }
+
+        CHECK(took_arm_damage);
+    }
+
     SECTION("jumping through a closed window is safe when covered") {
         here.ter_set(middle, ter_id("t_window"));
         reset_jumping_avatar(g->u, origin, 2);
@@ -357,11 +447,23 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
     SECTION("can trip and end up downed when jumping over furniture") {
         here.furn_set(middle, furn_id("f_chair"));
         g->u.dex_cur = 1;
+        const auto limb_hp_before = g->u.get_part_hp_cur(bodypart_id("arm_l")) +
+                                    g->u.get_part_hp_cur(bodypart_id("arm_r")) +
+                                    g->u.get_part_hp_cur(bodypart_id("leg_l")) +
+                                    g->u.get_part_hp_cur(bodypart_id("leg_r"));
 
         CHECK(iexamine::can_jump_over_tile(g->u, middle));
         REQUIRE(iexamine::jump_over_tile(g->u, middle));
         CHECK(g->u.bub_pos() == landing);
         CHECK(g->u.has_effect(effect_downed));
+        const auto limb_hp_after = g->u.get_part_hp_cur(bodypart_id("arm_l")) +
+                                   g->u.get_part_hp_cur(bodypart_id("arm_r")) +
+                                   g->u.get_part_hp_cur(bodypart_id("leg_l")) +
+                                   g->u.get_part_hp_cur(bodypart_id("leg_r"));
+        CHECK(limb_hp_after < limb_hp_before);
+        const auto downed_duration = g->u.get_effect(effect_downed).get_duration();
+        CHECK(downed_duration >= 2_turns);
+        CHECK(downed_duration <= 3_turns);
     }
 
     SECTION("cannot jump over creatures our size or larger") {
@@ -393,6 +495,11 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
     }
 
     SECTION("jumping burns stamina and heavier carried loads burn more") {
+        struct jump_stamina_result {
+            int actual_burn;
+            int expected_burn;
+        };
+
         const auto jump_stamina_burn = [&](const float burden_proportion) {
             clear_character(g->u, false);
             g->u.setpos(origin);
@@ -401,17 +508,29 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
             g->u.set_stamina(g->u.get_stamina_max());
             burden_jumping_player(g->u, burden_proportion);
 
+            const auto move_cost = g->u.run_cost(200);
+            const auto base_stamina_burn = divide_round_up(
+                                               get_option<int>("PLAYER_BASE_STAMINA_BURN_RATE") * move_cost * 14, 100);
+            const auto carried_weight_grams = units::to_gram(g->u.weight_carried());
+            const auto carry_capacity_grams = units::to_gram(std::max(g->u.weight_capacity(), 1_gram));
+            const auto carried_weight_percentage = std::clamp(
+                                                       static_cast<int>(carried_weight_grams * 100 / carry_capacity_grams), 0, 100);
             const auto stamina_before = g->u.get_stamina();
             CHECK(iexamine::can_jump_over_tile(g->u, middle));
             REQUIRE(iexamine::jump_over_tile(g->u, middle));
-            return stamina_before - g->u.get_stamina();
+            return jump_stamina_result{
+                .actual_burn = stamina_before - g->u.get_stamina(),
+                .expected_burn = divide_round_up(base_stamina_burn * (100 + carried_weight_percentage), 100),
+            };
         };
 
         const auto unburdened_burn = jump_stamina_burn(0.0f);
         const auto burdened_burn = jump_stamina_burn(0.2f);
 
-        CHECK(unburdened_burn > 0);
-        CHECK(burdened_burn > unburdened_burn);
+        CHECK(unburdened_burn.actual_burn == unburdened_burn.expected_burn);
+        CHECK(burdened_burn.actual_burn == burdened_burn.expected_burn);
+        CHECK(unburdened_burn.actual_burn > 0);
+        CHECK(burdened_burn.actual_burn > unburdened_burn.actual_burn);
     }
 
     SECTION("warns when too weak to jump") {
