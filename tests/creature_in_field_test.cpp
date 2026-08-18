@@ -65,12 +65,12 @@ TEST_CASE("noslip clothing prevents field-based slipping", "[avatar],[field]") {
         CHECK_FALSE(you.has_effect(effect_downed));
     }
 
-    SECTION( "noslip enchantments block the downed effect from slippery fields" ) {
-        REQUIRE_FALSE( you.wear_item( item::spawn( "test_socks_of_noslip" ), false ) );
-        here.add_field( target_location, field_test_fd_slip );
+    SECTION("noslip enchantments block the downed effect from slippery fields") {
+        REQUIRE_FALSE(you.wear_item(item::spawn("test_socks_of_noslip"), false));
+        here.add_field(target_location, field_test_fd_slip);
 
-        here.creature_in_field( you );
+        here.creature_in_field(you);
 
-        CHECK_FALSE( you.has_effect( effect_downed ) );
+        CHECK_FALSE(you.has_effect(effect_downed));
     }
 }

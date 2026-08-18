@@ -33,13 +33,7 @@
   {
     "id": "test_fd_rgb_tint",
     "type": "field_type",
-    "intensity_levels": [
-      {
-        "name": "test rgb tinted field",
-        "sym": "~",
-        "color": "light_gray"
-      }
-    ],
+    "intensity_levels": [ { "name": "test rgb tinted field", "sym": "~", "color": "light_gray" } ],
     "half_life": "1 turn",
     "phase": "liquid",
     "display_field": true,
