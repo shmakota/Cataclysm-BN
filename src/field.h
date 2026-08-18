@@ -108,9 +108,6 @@ class field_entry
         auto is_moppable() const -> bool {
             return type.obj().moppable;
         }
-        auto add_spilled_liquid_item( std::string &&serialized_item ) -> void;
-        auto has_spilled_liquid_items() const -> bool;
-        auto spilled_liquid_items() const -> const std::vector<std::string> &; // *NOPAD*
 
     private:
         // The field identifier.

@@ -957,40 +957,6 @@ static constexpr std::array<std::pair<int, int>, 8> spilled_liquid_adjacent_offs
     { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 },
     { 1, -1 }, { -1, 1 }, { -1, -1 }, { 1, 1 },
 }};
-
-auto serialize_spilled_liquid_item( const item &liquid ) -> std::string
-{
-    auto serialized = std::ostringstream();
-    auto jsout = JsonOut( serialized );
-    liquid.serialize( jsout );
-    return serialized.str();
-}
-
-auto deserialize_spilled_liquid_item( const std::string &serialized_item ) -> detached_ptr<item>
-{
-    if( serialized_item.empty() ) {
-        return detached_ptr<item>();
-    }
-
-    {
-        auto type_check_input = std::istringstream( serialized_item );
-        auto type_check_json = JsonIn( type_check_input );
-        if( !type_check_json.test_object() ) {
-            return detached_ptr<item>();
-        }
-        const auto item_obj = type_check_json.get_object();
-        auto type_id = std::string();
-        if( !item_obj.read( "typeid", type_id ) || !itype_id( type_id ).is_valid() ) {
-            return detached_ptr<item>();
-        }
-    }
-
-    auto recovered = item();
-    auto input = std::istringstream( serialized_item );
-    auto jsin = JsonIn( input );
-    recovered.deserialize( jsin );
-    return item::spawn( recovered );
-}
 } // namespace
 
 void map::spill_liquid_field( const tripoint_bub_ms &center, const item &liquid )
@@ -1005,7 +971,6 @@ void map::spill_liquid_field( const tripoint_bub_ms &center, const item &liquid 
                                  units::to_milliliter( liquid.volume() ),
                                  units::to_milliliter( spill_tile_volume ) );
     const auto amount = static_cast<int>( std::max<decltype( spill_tiles )>( 1, spill_tiles ) );
-    auto serialized_liquid = serialize_spilled_liquid_item( liquid );
     if( amount <= 0 ) {
         return;
     }
@@ -1124,10 +1089,6 @@ void map::spill_liquid_field( const tripoint_bub_ms &center, const item &liquid 
         if( !changed ) {
             break;
         }
-    }
-
-    if( auto *center_field = get_field( center, type ) ) {
-        center_field->add_spilled_liquid_item( std::move( serialized_liquid ) );
     }
 }
 
