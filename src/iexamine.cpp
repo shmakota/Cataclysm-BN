@@ -5609,6 +5609,8 @@ struct jump_over_tile_state {
 static constexpr auto jump_over_tile_base_move_cost = 200;
 static constexpr auto jump_over_tile_min_strength = 4;
 static constexpr auto jump_over_tile_stamina_burn_ratio = 7;
+static const auto dashing_effect = efftype_id( "dashing" );
+static const auto effect_downed = efftype_id( "downed" );
 
 auto jump_over_tile_carried_weight_percentage( const player &p ) -> int
 {
@@ -5643,6 +5645,55 @@ auto get_jump_over_tile_state( const player &p,
     };
 }
 
+auto is_jumpable_window_terrain( const ter_id &terrain ) -> bool
+{
+    static const auto jumpable_window_terrains = std::array{
+        t_window, t_window_taped, t_window_domestic, t_window_domestic_taped,
+        t_window_open, t_window_alarm, t_window_alarm_taped,
+        t_window_no_curtains, t_window_no_curtains_open, t_window_no_curtains_taped,
+        t_window_stained_green, t_window_stained_red, t_window_stained_blue
+    };
+    namespace ranges = std::ranges;
+    return ranges::contains( jumpable_window_terrains, terrain );
+}
+
+auto jump_over_tile_has_stumble_risk( const map &here,
+                                      const tripoint_bub_ms &jumped_tile ) -> bool
+{
+    return is_jumpable_window_terrain( here.ter( jumped_tile ) ) || here.has_furn( jumped_tile );
+}
+
+auto jump_over_tile_stumble_roll( const player &p ) -> bool
+{
+    auto climb = p.dex_cur;
+    if( p.has_trait( trait_BADKNEES ) ) {
+        climb /= 2;
+    }
+    if( p.mutation_value( "movecost_obstacle_modifier" ) != 0.0f ) {
+        climb = static_cast<int>( climb / p.mutation_value( "movecost_obstacle_modifier" ) );
+    }
+    return one_in( std::max( climb, 1 ) );
+}
+
+auto confirm_dangerous_jump_landing( const player &p,
+                                     const tripoint_abs_ms &dest ) -> bool
+{
+    if( !p.is_avatar() ) {
+        return true;
+    }
+
+    if( get_option<std::string>( "DANGEROUS_TERRAIN_WARNING_PROMPT" ) == "IGNORE" ) {
+        return true;
+    }
+
+    const auto harmful_stuff = g->get_dangerous_tile( abs_to_bub( dest ) );
+    if( harmful_stuff.empty() || p.has_effect( dashing_effect ) ) {
+        return true;
+    }
+
+    return query_yn( _( "Really jump into %s?" ), enumerate_as_string( harmful_stuff ) );
+}
+
 auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
                               const bool show_messages ) -> bool
 {
@@ -5658,11 +5709,13 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
     }
 
     auto &buffer = p.get_mapbuffer();
-    const auto tile_reader = buffer.make_abs_tile_reader();
-    const auto jumped_tile = tile_reader.get_tile( jump_state.examp );
-    if( jumped_tile && jumped_tile->get_furn() != f_null && jumped_tile->get_furn_t().movecost < 0 ) {
+    auto &here = get_map();
+    const auto jumped_tile = abs_to_bub( jump_state.examp );
+    if( here.impassable( jumped_tile ) &&
+        !is_jumpable_window_terrain( here.ter( jumped_tile ) ) ) {
         if( show_messages ) {
-            add_msg( m_warning, _( "You cannot jump over that piece of furniture." ) );
+            add_msg( m_warning, _( "You cannot jump through the %s." ),
+                     here.obstacle_name( jumped_tile ) );
         }
         return false;
     }
@@ -5676,9 +5729,11 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
         }
     }
 
-    if( !buffer.valid_move( jump_state.examp, jump_state.dest, { .flying = true } ) ) {
+    const auto landing_tile = abs_to_bub( jump_state.dest );
+    if( here.impassable( landing_tile ) ) {
         if( show_messages ) {
-            add_msg( m_warning, _( "You cannot jump over an obstacle - something is blocking the way." ) );
+            add_msg( m_warning, _( "You cannot land there - the %s is blocking the way." ),
+                     here.obstacle_name( landing_tile ) );
         }
         return false;
     }
@@ -5720,7 +5775,6 @@ auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
             !query_yn( _( "Do you really want to jump off the vehicle?" ) ) ) {
             return false;
         }
-        get_map().unboard_vehicle( p.bub_pos() );
     }
 
     if( !can_jump_over_tile_impl( p, examp, true ) ) {
@@ -5728,13 +5782,30 @@ auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
     }
 
     const auto jump_state = get_jump_over_tile_state( p, examp );
+    if( !confirm_dangerous_jump_landing( p, jump_state.dest ) ) {
+        return false;
+    }
+
+    if( p.in_vehicle ) {
+        get_map().unboard_vehicle( p.bub_pos() );
+    }
+
     const auto move_cost = p.run_cost( jump_over_tile_base_move_cost );
     const auto stamina_cost = jump_over_tile_stamina_cost( p, move_cost );
-    add_msg( m_info, _( "You jump over an obstacle." ) );
+    auto &here = get_map();
+    const auto jumped_tile = abs_to_bub( jump_state.examp );
+    const auto stumbled = jump_over_tile_has_stumble_risk( here, jumped_tile ) &&
+                          jump_over_tile_stumble_roll( p );
+    add_msg( m_info, _( "You leap across." ) );
     p.mod_moves( -move_cost );
     p.mod_stamina( -stamina_cost, false );
     p.setpos( jump_state.dest );
-    get_map().creature_on_trap( p, false );
+    if( stumbled ) {
+        add_msg( m_bad, _( "You misjudge the leap past %s and crash to the ground." ),
+                 here.name( jumped_tile ) );
+        p.add_effect( effect_downed, 2_turns, bodypart_str_id::NULL_ID(), 0, true );
+    }
+    here.creature_on_trap( p, false );
     return true;
 }
 

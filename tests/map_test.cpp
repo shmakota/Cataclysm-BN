@@ -35,6 +35,7 @@
 namespace {
 
 static const auto effect_in_pit = efftype_id("in_pit");
+static const auto effect_downed = efftype_id("downed");
 static const auto skill_dodge = skill_id("dodge");
 
 auto burden_jumping_player(avatar& you, const float burden_proportion) -> void {
@@ -235,6 +236,7 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
     }
 
     SECTION("can jump into open air and immediately resolve the ledge fall") {
+        const auto dangerous_prompt = override_option("DANGEROUS_TERRAIN_WARNING_PROMPT", "IGNORE");
         here.ter_set(landing, ter_id("t_open_air"));
         const auto moves_before = g->u.moves;
         CHECK(iexamine::can_jump_over_tile(g->u, middle));
@@ -249,6 +251,42 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
         CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
         CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
         CHECK(g->u.bub_pos() == origin);
+    }
+
+    SECTION("cannot jump through walls") {
+        here.ter_set(middle, ter_id("t_wall"));
+
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
+    }
+
+    SECTION("cannot jump through trees") {
+        here.ter_set(middle, ter_id("t_tree"));
+
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
+    }
+
+    SECTION("can jump through a window but may end up downed") {
+        here.ter_set(middle, ter_id("t_window"));
+        g->u.dex_cur = 1;
+
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+        CHECK(g->u.has_effect(effect_downed));
+    }
+
+    SECTION("can trip and end up downed when jumping over furniture") {
+        here.furn_set(middle, furn_id("f_chair"));
+        g->u.dex_cur = 1;
+
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+        CHECK(g->u.has_effect(effect_downed));
     }
 
     SECTION("cannot jump over creatures our size or larger") {
