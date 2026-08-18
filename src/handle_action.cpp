@@ -147,13 +147,13 @@ auto is_terrain_memory( const memorized_terrain_tile &memory ) -> bool
     return !memory.tile.empty() && ter_str_id( memory.tile ).is_valid();
 }
 
-auto has_memorized_terrain_at( avatar &you, map &here, const tripoint_bub_ms &target ) -> bool
+auto has_memorized_terrain_at( avatar &you, map &/*here*/, const tripoint_bub_ms &target ) -> bool
 {
     if( !you.should_show_map_memory() ) {
         return false;
     }
 
-    const auto abs_target = here.bub_to_abs( target );
+    const auto abs_target = bub_to_abs( target );
     return is_terrain_memory( you.get_terrain_tile( abs_target ) ) ||
            is_terrain_memory( you.get_memorized_tile( abs_target ) );
 }

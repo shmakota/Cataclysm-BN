@@ -950,7 +950,7 @@ struct avatar_remembers_stairs_at_options {
 
 auto avatar_remembers_stairs_at( const avatar_remembers_stairs_at_options &opts ) -> bool
 {
-    const auto abs_candidate = opts.here.bub_to_abs( opts.candidate );
+    const auto abs_candidate = bub_to_abs( opts.candidate );
     return memorized_terrain_has_stair_flag( opts.you.get_terrain_tile( abs_candidate ), opts.going_up,
             opts.going_down ) ||
            memorized_terrain_has_stair_flag( opts.you.get_memorized_tile( abs_candidate ), opts.going_up,
@@ -3763,7 +3763,7 @@ bool game::try_get_right_click_action( action_id &act, const tripoint_bub_ms &mo
 
             queued_right_click_action_ = {
                 .action = selected->action,
-                .target = m.bub_to_abs( mouse_target ),
+                .target = bub_to_abs( mouse_target ),
                 .target_name = action_target_name,
                 .action_name = action_name,
             };
@@ -3842,8 +3842,8 @@ auto game::try_get_queued_right_click_action( action_id &act,
         return false;
     }
 
-    const auto target = m.abs_to_bub( queued_right_click_action_->target );
-    const auto abs_target = m.bub_to_abs( target );
+    const auto target = abs_to_bub( queued_right_click_action_->target );
+    const auto abs_target = bub_to_abs( target );
     const auto target_has_memory =
         u.should_show_map_memory() &&
         ( ter_str_id( u.get_terrain_tile( abs_target ).tile ).is_valid() ||
@@ -8719,11 +8719,13 @@ auto maybe_play_describe_sound( const tripoint_bub_ms &target, const MapPart &pa
     }
 
     const auto variant = part.id.str();
-    const auto heard_volume = sfx::get_heard_volume( target );
-
     if( sfx::has_variant_sound( "smash_fail", variant ) ) {
+        const auto heard_volume = sfx::get_heard_volume( target,
+                                  std::min( 120, units::to_decibel( part.bash.sound_fail_vol.value_or( 70_dB ) ) ) );
         sfx::play_variant_sound( "smash_fail", variant, heard_volume );
     } else if( sfx::has_variant_sound( "smash_success", variant ) ) {
+        const auto heard_volume = sfx::get_heard_volume( target,
+                                  std::min( 120, units::to_decibel( part.bash.sound_vol.value_or( 70_dB ) ) ) );
         sfx::play_variant_sound( "smash_success", variant, heard_volume );
     }
 }
@@ -8929,7 +8931,7 @@ auto game::describe_tile( const tripoint_bub_ms &target ) -> void
 {
     if( !u.sees( target ) ) {
         if( u.should_show_map_memory() ) {
-            const auto abs_target = m.bub_to_abs( target );
+            const auto abs_target = bub_to_abs( target );
             if( describe_memorized_terrain( u.get_terrain_tile( abs_target ), target ) ||
                 describe_memorized_terrain( u.get_memorized_tile( abs_target ), target ) ) {
                 return;
@@ -14476,7 +14478,7 @@ void game::vertical_move( int movez, bool force, bool peeking )
     const bool can_noclip = character_funcs::can_noclip( get_avatar() );
     int move_cost = 100;
     tripoint_bub_ms stairs( u.bub_pos().x(), u.bub_pos().y(), u.bub_pos().z() + movez );
-    if( m.has_zlevels() && !force && movez == 1 &&
+    if( !force && movez == 1 &&
         !terrain_leads_to_zlevel( m, u.bub_pos(), movez ) &&
         !u.is_underwater() && !can_fly ) {
 
@@ -14630,8 +14632,8 @@ void game::vertical_move( int movez, bool force, bool peeking )
         return;
     }
 
-    // Because get_levz takes z-value from the map, it will change when vertical_shift (m.has_zlevels() == true)
-    // is called or when the map is loaded on new z-level (== false).
+    // Because get_levz takes z-value from the map, it will change when vertical_shift
+    // is called or when the map is loaded on a new z-level.
     // This caches the z-level we start the movement on (current) and the level we're want to end.
     const int z_before = get_levz();
     const int z_after = get_levz() + movez;

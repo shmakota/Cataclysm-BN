@@ -44,13 +44,13 @@
 namespace
 {
 
-auto has_memorized_terrain_at( avatar &you, map &here, const tripoint_bub_ms &target ) -> bool
+auto has_memorized_terrain_at( avatar &you, map &/*here*/, const tripoint_bub_ms &target ) -> bool
 {
     if( !you.should_show_map_memory() ) {
         return false;
     }
 
-    const auto abs_target = here.bub_to_abs( target );
+    const auto abs_target = bub_to_abs( target );
     return ter_str_id( you.get_terrain_tile( abs_target ).tile ).is_valid() ||
            ter_str_id( you.get_memorized_tile( abs_target ).tile ).is_valid();
 }
