@@ -3913,7 +3913,7 @@ bool map::mop_spills( const tripoint_bub_ms &p )
     }
 
     field &fld = field_at( p );
-    auto fields_to_remove = std::vector<field_type_id>{};
+    auto fields_to_remove = std::vector<field_type_id> {};
     for( const auto &[field_id, entry] : fld ) {
         static_cast<void>( field_id );
         if( entry.is_moppable() ) {

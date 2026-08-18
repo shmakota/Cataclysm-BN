@@ -1579,12 +1579,9 @@
     "id": "fd_syrup",
     "type": "field_type",
     "intensity_levels": [
+      { "name": "syrup splatter", "sym": "~", "color": "brown" },
       {
-        "name": "syrup splatter",
-        "sym": "~",
-        "color": "brown"
-      },
-      { "name": "syrup smear",
+        "name": "syrup smear",
         "effects": [
           {
             "effect_id": "sap",
@@ -1617,12 +1614,9 @@
     "id": "fd_glue",
     "type": "field_type",
     "intensity_levels": [
+      { "name": "glue splatter", "sym": "~", "color": "white" },
       {
-        "name": "glue splatter",
-        "sym": "~",
-        "color": "white"
-      },
-      { "name": "glop of glue",
+        "name": "glop of glue",
         "effects": [
           {
             "effect_id": "sap",
@@ -1672,11 +1666,7 @@
   {
     "id": "fd_alcohol",
     "type": "field_type",
-    "intensity_levels": [
-      { "name": "alcohol splatter", "sym": "~" },
-      { "name": "alcohol puddle" },
-      { "name": "pool of alcohol" }
-    ],
+    "intensity_levels": [ { "name": "alcohol splatter", "sym": "~" }, { "name": "alcohol puddle" }, { "name": "pool of alcohol" } ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
     "accelerated_decay": true,
@@ -1692,7 +1682,7 @@
     "id": "fd_plutonium_slurry",
     "type": "field_type",
     "intensity_levels": [
-      { "name": "nuclear waste splatter", "sym": "~", "color": "light_green"},
+      { "name": "nuclear waste splatter", "sym": "~", "color": "light_green" },
       { "name": "nuclear waste puddle" },
       { "name": "pool of nuclear waste", "color": "green", "extra_radiation_max": 1 }
     ],

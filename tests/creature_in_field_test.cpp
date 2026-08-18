@@ -11,8 +11,8 @@
 
 #include <memory>
 
-static const auto effect_downed = efftype_id( "downed" );
-static const auto field_test_fd_slip = field_type_id( "test_fd_slip" );
+static const auto effect_downed = efftype_id("downed");
+static const auto field_test_fd_slip = field_type_id("test_fd_slip");
 
 TEST_CASE("creature_in_field", "[monster],[field]") {
     clear_all_state();
@@ -40,29 +40,28 @@ TEST_CASE("creature_in_field", "[monster],[field]") {
     }
 }
 
-TEST_CASE( "noslip clothing prevents field-based slipping", "[avatar],[field]" )
-{
+TEST_CASE("noslip clothing prevents field-based slipping", "[avatar],[field]") {
     clear_all_state();
 
-    auto &here = get_map();
-    auto &you = get_avatar();
-    const auto target_location = tripoint_bub_ms( 5, 5, 0 );
-    you.setpos( target_location );
+    auto& here = get_map();
+    auto& you = get_avatar();
+    const auto target_location = tripoint_bub_ms(5, 5, 0);
+    you.setpos(target_location);
 
-    SECTION( "slippery fields down the avatar without noslip footwear" ) {
-        here.add_field( target_location, field_test_fd_slip );
+    SECTION("slippery fields down the avatar without noslip footwear") {
+        here.add_field(target_location, field_test_fd_slip);
 
-        here.creature_in_field( you );
+        here.creature_in_field(you);
 
-        CHECK( you.has_effect( effect_downed ) );
+        CHECK(you.has_effect(effect_downed));
     }
 
-    SECTION( "noslip footwear blocks the downed effect from slippery fields" ) {
-        REQUIRE_FALSE( you.wear_item( item::spawn( "test_noslip_boots" ), false ) );
-        here.add_field( target_location, field_test_fd_slip );
+    SECTION("noslip footwear blocks the downed effect from slippery fields") {
+        REQUIRE_FALSE(you.wear_item(item::spawn("test_noslip_boots"), false));
+        here.add_field(target_location, field_test_fd_slip);
 
-        here.creature_in_field( you );
+        here.creature_in_field(you);
 
-        CHECK_FALSE( you.has_effect( effect_downed ) );
+        CHECK_FALSE(you.has_effect(effect_downed));
     }
 }

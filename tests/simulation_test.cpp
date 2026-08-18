@@ -42,8 +42,8 @@ static auto plant_fire(submap& sm, const point_sm_ms& local, int intensity = 1) 
 }
 
 static auto plant_field(
-    submap& sm, const point_sm_ms& local, const field_type_id& field_type,
-    int intensity = 1) -> void {
+    submap& sm, const point_sm_ms& local, const field_type_id& field_type, int intensity = 1)
+    -> void {
     if (sm.get_field(local).add_field(field_type, intensity, 0_turns)) {
         ++sm.field_count;
         sm.field_cache.push_back(local);
@@ -108,7 +108,8 @@ TEST_CASE("adjacent_fire_ignites_fuel_fields", "[simulation][field][fire]") {
     MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
 
-TEST_CASE("adjacent_fire_propagates_through_fuel_over_multiple_ticks", "[simulation][field][fire]") {
+TEST_CASE(
+    "adjacent_fire_propagates_through_fuel_over_multiple_ticks", "[simulation][field][fire]") {
     clear_all_state();
     put_player_underground();
 
@@ -164,7 +165,8 @@ TEST_CASE("water_puddles_extinguish_fire_on_the_same_tile", "[simulation][field]
     MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
 
-TEST_CASE("adjacent_electricity_energizes_salt_water_fields", "[simulation][field][electric][liquid]") {
+TEST_CASE(
+    "adjacent_electricity_energizes_salt_water_fields", "[simulation][field][electric][liquid]") {
     clear_all_state();
     put_player_underground();
 
@@ -191,8 +193,9 @@ TEST_CASE("adjacent_electricity_energizes_salt_water_fields", "[simulation][fiel
     MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
 
-TEST_CASE("adjacent_electricity_propagates_through_salt_water_over_multiple_ticks",
-          "[simulation][field][electric][liquid]") {
+TEST_CASE(
+    "adjacent_electricity_propagates_through_salt_water_over_multiple_ticks",
+    "[simulation][field][electric][liquid]") {
     clear_all_state();
     put_player_underground();
 

@@ -954,9 +954,10 @@ struct spilled_liquid_field_candidate {
 };
 
 static constexpr std::array<std::pair<int, int>, 8> spilled_liquid_adjacent_offsets = {{
-    { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 },
-    { 1, -1 }, { -1, 1 }, { -1, -1 }, { 1, 1 },
-}};
+        { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 },
+        { 1, -1 }, { -1, 1 }, { -1, -1 }, { 1, 1 },
+    }
+};
 } // namespace
 
 void map::spill_liquid_field( const tripoint_bub_ms &center, const item &liquid )
@@ -983,19 +984,20 @@ void map::spill_liquid_field( const tripoint_bub_ms &center, const item &liquid 
     auto candidates = std::vector<spilled_liquid_field_candidate>();
     auto represented_amount = 0;
     const auto sort_spill_tiles = [&]() {
-        ranges::sort( spill_tiles_to_fill, [&]( const tripoint_bub_ms &lhs, const tripoint_bub_ms &rhs ) {
+        ranges::sort( spill_tiles_to_fill, [&]( const tripoint_bub_ms & lhs, const tripoint_bub_ms & rhs ) {
             return std::tuple( rl_dist( center, lhs ), lhs.x(), lhs.y(), lhs.z() ) <
                    std::tuple( rl_dist( center, rhs ), rhs.x(), rhs.y(), rhs.z() );
         } );
     };
     const auto sort_candidates = [&]() {
-        ranges::sort( candidates, [&]( const spilled_liquid_field_candidate &lhs,
-        const spilled_liquid_field_candidate &rhs ) {
+        ranges::sort( candidates, [&]( const spilled_liquid_field_candidate & lhs,
+        const spilled_liquid_field_candidate & rhs ) {
             return std::tuple( lhs.distance, lhs.pos.x(), lhs.pos.y(), lhs.pos.z() ) <
                    std::tuple( rhs.distance, rhs.pos.x(), rhs.pos.y(), rhs.pos.z() );
         } );
     };
-    const auto add_candidate = [&]( const tripoint_bub_ms &current, const tripoint_bub_ms &adjacent ) {
+    const auto add_candidate = [&]( const tripoint_bub_ms & current,
+    const tripoint_bub_ms & adjacent ) {
         if( spill_tiles_seen.contains( adjacent ) || candidates_seen.contains( adjacent ) ||
             impassable( adjacent ) || obstructed_by_vehicle_rotation( current, adjacent ) ) {
             return;
@@ -1007,7 +1009,7 @@ void map::spill_liquid_field( const tripoint_bub_ms &center, const item &liquid 
             .pos = adjacent,
         } );
     };
-    const auto expand_candidates = [&]( const tripoint_bub_ms &current ) {
+    const auto expand_candidates = [&]( const tripoint_bub_ms & current ) {
         for( const auto &[dx, dy] : spilled_liquid_adjacent_offsets ) {
             const auto adjacent = current + point( dx, dy );
             if( get_field( adjacent, type ) != nullptr ) {
@@ -1270,7 +1272,7 @@ auto ignite_fuel_field( field_cache_dirty_context const &ctx, SubTile &dst,
 auto conductive_field_intensity( const field &fields ) -> int
 {
     auto max_intensity = 0;
-    std::ranges::for_each( fields, [&]( const auto &field_pair ) {
+    std::ranges::for_each( fields, [&]( const auto & field_pair ) {
         if( field_pair.second.get_field_type()->is_conductive() ) {
             max_intensity = std::max( max_intensity, field_pair.second.get_field_intensity() );
         }

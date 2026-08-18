@@ -60,8 +60,8 @@ auto prompt_for_ground_amount( const item &liquid ) -> int
     const auto amount = string_input_popup()
                         .title( string_format(
                                     vgettext( "Pour how many charges of %1$s onto the ground?  Max: %2$d charge.  (0 to cancel)",
-                                              "Pour how many charges of %1$s onto the ground?  Max: %2$d charges.  (0 to cancel)",
-                                              liquid.charges ),
+                                            "Pour how many charges of %1$s onto the ground?  Max: %2$d charges.  (0 to cancel)",
+                                            liquid.charges ),
                                     liquid.tname(), liquid.charges ) )
                         .width( 20 )
                         .text( std::to_string( liquid.charges ) )
@@ -357,7 +357,8 @@ auto get_liquid_target( item &liquid, const int radius, liquid_dest_opt &target 
     return true;
 }
 
-static auto perform_liquid_transfer( item &liquid, liquid_dest_opt &target ) -> liquid_transfer_result
+static auto perform_liquid_transfer( item &liquid,
+                                     liquid_dest_opt &target ) -> liquid_transfer_result
 {
     map &here = get_map();
     switch( target.dest_opt ) {

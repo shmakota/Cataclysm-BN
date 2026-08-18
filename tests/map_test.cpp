@@ -82,8 +82,8 @@ auto mapgen_item_count_in_radius(
 }
 
 auto count_field_tiles_in_radius(
-    map& here, const tripoint_bub_ms& center, const size_t radius,
-    const field_type_id& field_id) -> int {
+    map& here, const tripoint_bub_ms& center, const size_t radius, const field_type_id& field_id)
+    -> int {
     auto result = 0;
     for (const auto& pos : here.points_in_radius(center, radius)) {
         result += here.get_field(pos, field_id) != nullptr ? 1 : 0;
@@ -92,8 +92,8 @@ auto count_field_tiles_in_radius(
 }
 
 auto total_field_intensity_in_radius(
-    map& here, const tripoint_bub_ms& center, const size_t radius,
-    const field_type_id& field_id) -> int {
+    map& here, const tripoint_bub_ms& center, const size_t radius, const field_type_id& field_id)
+    -> int {
     auto result = 0;
     for (const auto& pos : here.points_in_radius(center, radius)) {
         if (const auto* field = here.get_field(pos, field_id)) {
@@ -279,8 +279,8 @@ TEST_CASE("repeated_liquid_spills_intensify_before_expanding", "[map][item][liqu
     REQUIRE_FALSE(here.add_item_or_charges(center, std::move(third_pour), false));
     CHECK(count_field_tiles_in_radius(here, center, 2, water_field) == 1);
     REQUIRE(here.get_field(center, water_field) != nullptr);
-    CHECK(
-        here.get_field(center, water_field)->get_field_intensity() == water_field.obj().get_max_intensity());
+    CHECK(here.get_field(center, water_field)->get_field_intensity()
+          == water_field.obj().get_max_intensity());
 
     auto fourth_pour = item::spawn("water", calendar::turn);
     fourth_pour->charges = 1;
@@ -315,16 +315,17 @@ TEST_CASE(
 
     REQUIRE_FALSE(here.add_item_or_charges(center, std::move(spilled_gasoline), false));
     CHECK(count_field_tiles_in_radius(here, center, 12, fuel_field) <= 90);
-    CHECK(total_field_intensity_in_radius(here, center, 12, fuel_field) == expected_visual_intensity);
+    CHECK(
+        total_field_intensity_in_radius(here, center, 12, fuel_field) == expected_visual_intensity);
     REQUIRE(here.get_field(center, fuel_field) != nullptr);
     CHECK(here.get_field(center, fuel_field)->get_field_intensity() == max_fuel_intensity);
 }
 TEST_CASE("mop_spills_respects_jsonized_field_property", "[map][field][mop]") {
     clear_all_state();
 
-    auto &here = get_map();
-    const auto center = tripoint_bub_ms( 60, 60, 0 );
-    g->place_player( center );
+    auto& here = get_map();
+    const auto center = tripoint_bub_ms(60, 60, 0);
+    g->place_player(center);
 
     SECTION("moppable fields are removed") {
         const auto bile_field = field_type_id("fd_bile");
