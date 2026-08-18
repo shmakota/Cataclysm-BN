@@ -5651,8 +5651,85 @@ auto jump_over_tile_has_stumble_risk( const map &here,
     return here.has_flag( "WINDOW", jumped_tile ) || here.has_furn( jumped_tile );
 }
 
+auto jump_over_tile_bashes_window( const map &here,
+                                   const tripoint_bub_ms &jumped_tile ) -> bool
+{
+    if( !here.impassable( jumped_tile ) || !here.has_flag( "WINDOW", jumped_tile ) ||
+        !here.is_bashable_ter( jumped_tile ) ) {
+        return false;
+    }
+
+    const auto &bash = here.ter( jumped_tile ).obj().bash;
+    if( !bash.ter_set ) {
+        return false;
+    }
+
+    return bash.ter_set->movecost > 0 ||
+           bash.ter_set->has_flag( TFLAG_THIN_OBSTACLE ) ||
+           bash.ter_set->has_flag( TFLAG_SMALL_PASSAGE );
+}
+
+auto bash_window_for_jump( map &here, const player &p,
+                           const tripoint_bub_ms &jumped_tile ) -> bool
+{
+    const auto bash = bash_params{
+        .strength = std::max( p.get_str(), 1 ),
+        .silent = false,
+        .destroy = true,
+        .bash_floor = false,
+        .roll = 1.0f,
+        .bashing_from_above = false,
+        .caused_by_player = p.is_avatar(),
+    };
+    const auto bash_result = here.bash( jumped_tile, bash );
+    return bash_result.success && !here.impassable( jumped_tile );
+}
+
+auto jump_over_tile_window_cut_bodyparts( const player &p ) -> std::vector<bodypart_id>
+{
+    static const auto risky_bodyparts = std::array{
+        bodypart_id( "hand_l" ), bodypart_id( "hand_r" ),
+        bodypart_id( "arm_l" ), bodypart_id( "arm_r" ),
+        bodypart_id( "leg_l" ), bodypart_id( "leg_r" ),
+        bodypart_id( "torso" )
+    };
+    namespace ranges = std::ranges;
+    using namespace std::views;
+
+    return risky_bodyparts
+           | filter( [&p]( const bodypart_id &bp ) {
+               return !p.wearing_something_on( bp );
+           } )
+           | ranges::to<std::vector>();
+}
+
+auto maybe_cut_from_smashing_window( player &p,
+                                     const std::string &obstacle_name ) -> void
+{
+    const auto exposed_bodyparts = jump_over_tile_window_cut_bodyparts( p );
+    if( exposed_bodyparts.empty() ) {
+        return;
+    }
+
+    if( one_in( 3 ) || x_in_y( 1 + p.dex_cur / 2.0, 40 ) ||
+        ( p.mutation_value( "movecost_obstacle_modifier" ) <= 0.5f && !one_in( 4 ) ) ||
+        ( p.has_trait( trait_id( "THICKSKIN" ) ) && one_in( 8 ) ) ) {
+        return;
+    }
+
+    const auto bp = random_entry( exposed_bodyparts );
+    if( p.deal_damage( nullptr, bp, damage_instance( DT_CUT, rng( 1, 10 ) ) ).total_damage() > 0 ) {
+        add_msg( m_bad, _( "You smash through the %1$s and cut your %2$s on the broken glass!" ),
+                 obstacle_name, body_part_name_accusative( bp ) );
+    }
+}
+
 auto jump_over_tile_stumble_roll( const player &p ) -> bool
 {
+    if( p.has_trait( trait_id( "PARKOUR" ) ) ) {
+        return false;
+    }
+
     auto climb = p.dex_cur;
     if( p.has_trait( trait_BADKNEES ) ) {
         climb /= 2;
@@ -5682,6 +5759,16 @@ auto confirm_dangerous_jump_landing( const player &p,
     return query_yn( _( "Really jump into %s?" ), enumerate_as_string( harmful_stuff ) );
 }
 
+auto confirm_crash_through_window( const player &p,
+                                   const std::string &obstacle_name ) -> bool
+{
+    if( !p.is_avatar() ) {
+        return true;
+    }
+
+    return query_yn( _( "Crash through the %s?" ), obstacle_name );
+}
+
 auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
                               const bool show_messages ) -> bool
 {
@@ -5699,7 +5786,8 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
     auto &buffer = p.get_mapbuffer();
     auto &here = get_map();
     const auto jumped_tile = abs_to_bub( jump_state.examp );
-    if( here.impassable( jumped_tile ) ) {
+    if( here.impassable( jumped_tile ) &&
+        !jump_over_tile_bashes_window( here, jumped_tile ) ) {
         if( show_messages ) {
             add_msg( m_warning, _( "You cannot jump through the %s." ),
                      here.obstacle_name( jumped_tile ) );
@@ -5781,15 +5869,28 @@ auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
     const auto stamina_cost = jump_over_tile_stamina_cost( p, move_cost );
     auto &here = get_map();
     const auto jumped_tile = abs_to_bub( jump_state.examp );
-    const auto stumbled = jump_over_tile_has_stumble_risk( here, jumped_tile ) &&
+    const auto jumped_obstacle_name = here.name( jumped_tile );
+    const auto bashed_window = jump_over_tile_bashes_window( here, jumped_tile );
+    if( bashed_window && !confirm_crash_through_window( p, jumped_obstacle_name ) ) {
+        return false;
+    }
+    const auto stumbled = ( bashed_window || jump_over_tile_has_stumble_risk( here, jumped_tile ) ) &&
                           jump_over_tile_stumble_roll( p );
-    add_msg( m_info, _( "You leap across." ) );
+    if( bashed_window ) {
+        add_msg( m_info, _( "You crash through the %s." ), jumped_obstacle_name );
+        if( !bash_window_for_jump( here, p, jumped_tile ) ) {
+            return false;
+        }
+        maybe_cut_from_smashing_window( p, jumped_obstacle_name );
+    } else {
+        add_msg( m_info, _( "You leap across." ) );
+    }
     p.mod_moves( -move_cost );
     p.mod_stamina( -stamina_cost, false );
     p.setpos( jump_state.dest );
     if( stumbled ) {
         add_msg( m_bad, _( "You misjudge the leap past %s and crash to the ground." ),
-                 here.name( jumped_tile ) );
+                 jumped_obstacle_name );
         p.add_effect( effect_downed, 2_turns, bodypart_str_id::NULL_ID(), 0, true );
     }
     here.creature_on_trap( p, false );
