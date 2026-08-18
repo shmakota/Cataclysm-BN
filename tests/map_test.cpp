@@ -49,19 +49,18 @@ auto burden_jumping_player(avatar& you, const float burden_proportion) -> void {
     }
 }
 
-auto reset_jumping_avatar( avatar &you, const tripoint_bub_ms &origin,
-                           const int dexterity ) -> void {
-    clear_character( you, false );
-    you.setpos( origin );
+auto reset_jumping_avatar(avatar& you, const tripoint_bub_ms& origin, const int dexterity) -> void {
+    clear_character(you, false);
+    you.setpos(origin);
     you.str_cur = 8;
     you.dex_cur = dexterity;
     you.moves = 1000;
 }
 
-auto equip_window_jump_protection( avatar &you ) -> void {
-    REQUIRE_FALSE( you.wear_item( item::spawn( "gloves_work" ), false ) );
-    REQUIRE_FALSE( you.wear_item( item::spawn( "longshirt" ), false ) );
-    REQUIRE_FALSE( you.wear_item( item::spawn( "jeans" ), false ) );
+auto equip_window_jump_protection(avatar& you) -> void {
+    REQUIRE_FALSE(you.wear_item(item::spawn("gloves_work"), false));
+    REQUIRE_FALSE(you.wear_item(item::spawn("longshirt"), false));
+    REQUIRE_FALSE(you.wear_item(item::spawn("jeans"), false));
 }
 
 struct adjacent_pit_move {
@@ -297,15 +296,15 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
 
     SECTION("jumping through a closed window can cut exposed body parts") {
         auto took_damage = false;
-        for( const auto attempt : std::views::iota( 0, 16 ) ) {
-            ( void )attempt;
+        for (const auto attempt : std::views::iota(0, 16)) {
+            (void)attempt;
             here.ter_set(middle, ter_id("t_window"));
             reset_jumping_avatar(g->u, origin, 2);
 
             const auto hp_before = g->u.get_hp();
             CHECK(iexamine::can_jump_over_tile(g->u, middle));
             REQUIRE(iexamine::jump_over_tile(g->u, middle));
-            if( g->u.get_hp() < hp_before ) {
+            if (g->u.get_hp() < hp_before) {
                 took_damage = true;
                 break;
             }

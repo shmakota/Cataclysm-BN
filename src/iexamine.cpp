@@ -5697,10 +5697,10 @@ auto jump_over_tile_window_cut_bodyparts( const player &p ) -> std::vector<bodyp
     using namespace std::views;
 
     return risky_bodyparts
-           | filter( [&p]( const bodypart_id &bp ) {
-               return !p.wearing_something_on( bp );
-           } )
-           | ranges::to<std::vector>();
+    | filter( [&p]( const bodypart_id & bp ) {
+        return !p.wearing_something_on( bp );
+    } )
+    | ranges::to<std::vector>();
 }
 
 auto maybe_cut_from_smashing_window( player &p,
