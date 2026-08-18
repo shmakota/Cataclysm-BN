@@ -5751,7 +5751,8 @@ auto maybe_cut_from_sharp_jump_terrain( player &p, map &here,
     if( p.deal_damage( nullptr, bp, damage_instance( DT_CUT, rng( 1, 10 ) ) ).total_damage() > 0 ) {
         add_msg( m_bad, _( "You cut your %1$s on the %2$s as you leap over it!" ),
                  body_part_name_accusative( damaged_bp ),
-                 here.has_flag_ter( "SHARP", sharp_tile ) ? here.tername( sharp_tile ) : here.furnname( sharp_tile ) );
+                 here.has_flag_ter( "SHARP", sharp_tile ) ? here.tername( sharp_tile ) : here.furnname(
+                     sharp_tile ) );
         if( one_in( 2 ) && !p.is_immune_effect( effect_bleed ) ) {
             p.add_effect( effect_bleed, rng( 2_minutes, 5_minutes ), bp.id() );
         }

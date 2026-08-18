@@ -405,12 +405,14 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
             REQUIRE_FALSE(g->u.wear_item(item::spawn("longshirt"), false));
             REQUIRE_FALSE(g->u.wear_item(item::spawn("jeans"), false));
 
-            const auto arm_hp_before = g->u.get_part_hp_cur(bodypart_id("arm_l")) +
-                                       g->u.get_part_hp_cur(bodypart_id("arm_r"));
+            const auto arm_hp_before =
+                g->u.get_part_hp_cur(bodypart_id("arm_l"))
+                + g->u.get_part_hp_cur(bodypart_id("arm_r"));
             CHECK(iexamine::can_jump_over_tile(g->u, middle));
             REQUIRE(iexamine::jump_over_tile(g->u, middle));
-            const auto arm_hp_after = g->u.get_part_hp_cur(bodypart_id("arm_l")) +
-                                      g->u.get_part_hp_cur(bodypart_id("arm_r"));
+            const auto arm_hp_after =
+                g->u.get_part_hp_cur(bodypart_id("arm_l"))
+                + g->u.get_part_hp_cur(bodypart_id("arm_r"));
             if (arm_hp_after < arm_hp_before) {
                 took_arm_damage = true;
                 break;
@@ -447,19 +449,19 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
     SECTION("can trip and end up downed when jumping over furniture") {
         here.furn_set(middle, furn_id("f_chair"));
         g->u.dex_cur = 1;
-        const auto limb_hp_before = g->u.get_part_hp_cur(bodypart_id("arm_l")) +
-                                    g->u.get_part_hp_cur(bodypart_id("arm_r")) +
-                                    g->u.get_part_hp_cur(bodypart_id("leg_l")) +
-                                    g->u.get_part_hp_cur(bodypart_id("leg_r"));
+        const auto limb_hp_before =
+            g->u.get_part_hp_cur(bodypart_id("arm_l")) + g->u.get_part_hp_cur(bodypart_id("arm_r"))
+            + g->u.get_part_hp_cur(bodypart_id("leg_l"))
+            + g->u.get_part_hp_cur(bodypart_id("leg_r"));
 
         CHECK(iexamine::can_jump_over_tile(g->u, middle));
         REQUIRE(iexamine::jump_over_tile(g->u, middle));
         CHECK(g->u.bub_pos() == landing);
         CHECK(g->u.has_effect(effect_downed));
-        const auto limb_hp_after = g->u.get_part_hp_cur(bodypart_id("arm_l")) +
-                                   g->u.get_part_hp_cur(bodypart_id("arm_r")) +
-                                   g->u.get_part_hp_cur(bodypart_id("leg_l")) +
-                                   g->u.get_part_hp_cur(bodypart_id("leg_r"));
+        const auto limb_hp_after =
+            g->u.get_part_hp_cur(bodypart_id("arm_l")) + g->u.get_part_hp_cur(bodypart_id("arm_r"))
+            + g->u.get_part_hp_cur(bodypart_id("leg_l"))
+            + g->u.get_part_hp_cur(bodypart_id("leg_r"));
         CHECK(limb_hp_after < limb_hp_before);
         const auto downed_duration = g->u.get_effect(effect_downed).get_duration();
         CHECK(downed_duration >= 2_turns);
@@ -510,17 +512,19 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
 
             const auto move_cost = g->u.run_cost(200);
             const auto base_stamina_burn = divide_round_up(
-                                               get_option<int>("PLAYER_BASE_STAMINA_BURN_RATE") * move_cost * 14, 100);
+                get_option<int>("PLAYER_BASE_STAMINA_BURN_RATE") * move_cost * 14, 100);
             const auto carried_weight_grams = units::to_gram(g->u.weight_carried());
-            const auto carry_capacity_grams = units::to_gram(std::max(g->u.weight_capacity(), 1_gram));
-            const auto carried_weight_percentage = std::clamp(
-                                                       static_cast<int>(carried_weight_grams * 100 / carry_capacity_grams), 0, 100);
+            const auto carry_capacity_grams = units::to_gram(
+                std::max(g->u.weight_capacity(), 1_gram));
+            const auto carried_weight_percentage = std::
+                clamp(static_cast<int>(carried_weight_grams * 100 / carry_capacity_grams), 0, 100);
             const auto stamina_before = g->u.get_stamina();
             CHECK(iexamine::can_jump_over_tile(g->u, middle));
             REQUIRE(iexamine::jump_over_tile(g->u, middle));
             return jump_stamina_result{
                 .actual_burn = stamina_before - g->u.get_stamina(),
-                .expected_burn = divide_round_up(base_stamina_burn * (100 + carried_weight_percentage), 100),
+                .expected_burn =
+                    divide_round_up(base_stamina_burn * (100 + carried_weight_percentage), 100),
             };
         };
 
