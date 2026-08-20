@@ -248,7 +248,7 @@ TEST_CASE("auto_stair_travel_finds_remembered_stairs", "[map][stair][autotravel]
 
     g->u.setpos(origin);
     here.ter_set(remembered_stairs, ter_id("t_floor"));
-    g->u.memorize_terrain_tile(here.bub_to_abs(remembered_stairs), "t_stairs_up", 0, 0);
+    g->u.memorize_terrain_tile( bub_to_abs( remembered_stairs ), "t_stairs_up", 0, 0 );
 
     const auto found_stairs = g->find_local_stairs_leading_to(here, origin.z() + 1);
 
