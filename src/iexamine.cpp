@@ -5699,7 +5699,7 @@ auto jump_over_tile_can_land_on_ledge( mapbuffer &buffer,
     }
 
     return buffer.valid_move( landing_tile, landing_tile + tripoint_rel_ms::below(),
-                              { .flying = true } );
+    { .flying = true } );
 }
 
 auto bash_window_for_jump( map &here, const player &p,

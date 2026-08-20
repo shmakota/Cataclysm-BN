@@ -548,7 +548,7 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
 
     SECTION("cannot start when too weak to jump") {
         g->u.str_max = 3;
-        g->u.set_str_bonus( 0 );
+        g->u.set_str_bonus(0);
         g->u.str_cur = g->u.get_str();
 
         CHECK_FALSE(iexamine::can_start_jump_over_tile(g->u, true));
@@ -556,8 +556,8 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
 
     SECTION("cannot start when stamina is below the jump cost") {
         const auto move_cost = g->u.run_cost(200);
-        const auto required_stamina = divide_round_up(
-            get_option<int>("PLAYER_BASE_STAMINA_BURN_RATE") * move_cost * 14, 100);
+        const auto required_stamina =
+            divide_round_up(get_option<int>("PLAYER_BASE_STAMINA_BURN_RATE") * move_cost * 14, 100);
         REQUIRE(required_stamina > 0);
         g->u.set_stamina(required_stamina - 1);
 
