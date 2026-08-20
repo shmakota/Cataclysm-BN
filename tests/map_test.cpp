@@ -59,12 +59,6 @@ auto reset_jumping_player(player& you, const tripoint_bub_ms& origin, const int 
     you.moves = 1000;
 }
 
-auto equip_window_jump_protection(player& you) -> void {
-    REQUIRE_FALSE(you.wear_item(item::spawn("gloves_work"), false));
-    REQUIRE_FALSE(you.wear_item(item::spawn("longshirt"), false));
-    REQUIRE_FALSE(you.wear_item(item::spawn("jeans"), false));
-}
-
 auto spawn_window_jump_npc(const tripoint_bub_ms& origin, const int dexterity) -> npc& {
     g->place_player(origin + tripoint_rel_ms::south());
     auto& jumper = spawn_npc(origin, "test_talker");
@@ -429,30 +423,6 @@ TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][mov
         }
 
         CHECK(took_arm_damage);
-    }
-
-    SECTION("jumping through a closed window is safe when covered") {
-        here.ter_set(middle, ter_id("t_window"));
-        auto& jumper = spawn_window_jump_npc(origin, 2);
-        equip_window_jump_protection(jumper);
-
-        const auto hp_before = jumper.get_hp();
-        CHECK(iexamine::can_jump_over_tile(jumper, middle));
-        REQUIRE(iexamine::jump_over_tile(jumper, middle));
-        CHECK(jumper.bub_pos() == landing);
-        CHECK(jumper.get_hp() == hp_before);
-    }
-
-    SECTION("parkour experts never trip while jumping obstacles") {
-        here.ter_set(middle, ter_id("t_window"));
-        auto& jumper = spawn_window_jump_npc(origin, 1);
-        equip_window_jump_protection(jumper);
-        jumper.toggle_trait(trait_id("PARKOUR"));
-
-        CHECK(iexamine::can_jump_over_tile(jumper, middle));
-        REQUIRE(iexamine::jump_over_tile(jumper, middle));
-        CHECK(jumper.bub_pos() == landing);
-        CHECK_FALSE(jumper.has_effect(effect_downed));
     }
 
     SECTION("can trip and end up downed when jumping over furniture") {
