@@ -5680,6 +5680,23 @@ auto jump_over_tile_can_cross_impassable( const map &here, const player &p,
            jump_over_tile_bashes_window( here, p, jumped_tile );
 }
 
+auto jump_over_tile_can_land_on_ledge( mapbuffer &buffer,
+                                       const tripoint_abs_ms &landing_tile ) -> bool
+{
+    const auto tile_reader = buffer.make_abs_tile_reader();
+    const auto landing = tile_reader.get_tile( landing_tile );
+    if( !landing ) {
+        return false;
+    }
+
+    if( landing->get_trap() != tr_ledge && landing->get_ter_t().trap != tr_ledge ) {
+        return false;
+    }
+
+    return buffer.valid_move( landing_tile, landing_tile + tripoint_rel_ms::below(),
+                              { .flying = true } );
+}
+
 auto bash_window_for_jump( map &here, const player &p,
                            const tripoint_bub_ms &jumped_tile ) -> bool
 {
@@ -5797,6 +5814,10 @@ auto confirm_dangerous_jump_landing( const player &p,
         return true;
     }
 
+    if( get_option<std::string>( "DANGEROUS_TERRAIN_WARNING_PROMPT" ) == "IGNORE" ) {
+        return true;
+    }
+
     return g->prompt_dangerous_tile( abs_to_bub( dest ), _( "Really jump into %s?" ), false );
 }
 
@@ -5846,7 +5867,8 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
     }
 
     const auto landing_tile = abs_to_bub( jump_state.dest );
-    if( here.impassable( landing_tile ) ) {
+    if( here.impassable( landing_tile ) &&
+        !jump_over_tile_can_land_on_ledge( buffer, jump_state.dest ) ) {
         if( show_messages ) {
             add_msg( m_warning, _( "You cannot land there - the %s is blocking the way." ),
                      here.obstacle_name( landing_tile ) );
