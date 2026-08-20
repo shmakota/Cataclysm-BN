@@ -5628,6 +5628,11 @@ auto scale_jump_over_tile_cost_round_up( const int value, const int numerator,
     return divide_round_up( value * numerator, denominator );
 }
 
+auto jump_over_tile_move_cost( const player &p ) -> int
+{
+    return p.run_cost( jump_over_tile_base_move_cost );
+}
+
 auto jump_over_tile_stamina_cost( const player &p, const int move_cost ) -> int
 {
     const auto base_stamina_cost = scale_jump_over_tile_cost_round_up(
@@ -5898,6 +5903,14 @@ auto iexamine::can_start_jump_over_tile( const player &p, const bool show_messag
         return false;
     }
 
+    const auto stamina_cost = jump_over_tile_stamina_cost( p, jump_over_tile_move_cost( p ) );
+    if( p.get_stamina() < stamina_cost ) {
+        if( show_messages ) {
+            add_msg( m_warning, _( "You're too exhausted to jump over an obstacle." ) );
+        }
+        return false;
+    }
+
     return true;
 }
 
@@ -5928,7 +5941,7 @@ auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
         get_map().unboard_vehicle( p.bub_pos() );
     }
 
-    const auto move_cost = p.run_cost( jump_over_tile_base_move_cost );
+    const auto move_cost = jump_over_tile_move_cost( p );
     const auto stamina_cost = jump_over_tile_stamina_cost( p, move_cost );
     auto &here = get_map();
     const auto jumped_tile = abs_to_bub( jump_state.examp );
