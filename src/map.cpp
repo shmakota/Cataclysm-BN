@@ -5973,7 +5973,7 @@ void map::add_item( const tripoint_bub_ms &p, detached_ptr<item> &&new_item )
     // Process foods when they are added to the map, here instead of add_item_at()
     // to avoid double processing food and corpses during active item processing.
     if( new_item->is_food() ) {
-        new_item = item::process( std::move( new_item ), nullptr, p, false );
+        new_item = item::process( std::move( new_item ), nullptr, p, 1, false );
         if( !new_item ) {
             return;
         }
@@ -6163,11 +6163,7 @@ static bool process_map_items( item *item_ref, const tripoint_bub_ms &location,
 {
     ZoneScopedN( "process_map_items" );
     return item_ref->attempt_detach( [&location, &flag, &turns]( detached_ptr<item> &&it ) {
-        auto ret = std::move( it );
-        for( int i = 0; i < turns; i++ ) {
-            ret = item::process( std::move( ret ), nullptr, location, false, flag );
-        }
-        return ret;
+        return item::process( std::move( it ), nullptr, location, false, turns, flag );
     } );
 }
 
