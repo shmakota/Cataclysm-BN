@@ -309,7 +309,7 @@ TEST_CASE(
     spilled_gasoline->charges = 10000;
     const auto max_fuel_intensity = fuel_field.obj().get_max_intensity();
     const auto spill_tiles =
-        divide_round_up(units::to_milliliter(spilled_gasoline->volume()), 1000);
+        divide_round_up( units::to_milliliter( spilled_gasoline->volume() ), 1000L );
     const auto expected_visual_intensity = std::min(
         static_cast<int>(std::max<decltype(spill_tiles)>(1, spill_tiles)), 90 * max_fuel_intensity);
 
