@@ -293,7 +293,7 @@ the weather generator reusable and lets the overlay stay small.
     "base_wind": 14,
     "base_wind_distrib_peaks": 120,
     "extend": {
-      "weather_patterns": [ "storm_front" ]
+      "weather_patterns": ["storm_front"]
     },
     "delete": {
       "weather_types": [
@@ -310,7 +310,7 @@ the weather generator reusable and lets the overlay stay small.
   },
   {
     "type": "region_overlay",
-    "regions": [ "default" ],
+    "regions": ["default"],
     "base_weather": "my_stormy_weather"
   }
 ]

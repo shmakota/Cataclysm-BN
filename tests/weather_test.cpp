@@ -168,15 +168,17 @@ TEST_CASE("weather refreshes when the player crosses a submap", "[weather]") {
 TEST_CASE("forecast representative weather prefers the most common sample", "[weather]") {
     const auto& wgen = get_weather().get_cur_weather_gen();
     const auto representative = wgen.choose_representative_weather(
-    {{weather_type_id("cloudy"), 4}, {weather_type_id("rain"), 2}, {weather_type_id("thunder"), 1}});
+        {{weather_type_id("cloudy"), 4},
+         {weather_type_id("rain"), 2},
+         {weather_type_id("thunder"), 1}});
 
     CHECK(representative == weather_type_id("cloudy"));
 }
 
 TEST_CASE("forecast representative weather breaks ties by forecast priority", "[weather]") {
     const auto& wgen = get_weather().get_cur_weather_gen();
-    const auto representative =
-        wgen.choose_representative_weather({{weather_type_id("rain"), 2}, {weather_type_id("thunder"), 2}});
+    const auto representative = wgen.choose_representative_weather(
+        {{weather_type_id("rain"), 2}, {weather_type_id("thunder"), 2}});
 
     CHECK(representative == weather_type_id("thunder"));
 }
