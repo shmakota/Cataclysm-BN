@@ -308,8 +308,10 @@ TEST_CASE(
     auto spilled_gasoline = item::spawn("gasoline", calendar::turn);
     spilled_gasoline->charges = 10000;
     const auto max_fuel_intensity = fuel_field.obj().get_max_intensity();
+    static constexpr auto spill_tile_volume = 1_liter;
     const auto spill_tiles =
-        divide_round_up(units::to_milliliter(spilled_gasoline->volume()), 1000L);
+        divide_round_up(units::to_milliliter(spilled_gasoline->volume()),
+                        units::to_milliliter(spill_tile_volume));
     const auto expected_visual_intensity = std::min(
         static_cast<int>(std::max<decltype(spill_tiles)>(1, spill_tiles)), 90 * max_fuel_intensity);
 
