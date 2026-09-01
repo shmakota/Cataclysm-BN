@@ -11,8 +11,11 @@
 
 #include <memory>
 
-static const auto effect_downed = efftype_id("downed");
-static const auto field_test_fd_slip = field_type_id("test_fd_slip");
+namespace {
+
+const auto effect_downed = efftype_id("downed");
+
+} // namespace
 
 TEST_CASE("creature_in_field", "[monster],[field]") {
     clear_all_state();
@@ -46,6 +49,7 @@ TEST_CASE("noslip clothing prevents field-based slipping", "[avatar],[field]") {
     auto& here = get_map();
     auto& you = get_avatar();
     const auto target_location = tripoint_bub_ms(5, 5, 0);
+    const auto field_test_fd_slip = field_type_id("test_fd_slip");
     you.setpos(target_location);
 
     SECTION("slippery fields down the avatar without noslip footwear") {
