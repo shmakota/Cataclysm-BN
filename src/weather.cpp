@@ -1106,7 +1106,7 @@ auto weather_manager::set_omt_weather_override( const omt_weather_override_optio
 }
 
 auto weather_manager::clear_omt_weather_override( const tripoint_abs_omt &center, const int radius )
-- > void
+-> void
 {
     prune_expired_omt_weather_overrides();
     for( const tripoint_abs_omt &location : points_in_radius( center, radius ) ) {
@@ -1123,7 +1123,7 @@ auto weather_manager::is_omt_weather_override_expired(
 }
 
 auto weather_manager::get_next_omt_weather_override_expiration() const
-- > std::optional<time_point>
+-> std::optional<time_point>
 {
     std::optional<time_point> earliest_expiration = std::nullopt;
     for( const auto &override : omt_weather_overrides | std::views::values ) {
@@ -1143,7 +1143,7 @@ auto weather_manager::prune_expired_omt_weather_overrides() -> void
 }
 
 auto weather_manager::needs_forced_position_refresh( const tripoint_abs_ms &current_pos ) const
-- > bool
+-> bool
 {
     if( weather_id == weather_type_id::NULL_ID() ) { return true; }
     return project_to<coords::sm>( current_pos ) != project_to<coords::sm>( last_weather_position );
@@ -1293,7 +1293,7 @@ units::temperature
 }
 
 auto weather_manager::get_temperature( const tripoint_abs_omt &location ) const
-- > units::temperature
+-> units::temperature
 {
     if( location.z() < 0 && !get_option<bool>( "UNDERGROUND_TEMPERATURE_INFLUENCED_BY_SURFACE" ) ) {
         // Default behavior: underground is always annual average
