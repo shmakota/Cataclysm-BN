@@ -48,12 +48,13 @@ TEST_CASE("noslip clothing prevents field-based slipping", "[avatar],[field]") {
 
     auto& here = get_map();
     auto& you = get_avatar();
-    const auto target_location = tripoint_bub_ms(5, 5, 0);
     const auto field_test_fd_slip = field_type_id("test_fd_slip");
-    you.setpos(target_location);
+    you.setpos(tripoint_bub_ms(5, 5, 0));
+    // Moving the avatar recenters the map, so read its local position afterward.
+    const auto target_location = you.bub_pos();
 
     SECTION("slippery fields down the avatar without noslip footwear") {
-        here.add_field(target_location, field_test_fd_slip);
+        REQUIRE(here.add_field(target_location, field_test_fd_slip));
 
         here.creature_in_field(you);
 
@@ -62,7 +63,7 @@ TEST_CASE("noslip clothing prevents field-based slipping", "[avatar],[field]") {
 
     SECTION("noslip footwear blocks the downed effect from slippery fields") {
         REQUIRE_FALSE(you.wear_item(item::spawn("test_noslip_boots"), false));
-        here.add_field(target_location, field_test_fd_slip);
+        REQUIRE(here.add_field(target_location, field_test_fd_slip));
 
         here.creature_in_field(you);
 
@@ -71,7 +72,7 @@ TEST_CASE("noslip clothing prevents field-based slipping", "[avatar],[field]") {
 
     SECTION("noslip enchantments block the downed effect from slippery fields") {
         REQUIRE_FALSE(you.wear_item(item::spawn("test_socks_of_noslip"), false));
-        here.add_field(target_location, field_test_fd_slip);
+        REQUIRE(here.add_field(target_location, field_test_fd_slip));
 
         here.creature_in_field(you);
 
