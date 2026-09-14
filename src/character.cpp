@@ -7753,7 +7753,7 @@ mutation_value_map = {
     { "fatigue_regen_modifier", calc_mutation_value<&mutation_branch::fatigue_regen_modifier> },
     { "fatigue_modifier", calc_mutation_value<&mutation_branch::fatigue_modifier> },
     { "stamina_regen_modifier", calc_mutation_value<&mutation_branch::stamina_regen_modifier> },
-    { "stealth_modifier", calc_mutation_value<&mutation_branch::stealth_modifier> },
+    { "stealth_modifier", calc_mutation_value_additive<&mutation_branch::stealth_modifier> },
     { "str_modifier", calc_mutation_value<&mutation_branch::str_modifier> },
     { "bleed_resist", calc_mutation_value<&mutation_branch::bleed_resist> },
     { "dodge_modifier", calc_mutation_value_additive<&mutation_branch::dodge_modifier> },
