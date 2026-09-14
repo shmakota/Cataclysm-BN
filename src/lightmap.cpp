@@ -2175,7 +2175,10 @@ bool map::pl_sees( const tripoint_bub_ms &t, const int max_range ) const
 
 #if defined( CATA_SDL )
     const auto &map_cache = get_cache_ref( t.z() );
-    if( !map_cache.visibility_cache_dirty && visibility_variables_cache.variables_set ) {
+    // Visibility cache is updated once per turn
+    // A door opening / closing and invalidating the cache doesn't matter here
+    // Just consider it to be seen as it all happens "at once"
+    if( visibility_variables_cache.variables_set ) {
         const auto ll = map_cache.visibility_cache[map_cache.idx( t.x(), t.y() )];
         return get_visibility( ll, visibility_variables_cache ) == VIS_CLEAR;
     }
