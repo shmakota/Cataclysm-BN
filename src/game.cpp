@@ -698,7 +698,7 @@ void game::setup( bool load_world_modfiles )
         init::load_world_modfiles( ui, get_active_world(), SAVE_ARTIFACTS );
     }
 
-    init_bubble_config();
+    init_bubble_config( g_reality_bubble_size );
     m.resize( g_mapsize );
 
     next_npc_id = character_id( 1 );
@@ -4154,7 +4154,7 @@ bool game::load( const save_t &name )
     // Re-read the bubble-size option for the submap-loader request.
     // Do NOT call m.resize() here — the grid is already filled by unserialize().
     // setup() already called init_bubble_config() + m.resize().
-    init_bubble_config();
+    init_bubble_config( g_reality_bubble_size );
     reality_bubble_radius_ = g_half_mapsize;
     // Old saves can have duplicate authority for in-bubble monsters: one copy in
     // active_monsters and another in overmap monster_map.  Purge the stale overmap
@@ -6717,10 +6717,7 @@ void game::monmove( const monster_activity_ai_mode mode, activity_monmove_cache 
     {
         ZoneScopedN( "monmove_despawn_oob" );
         for( monster &critter : all_monsters() ) {
-            if( critter.bub_pos().x() < 0 - ( g_mapsize_x ) / 6 ||
-                critter.bub_pos().y() < 0 - ( g_mapsize_y ) / 6 ||
-                critter.bub_pos().x() > ( g_mapsize_x * 7 ) / 6 ||
-                critter.bub_pos().y() > ( g_mapsize_y * 7 ) / 6 ) {
+            if( !m.inbounds( critter.bub_pos() ) ) {
                 despawn_monster( critter );
             }
         }
