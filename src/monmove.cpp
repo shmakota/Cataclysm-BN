@@ -2490,12 +2490,14 @@ bool monster::move_to( const tripoint_bub_ms &p, bool force, bool step_on_critte
     }
 
     if( !force ) {
+        if( stagger_adjustment == 0.0f ) {
+            return false;
+        }
         // This adjustment is to make it so that monster movement speed relative to the player
         // is consistent even if the monster stumbles,
         // and the same regardless of the distance measurement mode.
         // Note: Keep this as float here or else it will cancel valid moves
-        const float cost = stagger_adjustment *
-                           static_cast<float>( climbs() &&
+        const float cost = static_cast<float>( climbs() &&
                                                g->m.has_flag( TFLAG_NO_FLOOR, p ) ? calc_climb_cost( bub_pos(),
                                                        destination ) : calc_movecost( bub_pos(),
                                                                destination ) );
