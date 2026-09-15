@@ -11,12 +11,16 @@
 #include "mapbuffer.h"
 #include "mapbuffer_registry.h"
 #include "point.h"
+#include "rng.h"
 #include "state_helpers.h"
 #include "submap.h"
 #include "submap_fields.h"
 #include "submap_load_manager.h"
 #include "type_id.h"
 #include "units.h"
+
+#include <array>
+#include <ranges>
 
 // Dimension ID used only by these tests — never appears in game data.
 static const dimension_id TEST_DIM_ID("sim_test_dim");
@@ -223,6 +227,51 @@ TEST_CASE(
     REQUIRE(sm->get_field(second_salt_water_pt).find_field(fd_electricity) != nullptr);
 
     MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+}
+
+TEST_CASE(
+    "conductive_pool_cannot_sustain_its_own_electricity", "[simulation][field][electric][liquid]") {
+    clear_all_state();
+    put_player_underground();
+    auto restore_rng = restore_on_out_of_scope<cata_default_random_engine>(rng_get_engine());
+    rng_set_engine_seed(12345);
+
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    const auto cleanup = on_out_of_scope([]() {
+        MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    });
+    REQUIRE(sm != nullptr);
+    const auto pool_field = field_type_id("test_fd_conductive_pool");
+    const auto pool_tiles =
+        std::array{point_sm_ms{5, 5}, point_sm_ms{6, 5}, point_sm_ms{5, 6}, point_sm_ms{6, 6}};
+    for (const auto& tile : pool_tiles) { plant_field(*sm, tile, pool_field, 3); }
+    plant_field(*sm, pool_tiles.front(), fd_electricity, 3);
+
+    auto& dummy = get_avatar();
+    auto previous_charge = 3;
+    auto spread = false;
+    for (const auto tick : std::views::iota(0, 300)) {
+        CAPTURE(tick);
+        process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+        auto charge = 0;
+        for (const auto x : std::views::iota(0, SEEX)) {
+            for (const auto y : std::views::iota(0, SEEY)) {
+                const auto tile = point_sm_ms{x, y};
+                if (const auto* electricity = sm->get_field(tile).find_field(fd_electricity)) {
+                    charge += electricity->get_field_intensity();
+                    spread = spread || tile != pool_tiles.front();
+                }
+            }
+        }
+        REQUIRE(charge <= previous_charge);
+        previous_charge = charge;
+    }
+    CHECK(spread);
+    CHECK(previous_charge == 0);
+    for (const auto& tile : pool_tiles) {
+        REQUIRE(sm->get_field(tile).find_field(pool_field) != nullptr);
+        CHECK(sm->get_field(tile).find_field(pool_field)->get_field_intensity() == 3);
+    }
 }
 
 // ── Test 2 ────────────────────────────────────────────────────────────────────

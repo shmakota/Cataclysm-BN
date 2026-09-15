@@ -1282,27 +1282,24 @@ auto conductive_field_intensity( const field &fields ) -> int
     return max_intensity;
 }
 
-auto energize_conductive_field( SubTile &dst ) -> field_entry *
+auto energize_conductive_field( SubTile &dst, field_entry &source ) -> void
 {
-    if( !dst.valid() ) {
-        return nullptr;
+    if( !dst.valid() || source.get_field_intensity() <= 1 ||
+        dst.get_field().find_field( fd_electricity ) != nullptr ) {
+        return;
     }
 
     const auto max_conductive_intensity = conductive_field_intensity( dst.get_field() );
     if( max_conductive_intensity <= 0 ) {
-        return nullptr;
+        return;
     }
 
-    const auto electricity_intensity =
-        conductive_field_electricity_intensity( max_conductive_intensity );
-    auto *electricity = dst.get_field().find_field( fd_electricity );
-    if( electricity != nullptr ) {
-        electricity->set_field_intensity(
-            std::max( electricity->get_field_intensity(), electricity_intensity ) );
-        return electricity;
+    // Conduction transfers a finite charge; the puddle must not supply new energy.
+    const auto electricity_intensity = std::min( source.get_field_intensity() - 1,
+                                       conductive_field_electricity_intensity( max_conductive_intensity ) );
+    if( sub_add_field( dst, fd_electricity, electricity_intensity, 0_turns ) != nullptr ) {
+        source.set_field_intensity( source.get_field_intensity() - electricity_intensity );
     }
-
-    return sub_add_field( dst, fd_electricity, electricity_intensity, 0_turns );
 }
 
 auto consume_fire_smothering_puddle( field &curfield,
@@ -1813,7 +1810,7 @@ auto process_fields_in_submap( const dimension_id &dim, submap &sm,
             if( !is_newborn && cur_fd_type_id == fd_electricity ) {
                 std::ranges::for_each( eight_dirs_sm, [&]( const point & d ) {
                     auto dst = neighbor_tile( &sm, pos, local, d, mb );
-                    static_cast<void>( energize_conductive_field( dst ) );
+                    energize_conductive_field( dst, cur );
                 } );
 
                 if( !one_in( 5 ) ) {

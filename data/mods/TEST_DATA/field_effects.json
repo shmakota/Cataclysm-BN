@@ -1,5 +1,18 @@
 [
   {
+    "id": "test_fd_conductive_pool",
+    "type": "field_type",
+    "conductive": true,
+    "intensity_levels": [
+      { "name": "test conductive puddle", "sym": "~", "color": "cyan" },
+      { "name": "test conductive pool" },
+      { "name": "test deep conductive pool" }
+    ],
+    "half_life": "0 turns",
+    "phase": "liquid",
+    "display_field": true
+  },
+  {
     "id": "test_fd_slip",
     "type": "field_type",
     "intensity_levels": [
