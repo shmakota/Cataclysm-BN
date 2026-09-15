@@ -783,6 +783,8 @@ void cata::detail::reg_character( sol::state &lua )
 
         SET_FX_T( has_trait_flag, bool( const trait_flag_str_id & b ) const );
 
+        SET_FX_T( has_trait_type, bool( const std::string & mut_type ) const );
+
         SET_FX_T( has_opposite_trait, bool( const trait_id & flag ) const );
 
         SET_FX_T( set_mutation, void( const trait_id & ) );
