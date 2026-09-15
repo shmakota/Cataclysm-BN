@@ -998,6 +998,12 @@ bool game::start_game()
                    _( "Try again?\n\nIt may require several attempts until the game finds a valid starting location." ) );
     };
 
+    //Reset character safe mode/pickup rules
+    get_auto_pickup().clear_character_rules();
+    get_safemode().clear_character_rules();
+    get_auto_notes_settings().clear();
+    get_auto_notes_settings().default_initialize();
+
     do {
         omtstart = start_loc.find_player_initial_location();
         if( omtstart == overmap::invalid_tripoint ) {
@@ -1073,12 +1079,6 @@ bool game::start_game()
     get_weather().update_weather();
     u.next_climate_control_check = calendar::before_time_starts; // Force recheck at startup
     u.last_climate_control_ret = false;
-
-    //Reset character safe mode/pickup rules
-    get_auto_pickup().clear_character_rules();
-    get_safemode().clear_character_rules();
-    get_auto_notes_settings().clear();
-    get_auto_notes_settings().default_initialize();
 
     //Put some NPCs in there!
     if( get_option<std::string>( "STARTING_NPC" ) == "always" ||
