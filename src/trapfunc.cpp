@@ -1486,6 +1486,7 @@ bool trapfunc::cast_spell( const tripoint_bub_ms &p, Creature *critter, item * )
                                     g->m.tr_at( p ).name() );
     const spell trap_spell = g->m.tr_at( p ).spell_data.get_spell( 0 );
     npc dummy;
+    dummy.spawn_at_sm( project_to<coords::sm>( critter->abs_pos() ) );
     trap_spell.cast_all_effects( dummy, critter->bub_pos() );
     trap_spell.make_sound( p, dummy );
     g->m.tr_at( p ).trigger_aftermath( g->m, p );
