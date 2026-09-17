@@ -1067,7 +1067,11 @@ void weather_manager::update_weather() {
     lightning_active = false;
     // Check weather every few turns, instead of every turn.
     // TODO: predict when the weather changes and use that time.
-    nextweather = calendar::turn + activity_time_cadence::weather_refresh();
+    const auto weather_refresh_rate = activity_time_cadence::weather_refresh();
+    const auto max_to_next_weather = calendar::turn + weather_refresh_rate;
+    nextweather = time_point::from_turn(
+        (to_turn<int>(max_to_next_weather) / to_turns<int>(weather_refresh_rate))
+        * to_turns<int>(weather_refresh_rate));
     if (weather_id != old_weather && weather_id->dangerous && g->get_levz() >= 0
         && get_map().is_outside(g->u.bub_pos()) && !g->u.has_activity(ACT_WAIT_WEATHER)) {
         g->cancel_activity_or_ignore_query(
