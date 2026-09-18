@@ -730,7 +730,7 @@
     "intensity_levels": [ { "name": "spotlight", "sym": "&", "light_emitted": 80 } ],
     "description_affix": "illuminated_by",
     "priority": 1,
-    "half_life": "1 turns",
+    "half_life": "2 turns",
     "display_field": true,
     "looks_like": "fd_laser"
   },
