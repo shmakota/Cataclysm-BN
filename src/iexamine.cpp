@@ -8420,7 +8420,7 @@ void iexamine::multicooker( player &p, const tripoint_bub_ms &pos )
 
         for( const auto &r : g->u.get_learned_recipes() ) {
             if( vars->get( "CATEGORYIDS", std::set<std::string>() ).contains( r->subcategory ) ||
-                vars->get( "RECIPEIDS", std::set<std::string>() ).contains( r->result().str() ) ) {
+                vars->get( "RECIPEIDS", std::set<std::string>() ).contains( r->ident().str() ) ) {
                 dishes.push_back( r );
                 const bool can_make = r->deduped_requirements().can_make_with_inventory(
                                           crafting_inv, r->get_component_filter() );

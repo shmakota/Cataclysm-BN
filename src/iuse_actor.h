@@ -1319,7 +1319,7 @@ class multicooker_iuse : public iuse_actor
         int charges_to_start;
         float time_mult = 1.0f;
         float charges_per_minute;
-        std::set<itype_id> recipes;
+        std::set<recipe_id> recipes;
         std::set<std::string> subcategories;
         std::set<std::string> temporary_tools;
 

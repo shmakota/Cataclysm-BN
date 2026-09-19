@@ -5826,7 +5826,7 @@ void multicooker_iuse::load( const JsonObject &obj )
     assign( obj, "charges_per_minute", charges_per_minute );
     assign( obj, "time_mult", time_mult );
     for( const std::string line : obj.get_array( "recipes" ) ) {
-        recipes.emplace( line );
+        recipes.emplace( recipe_id( line ) );
     }
     for( const std::string line : obj.get_array( "subcategories" ) ) {
         subcategories.emplace( line );
@@ -6021,7 +6021,7 @@ int multicooker_iuse::use( player &p, item &it, bool t, const tripoint_bub_ms &p
             int counter = 0;
 
             for( const auto &r : g->u.get_learned_recipes() ) {
-                if( subcategories.contains( r->subcategory ) || recipes.contains( r->result() ) ) {
+                if( subcategories.contains( r->subcategory ) || recipes.contains( r->ident() ) ) {
                     dishes.push_back( r );
                     const bool can_make = r->deduped_requirements().can_make_with_inventory(
                                               crafting_inv, r->get_component_filter() );
