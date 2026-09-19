@@ -305,7 +305,7 @@ void iexamine::nanofab( player &p, const tripoint_bub_ms &examp )
     tripoint_bub_ms spawn_point;
     map &here = get_map();
     for( const auto &valid_location : here.points_in_radius( examp, 1 ) ) {
-        if( here.ter( valid_location ) == ter_str_id( "t_nanofab_body" ) ) {
+        if( here.has_flag( "NANOFAB_BODY", valid_location ) ) {
             spawn_point = valid_location;
             table_exists = true;
             break;
@@ -431,7 +431,7 @@ void iexamine::nanoforge( player &p, const tripoint_bub_ms &examp )
     tripoint_bub_ms spawn_point;
     map &here = get_map();
     for( const auto &valid_location : here.points_in_radius( examp, 1 ) ) {
-        if( here.ter( valid_location ) == ter_str_id( "t_nanoforge_body" ) ) {
+        if( here.has_flag( "NANOFORGE_BODY", valid_location ) ) {
             spawn_point = valid_location;
             table_exists = true;
             break;
