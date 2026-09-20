@@ -910,6 +910,7 @@ class bandolier_actor : public iuse_actor
         std::unique_ptr<iuse_actor> clone() const override;
         void info( const item &, std::vector<iteminfo> & ) const override;
 
+        std::string check() const override;
         units::volume max_stored_volume() const;
 };
 

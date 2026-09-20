@@ -1644,6 +1644,7 @@ void Item_factory::check_definitions() const
             if( actor->type == "CABLE_ATTACH" && !vpart_id( type->id.str() ).is_valid() ) {
                 msg += string_format( "no valid vehicle part for CABLE_ATTACH action\n" );
             }
+            msg += actor->check();
         }
 
         if( type->fuel && !type->count_by_charges() ) {

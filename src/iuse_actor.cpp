@@ -3058,6 +3058,17 @@ void bandolier_actor::load( const JsonObject &obj )
     draw_cost = obj.get_int( "draw_cost", draw_cost );
 }
 
+std::string bandolier_actor::check() const
+{
+    std::string res = "";
+    for( const auto &ammotype : ammo ) {
+        if( !ammotype.is_valid() ) {
+            res += string_format( "invalid ammotype %s\n", ammotype.str() );
+        }
+    }
+    return res;
+}
+
 void bandolier_actor::info( const item &, std::vector<iteminfo> &dump ) const
 {
     if( !ammo.empty() ) {
