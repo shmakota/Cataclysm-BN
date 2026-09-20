@@ -294,7 +294,8 @@
       [ "polisher", 70 ],
       [ "angle_grinder", 5 ],
       [ "welder", 10 ],
-      [ "clamp", 10 ]
+      [ "clamp", 10 ],
+      [ "spray_can", 20 ]
     ]
   },
   {
@@ -461,7 +462,8 @@
       [ "gelbox", 5 ],
       [ "microcentrifuge", 5 ],
       [ "dna_editor", 3 ],
-      { "item": "genome_drive", "prob": 10, "postprocessor": "genome_drive" },
+      [ "genome_drive_black_rat", 5 ],
+      [ "genome_drive_wolf_mutant_huge", 5 ],
       [ "beaker", 5 ],
       [ "gradcylinder", 5 ],
       [ "test_tube_micro", 5 ],

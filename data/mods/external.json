@@ -30,5 +30,23 @@
     "id": "otopack_bn_mk_2",
     "version": "2026.2.12",
     "url": "https://github.com/NarandBD/Otopack-BN-Mk-2/archive/refs/tags/sorrynotsorry.zip"
+  },
+  {
+    "id": "cata",
+    "version": "0.0.0",
+    "url": "https://github.com/Noctifer-de-Mortem/nocts_cata_mod/archive/refs/heads/master.zip",
+    "extract_path": "nocts_cata_mod_BN"
+  },
+  {
+    "id": "mst_extra",
+    "version": "0.0.0",
+    "url": "https://github.com/chaosvolt/MST_Extra_Mod/archive/refs/heads/master.zip",
+    "extract_path": "MST_Extra_BN"
+  },
+  {
+    "id": "medieval_mod_reborn",
+    "version": "0.0.0",
+    "url": "https://github.com/chaosvolt/cdda_medieval_mod_reborn/archive/refs/heads/master.zip",
+    "extract_path": "Medieval_Mod_Reborn_BN"
   }
 ]

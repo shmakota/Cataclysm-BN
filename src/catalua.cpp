@@ -23,34 +23,32 @@
 constexpr int LUA_API_VERSION = 2;
 
 #include "action_time_scale.h"
-#include "catalua_sol.h"
-
 #include "avatar.h"
 #include "bionics.h"
 #include "catalua_console.h"
 #include "catalua_coord.h"
 #include "catalua_hooks.h"
-#include "catalua_impl.h"
 #include "catalua_icallback_actor.h"
+#include "catalua_impl.h"
 #include "catalua_readonly.h"
-#include "catalua_coord.h"
 #include "catalua_serde.h"
+#include "catalua_sol.h"
 #include "filesystem.h"
 #include "fstream_utils.h"
 #include "init.h"
 #include "item_factory.h"
 #include "json.h"
-#include "mapgen_async.h"
-#include "lua_sidebar_widgets.h"
 #include "lua_action_menu.h"
-#include "map.h"
-#include "mapgen_constructor.h"
+#include "lua_sidebar_widgets.h"
+#include "map/map.h"
+#include "mapgen/mapgen_async.h"
+#include "mapgen/mapgen_constructor.h"
 #include "messages.h"
 #include "mod_manager.h"
 #include "mutation.h"
 #include "path_info.h"
-#include "point.h"
 #include "player_activity.h"
+#include "point.h"
 #include "worldfactory.h"
 
 namespace cata
@@ -356,9 +354,6 @@ void init_global_state_tables( lua_state &state, const std::vector<mod_id> &modl
 
     // mapgen functions
     gt["mapgen_functions"] = lua.create_table();
-
-    // Itemgroup modification functions
-    gt["itemgroup_postprocessors"] = lua.create_table();
 
     // monster / npc functions
     gt["monster_ai_functions"] = lua.create_table();
@@ -754,6 +749,11 @@ auto run_hooks( std::string_view hook_name,
             if( result.is<bool>() && !result.as<bool>() ) {
                 results["allowed"] = false;
                 if( opts.exit_early ) {
+                    break;
+                }
+            } else if( result.is<sol::table>() && opts.exit_early ) {
+                results = result.as<sol::table>();
+                if( !results.get_or( "allowed", true ) ) {
                     break;
                 }
             }

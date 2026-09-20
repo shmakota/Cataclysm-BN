@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "calendar.h"
-#include "field_type.h"
+#include "map/field_type.h"
 
 /// Some liquid puddles need to spawn a self-sustaining secondary field rather
 /// than a one-turn spark, otherwise connected spills do not reliably propagate

@@ -5,17 +5,15 @@
 #include "avatar.h"
 #include "bionics.h"
 #include "calendar.h"
-#include "distribution_grid.h"
-#include "mapbuffer.h"
-#include "mapbuffer_registry.h"
 #include "catalua_hooks.h"
 #include "catalua_sol.h"
+#include "character.h"
 #include "character_effects.h"
 #include "character_functions.h"
-#include "character_stat.h"
 #include "character_martial_arts.h"
-#include "character.h"
+#include "character_stat.h"
 #include "creature.h"
+#include "distribution_grid.h"
 #include "enchantments/enchantment.h"
 #include "flag.h"
 #include "flag_trait.h"
@@ -23,25 +21,28 @@
 #include "handle_liquid.h"
 #include "itype.h"
 #include "iuse.h"
-#include "mutation.h"
-#include "overmapbuffer.h"
 #include "make_static.h"
+#include "map/mapbuffer.h"
+#include "map/mapbuffer_registry.h"
+#include "map/submap.h"
 #include "map_iterator.h"
 #include "morale.h"
+#include "mutation.h"
+#include "overmapbuffer.h"
 #include "player.h"
 #include "player_activity.h"
+#include "profile.h"
 #include "rng.h"
-#include "submap.h"
 #include "trap.h"
 #include "type_id.h"
 #include "units_temperature.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vpart_position.h"
-#include "weather_gen.h"
-#include "weather.h"
-#include "profile.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+#include "weather/weather.h"
+#include "weather/weather_gen.h"
+
 #include <algorithm>
 
 static const trait_id trait_ACIDBLOOD( "ACIDBLOOD" );
@@ -221,7 +222,6 @@ void Character::process_turn()
     if( activity->targets.empty() ) {
         drop_invalid_inventory();
     }
-    process_items();
     // Didn't just pick something up
     last_item = itype_id( "null" );
 
@@ -915,12 +915,12 @@ static bool needs_elec_charges( item *it )
     }
 }
 
-void Character::process_items()
+void Character::process_items( int turns )
 {
     ZoneScoped;
 
-    auto process_item = [this]( detached_ptr<item> &&ptr ) {
-        return item::process( std::move( ptr ), as_player(), bub_pos(), false );
+    auto process_item = [this, &turns]( detached_ptr<item> &&ptr ) {
+        return item::process( std::move( ptr ), as_player(), bub_pos(), false, turns );
     };
     if( primary_weapon().needs_processing() ) {
         primary_weapon().attempt_detach( process_item );
@@ -949,7 +949,7 @@ void Character::process_items()
         item &it = inv.find_item( index );
         if( it.has_flag( flag_IS_UPS ) ) {
             ch_UPS += std::min( it.ammo_remaining() * it.type->tool->ups_eff_mult,
-                                it.type->tool->ups_recharge_rate );
+                                it.type->tool->ups_recharge_rate * turns );
         }
         if( it.has_flag( flag_USE_UPS ) && needs_elec_charges( &it ) ) {
             active_held_items.push_back( index );
@@ -962,7 +962,7 @@ void Character::process_items()
         }
         if( w->has_flag( flag_IS_UPS ) ) {
             ch_UPS += std::min( w->ammo_remaining() * w->type->tool->ups_eff_mult,
-                                w->type->tool->ups_recharge_rate );
+                                w->type->tool->ups_recharge_rate * turns );
         }
         if( !update_required && w->encumbrance_update_ ) {
             update_required = true;
@@ -974,7 +974,7 @@ void Character::process_items()
         set_check_encumbrance( false );
     }
     if( has_active_bionic( bionic_id( "bio_ups" ) ) ) {
-        ch_UPS += std::min( units::to_kilojoule( get_power_level() ), 10 );
+        ch_UPS += std::min( units::to_kilojoule( get_power_level() ), 10 * turns );
     }
     int ch_UPS_used = 0;
     if( weapon_active && ch_UPS_used < ch_UPS ) {
@@ -1079,7 +1079,7 @@ void update_body_wetness( Character &who, const w_point &weather )
         int drying_chance = pr.second.get_drench_capacity();
         // Body temperature affects duration of wetness
         // Note: Using temp_conv rather than temp_cur, to better approximate environment
-        int temp_conv = pr.second.get_temp_conv();
+        const auto temp_conv = pr.second.get_temp_conv();
         if( temp_conv >= BODYTEMP_SCORCHING ) {
             drying_chance *= 2;
         } else if( temp_conv >= BODYTEMP_VERY_HOT ) {

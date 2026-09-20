@@ -6,7 +6,7 @@
 #include "catalua_luna_doc.h"
 
 #include "effect.h"
-#include "field_type.h"
+#include "map/field_type.h"
 
 void cata::detail::reg_effect( sol::state &lua )
 {

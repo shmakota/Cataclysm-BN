@@ -605,7 +605,7 @@
     "react_cost": "200 J",
     "time": 1,
     "points": 2,
-    "bio_enchantments": [ { "condition": "ACTIVE", "flags": [ "SONAR" ], "values": [ { "value": "GROUNDED_CREATURE_SIGHT", "max": 5 } ] } ]
+    "bio_enchantments": [ { "condition": "ACTIVE", "special_vision": [ "SONAR", "GROUNDED_SONAR" ] } ]
   },
   {
     "id": "bio_heat_absorb",
@@ -667,7 +667,7 @@
     "act_cost": "10 J",
     "starting_bionic": true,
     "points": 1,
-    "bio_enchantments": [ { "flags": [ "INTERNAL_ALARMCLOCK", "WATCH", "RADIO", "THERMOMETER", "VIEW_DRONE_CAM" ] } ]
+    "bio_enchantments": [ { "flags": [ "INTERNAL_ALARMCLOCK", "WATCH", "RADIO", "THERMOMETER" ], "special_vision": [ "DRONE_CAM" ] } ]
   },
   {
     "id": "bio_infrared",
@@ -680,7 +680,7 @@
     "react_cost": "5 J",
     "time": 1,
     "points": 1,
-    "bio_enchantments": [ { "flags": [ "INFRARED_VISION" ] } ]
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "special_vision": [ "INFRARED" ] } ]
   },
   {
     "id": "bio_int_enhancer",
@@ -751,7 +751,7 @@
     "id": "bio_lockpick",
     "type": "bionic",
     "name": { "str": "Fingerpick" },
-    "description": "One of your fingers has an electronic lockpick surgically embedded in it.  This automatic system will quickly unlock all but the most advanced key locks without any skill required on the part of the user.  If you're crouched, examining a locked door will have you prioritize picking the lock instead of using a crowbar on it.",
+    "description": "One of your fingers has an electronic lockpick surgically embedded in it.  This automatic system will quickly unlock all but the most advanced key locks without any skill required on the part of the user.  If you're crouched or prone, examining a locked door will have you prioritize picking the lock instead of using a crowbar on it.",
     "occupied_bodyparts": [ [ "hand_r", 2 ] ],
     "fake_item": "pseudo_bio_picklock",
     "act_cost": "50 J",
@@ -828,6 +828,19 @@
     "enchantments": [ "ENCH_SHADOW_CLOUD" ],
     "act_cost": "9 kJ",
     "react_cost": "9 kJ",
+    "time": 1
+  },
+  {
+    "id": "bio_gas_remover",
+    "type": "bionic",
+    "name": { "str": "Contaminant Particle Ionizer" },
+    "description": "When active, this bionic emits a low energy electric field, causing dangerous airborne particles such as smoke and poison gas within a 5 tile radius to ionize and dissipate rapidly.",
+    "occupied_bodyparts": [ [ "torso", 16 ] ],
+    "points": 5,
+    "flags": [ "BIONIC_TOGGLED" ],
+    "enchantments": [ "ENCH_GAS_REMOVER_CLOUD" ],
+    "act_cost": "5 kJ",
+    "react_cost": "5 kJ",
     "time": 1
   },
   {
@@ -1584,7 +1597,7 @@
     "react_cost": "20 J",
     "time": 1,
     "included_bionics": [ "bio_electrosense_voltmeter", "bio_electrosense_bscanner" ],
-    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "flags": [ "ELECTROSENSE" ] } ]
+    "bio_enchantments": [ { "conditions": [ "ACTIVE" ], "special_vision": [ "ELECTROSENSE" ] } ]
   },
   {
     "id": "bio_electrosense_voltmeter",

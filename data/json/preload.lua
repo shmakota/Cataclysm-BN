@@ -37,9 +37,7 @@ game.add_hook("on_craft_result", function(...)
 end)
 game.add_hook("on_explosion_start", function(...) return mod.nuclear_tear.on_explosion(...) end)
 game.add_hook("on_character_death", function(...) return mod.minirose.on_character_death(...) end)
-
--- Itemgroup Modifiers
-game.itemgroup_postprocessors["genome_drive"] = function(...) return mod.genome.postprocess(...) end
+game.add_hook("on_character_try_wear", function(...) return mod.wool.on_character_try_wear(...) end)
 
 -- Mapgen
 game.mapgen_functions["slimepit"] = function(...) return mod.slimepit.draw(...) end

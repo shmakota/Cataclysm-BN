@@ -118,7 +118,7 @@
     "material": "hydrocarbons",
     "spill_field": "fd_fuel",
     "symbol": "=",
-    "color": "green",
+    "color": "light_red",
     "ammo_type": "avgas",
     "damage": { "damage_type": "heat", "amount": 5, "armor_penetration": 5 },
     "range": 4,

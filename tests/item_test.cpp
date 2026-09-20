@@ -3,7 +3,7 @@
 #include "calendar.h"
 #include "catch/catch.hpp"
 #include "enums.h"
-#include "field_type.h"
+#include "map/field_type.h"
 #include "flag.h"
 #include "item.h"
 #include "itype.h"
@@ -39,6 +39,14 @@ TEST_CASE("item_volume", "[item]") {
         i.charges++;
         CHECK(i.volume() > v); // one more charge should not fit
     }
+}
+
+TEST_CASE("solitary_item_has_no_charges", "[item]") {
+    const item& grenade =
+        *item::spawn_temporary("grenade", calendar::start_of_cataclysm, item::solitary_tag());
+
+    REQUIRE_FALSE(grenade.count_by_charges());
+    CHECK(grenade.charges == 0);
 }
 
 TEST_CASE("large_item_storage_volumes", "[item][volume]") {
@@ -85,7 +93,7 @@ TEST_CASE("ethereal_item_with_malformed_counter_expires_without_throwing", "[ite
     ethereal->set_var("ethereal", "not-a-number");
 
     CHECK_NOTHROW(
-        ethereal = item::process(std::move(ethereal), nullptr, tripoint_bub_ms::zero(), false));
+        ethereal = item::process(std::move(ethereal), nullptr, tripoint_bub_ms::zero(), false, 1));
     CHECK_FALSE(ethereal);
 }
 
