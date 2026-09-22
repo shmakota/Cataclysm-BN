@@ -223,7 +223,7 @@ TEST_CASE(
 
     process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
 
-    REQUIRE(sm->get_field(first_salt_water_pt).find_field(fd_electricity) != nullptr);
+    // The first tile can lose its remaining charge to decay after passing it on.
     REQUIRE(sm->get_field(second_salt_water_pt).find_field(fd_electricity) != nullptr);
 
     MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
@@ -248,6 +248,21 @@ TEST_CASE(
     plant_field(*sm, pool_tiles.front(), fd_electricity, 3);
 
     auto& dummy = get_avatar();
+    // Both fields on the source must remain newborn for the entire first tick,
+    // even though adding two field types puts the tile in the cache twice.
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+    const auto* source = sm->get_field(pool_tiles.front()).find_field(fd_electricity);
+    REQUIRE(source != nullptr);
+    CHECK(source->get_field_age() == 1_turns);
+    CHECK(source->get_field_intensity() == 3);
+    for (const auto& tile : pool_tiles) {
+        const auto* pool = sm->get_field(tile).find_field(pool_field);
+        REQUIRE(pool != nullptr);
+        CHECK(pool->get_field_age() == 1_turns);
+        if (tile != pool_tiles.front()) {
+            CHECK(sm->get_field(tile).find_field(fd_electricity) == nullptr);
+        }
+    }
     auto previous_charge = 3;
     auto spread = false;
     for (const auto tick : std::views::iota(0, 300)) {

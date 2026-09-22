@@ -1270,7 +1270,12 @@ auto process_fields_in_submap(
     // Newly-added entries are newborn (age 0) and skip all effects anyway, so processing
     // them next tick is correct behaviour.
     const auto field_positions = sm.field_cache;
+    auto processed_positions = std::bitset<SEEX * SEEY>{};
     std::ranges::for_each(field_positions, [&](const point_sm_ms& local) {
+        // A tile can be cached once per field type. Process all its fields only once per tick.
+        const auto idx = static_cast<std::size_t>(local.x() + local.y() * SEEX);
+        if (processed_positions.test(idx)) { return; }
+        processed_positions.set(idx);
         auto& curfield = sm.get_field(local);
 
         bool dirty_transparency_cache = false;
