@@ -1143,8 +1143,8 @@ auto sub_remove_field(field_cache_dirty_context const& ctx, SubTile& dst, const 
 }
 
 auto ignite_fuel_field(
-    field_cache_dirty_context const& ctx, SubTile& dst,
-    const time_duration& fire_age) -> field_entry* {
+    field_cache_dirty_context const& ctx, SubTile& dst, const time_duration& fire_age)
+    -> field_entry* {
     auto* fuel = dst.valid() ? dst.get_field().find_field(fd_fuel_field.id()) : nullptr;
     if (fuel == nullptr) { return nullptr; }
     const auto fuel_intensity = fuel->get_field_intensity();
@@ -1346,9 +1346,9 @@ auto process_fields_in_submap(
                         ter_furn_has_flag(ter, frn, TFLAG_SEALED)
                         && !ter_furn_has_flag(ter, frn, TFLAG_ALLOW_FIELD_EFFECT);
 
-                const auto tick_turns = action_time_scale::calendar_turns_this_tick();
-                const auto tick_duration = action_time_scale::calendar_duration_this_tick();
-                auto time_added = 0_turns;
+                    const auto tick_turns = action_time_scale::calendar_turns_this_tick();
+                    const auto tick_duration = action_time_scale::calendar_duration_this_tick();
+                    auto time_added = 0_turns;
 
                     // --- Item burning ---
                     auto& items_here = sm.get_items(local);

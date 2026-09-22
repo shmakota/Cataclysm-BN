@@ -114,8 +114,8 @@ auto mapgen_item_count_in_radius(
 }
 
 auto count_field_tiles_in_radius(
-    map& here, const tripoint_bub_ms& center, const size_t radius,
-    const field_type_id& field_id) -> int {
+    map& here, const tripoint_bub_ms& center, const size_t radius, const field_type_id& field_id)
+    -> int {
     auto result = 0;
     for (const auto& pos : here.points_in_radius(center, radius)) {
         result += here.get_field(pos, field_id) != nullptr ? 1 : 0;
@@ -124,8 +124,8 @@ auto count_field_tiles_in_radius(
 }
 
 auto total_field_intensity_in_radius(
-    map& here, const tripoint_bub_ms& center, const size_t radius,
-    const field_type_id& field_id) -> int {
+    map& here, const tripoint_bub_ms& center, const size_t radius, const field_type_id& field_id)
+    -> int {
     auto result = 0;
     for (const auto& pos : here.points_in_radius(center, radius)) {
         if (const auto* field = here.get_field(pos, field_id)) {
