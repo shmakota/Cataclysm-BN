@@ -1,25 +1,25 @@
 #include "regional_settings.h"
 
-#include <algorithm>
-#include <map>
-#include <memory>
-#include <sstream>
-#include <string>
-#include <utility>
-
 #include "all_enum_values.h"
 #include "consistency_report.h"
 #include "debug.h"
 #include "enum_conversions.h"
 #include "int_id.h"
 #include "json.h"
-#include "map_extras.h"
+#include "mapgen/map_extras.h"
 #include "options.h"
-#include "overmap_special.h"
+#include "overmap/overmap_special.h"
 #include "rng.h"
 #include "string_formatter.h"
 #include "string_id.h"
 #include "translations.h"
+
+#include <algorithm>
+#include <map>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <utility>
 
 ter_furn_id::ter_furn_id() : ter( t_null ), furn( f_null ) { }
 
@@ -842,6 +842,10 @@ void load_region_overlay( const JsonObject &jo )
 
 void apply_region_overlay( const JsonObject &jo, regional_settings &region )
 {
+    auto base_weather = base_weather_id();
+    if( jo.read( "base_weather", base_weather ) ) {
+        region.weather = base_weathers::get( base_weather );
+    }
     jo.read( "default_oter", region.default_oter );
     jo.read( "river_scale", region.river_scale );
     if( jo.has_array( "default_groundcover" ) ) {

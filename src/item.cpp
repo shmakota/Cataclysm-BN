@@ -1,26 +1,5 @@
 #include "item.h"
 
-#include <algorithm>
-#include <numeric>
-#include <array>
-#include <cassert>
-#include <cctype>
-#include <cmath>
-#include <cstdlib>
-#include <iomanip>
-#include <iterator>
-#include <limits>
-#include <locale>
-#include <memory>
-#include <optional>
-#include <ranges>
-#include <set>
-#include <sstream>
-#include <string>
-#include <tuple>
-#include <unordered_set>
-#include <vector>
-
 #include "action_time_scale.h"
 #include "active_tile_data_def.h"
 #include "ammo.h"
@@ -30,15 +9,16 @@
 #include "bodypart.h"
 #include "cached_item_options.h"
 #include "calendar.h"
-#include "catalua_icallback_actor.h"
 #include "cata_utility.h"
 #include "catacharset.h"
+#include "catalua_icallback_actor.h"
 #include "character.h"
 #include "character_encumbrance.h"
 #include "character_functions.h"
 #include "character_id.h"
 #include "character_martial_arts.h"
 #include "character_stat.h"
+#include "cloning_utils.h"
 #include "clothing_mod.h"
 #include "clzones.h"
 #include "color.h"
@@ -53,7 +33,6 @@
 #include "explosion.h"
 #include "faction.h"
 #include "fault.h"
-#include "field_type.h"
 #include "fire.h"
 #include "flag.h"
 #include "game.h"
@@ -73,8 +52,9 @@
 #include "line.h"
 #include "locations.h"
 #include "magic/magic.h"
-#include "map.h"
-#include "mapbuffer.h"
+#include "map/field_type.h"
+#include "map/map.h"
+#include "map/mapbuffer.h"
 #include "martialarts.h"
 #include "material.h"
 #include "melee.h"
@@ -85,15 +65,15 @@
 #include "npc.h"
 #include "options.h"
 #include "output.h"
-#include "overmap.h"
-#include "overmapbuffer.h"
+#include "overmap/overmap.h"
+#include "overmap/overmapbuffer.h"
 #include "pimpl.h"
 #include "player.h"
 #include "player_activity.h"
 #include "pldata.h"
 #include "point.h"
-#include "projectile.h"
 #include "profile.h"
+#include "projectile.h"
 #include "ranged.h"
 #include "recipe.h"
 #include "recipe_dictionary.h"
@@ -103,7 +83,6 @@
 #include "rng.h"
 #include "rot.h"
 #include "scores_ui.h"
-#include "cloning_utils.h"
 #include "skill.h"
 #include "sol/sol.hpp"
 #include "stomach.h"
@@ -114,17 +93,38 @@
 #include "translations.h"
 #include "type_id.h"
 #include "units.h"
-#include "utils/string_to_int.h"
 #include "units_energy.h"
 #include "units_utility.h"
+#include "utils/string_to_int.h"
 #include "value_ptr.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+#include "vehicle/wheel_dimensions.h"
 #include "vitamin.h"
-#include "vpart_position.h"
-#include "weather.h"
-#include "weather_gen.h"
-#include "wheel_dimensions.h"
+#include "weather/weather.h"
+#include "weather/weather_gen.h"
+
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cctype>
+#include <cmath>
+#include <cstdlib>
+#include <iomanip>
+#include <iterator>
+#include <limits>
+#include <locale>
+#include <memory>
+#include <numeric>
+#include <optional>
+#include <ranges>
+#include <set>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <unordered_set>
+#include <vector>
 
 static const std::string GUN_MODE_VAR_NAME( "item::mode" );
 static const std::string CLOTHING_MOD_VAR_PREFIX( "clothing_mod_" );
@@ -200,6 +200,9 @@ static const std::string has_thievery_witness( "has_thievery_witness" );
 static const activity_id ACT_PICKUP( "ACT_PICKUP" );
 
 static const matec_id rapid_strike( "RAPID" );
+
+static const enchantment_value_id ench_val_REACH_RANGE_ARMED( "REACH_RANGE_ARMED" );
+static const enchantment_value_id ench_val_ITEM_REACH_RANGE( "ITEM_REACH_RANGE" );
 
 class npc_class;
 
@@ -5141,19 +5144,18 @@ void item::on_damage( int qty, damage_type )
     }
 }
 
-void item::on_map_placement( const map &m, const tripoint_bub_ms &p )
+void item::on_map_placement( const tripoint_abs_ms &abs_pos )
 {
 
     // TODO: Move to reveal_map_actor
     if( is_map() && !has_var( "reveal_map_center_omt" ) ) {
-        const auto abs_pos = map_local_to_abs( m, p );
         set_var( "reveal_map_center_omt", project_to<coords::omt>( abs_pos ) );
     }
 
     for( const auto &func : type->use_methods | std::views::values ) {
         const auto actor = func.get_actor_ptr();
         if( actor != nullptr ) {
-            actor->on_placed( *this, m, p );
+            actor->on_placed( *this, abs_pos );
         }
     }
 }
@@ -6092,12 +6094,9 @@ damage_instance item::base_damage_thrown() const
 
 int item::reach_range( const Character &guy ) const
 {
-    int res = 1;
+    int res = 1 + ( has_flag( flag_REACH_ATTACK ) ? has_flag( flag_REACH3 ) ? 2 : 1 : 0 );
 
-    if( has_flag( flag_REACH_ATTACK ) ) {
-        res = has_flag( flag_REACH3 ) ? 3 : 2;
-    }
-
+    res = std::max( res, int( 1 + bonus_from_enchantments( 0, ench_val_ITEM_REACH_RANGE, true ) ) );
     // for guns consider any attached gunmods
     if( is_gun() && !is_gunmod() ) {
         for( const std::pair<const gun_mode_id, gun_mode> &m : gun_all_modes() ) {
@@ -6109,6 +6108,8 @@ int item::reach_range( const Character &guy ) const
             }
         }
     }
+
+    res += guy.bonus_from_enchantments( 0, ench_val_REACH_RANGE_ARMED, true );
 
     return std::max( 1, res );
 }
@@ -8005,8 +8006,10 @@ bool item::is_funnel_container( units::volume &bigger_than ) const
         contents.front().typeId() == itype_water ||
         contents.front().typeId() == itype_water_acid ||
         contents.front().typeId() == itype_water_acid_weak ) {
-        bigger_than = get_container_capacity();
-        return true;
+        if( !is_container_full() ) {
+            bigger_than = get_container_capacity();
+            return true;
+        }
     }
     return false;
 }
@@ -8111,11 +8114,16 @@ double item::bonus_from_enchantments( double base, enchantment_value_id value,
 
 const std::vector<relic_recharge> &item::get_relic_recharge_scheme() const
 {
-    if( is_relic( true ) ) {
-        return relic_data->get_recharge_scheme();
-    } else {
-        return type->relic_data->get_recharge_scheme();
+    std::vector<relic_recharge> recharge_schemes;
+    if( type->relic_data ) {
+        recharge_schemes = type->relic_data->get_recharge_scheme();
     }
+    if( is_relic( true ) ) {
+        std::vector<relic_recharge> dynamic_recharge_schemes = relic_data->get_recharge_scheme();
+        recharge_schemes.insert( recharge_schemes.end(), dynamic_recharge_schemes.begin(),
+                                 dynamic_recharge_schemes.end() );
+    }
+    return recharge_schemes;
 }
 
 bool item::can_contain( const item &it ) const
@@ -9205,81 +9213,6 @@ bool item::units_sufficient( const Character &ch, int qty ) const
     return units_remaining( ch, qty ) == qty;
 }
 
-item_reload_option::item_reload_option( const item_reload_option & ) = default;
-
-item_reload_option &item_reload_option::operator=( const item_reload_option & ) = default;
-
-item_reload_option::item_reload_option( const player *who, item *target, const item *parent,
-                                        item &ammo ) :
-    who( who ), target( target ), ammo( &ammo ), parent( parent )
-{
-    if( this->target->is_ammo_belt() ) {
-        const auto &linkage = this->target->type->magazine->linkage ;
-        if( linkage ) {
-            max_qty = this->who->charges_of( *linkage );
-        }
-    }
-    qty( max_qty );
-}
-
-int item_reload_option::moves() const
-{
-    int mv = ammo->obtain_cost( *who, qty() ) + who->item_reload_cost( *target, *ammo, qty() );
-    if( parent != target ) {
-        if( parent->is_gun() ) {
-            mv += parent->get_reload_time();
-        } else if( parent->is_tool() ) {
-            mv += 100;
-        }
-    }
-    return mv;
-}
-
-void item_reload_option::qty( int val )
-{
-    bool ammo_in_ammo_container = ammo->is_ammo_container();
-    bool ammo_in_container = ammo->is_container();
-    item &ammo_obj = ( ammo_in_ammo_container || ammo_in_container ) ?
-                     ammo->contents.front() : *ammo;
-
-    if( ammo_in_ammo_container && !ammo_obj.is_ammo() ) {
-        debugmsg( "Invalid reload option: %s", ammo_obj.tname() );
-        return;
-    }
-
-    // Checking ammo capacity implicitly limits guns with removable magazines to capacity 0.
-    // This gets rounded up to 1 later.
-    int remaining_capacity = 0;
-    if( target->is_watertight_container() && ammo_obj.made_of( LIQUID ) ) {
-        remaining_capacity = target->get_remaining_capacity_for_liquid( ammo_obj, true );
-    } else if( target->is_container() && ammo_obj.is_comestible() ) {
-        remaining_capacity = ammo_obj.charges_per_volume( target->get_container_capacity() );
-        if( !target->is_container_empty() ) {
-            remaining_capacity -= target->ammo_remaining();
-        }
-    } else {
-        remaining_capacity = target->ammo_capacity() - target->ammo_remaining();
-    }
-    if( target->has_flag( flag_RELOAD_ONE ) && !ammo->has_flag( flag_SPEEDLOADER ) ) {
-        remaining_capacity = 1;
-    }
-    if( ammo_obj.type->ammo ) {
-        if( ammo_obj.ammo_type() == ammo_plutonium ) {
-            remaining_capacity = remaining_capacity / PLUTONIUM_CHARGES +
-                                 ( remaining_capacity % PLUTONIUM_CHARGES != 0 );
-        }
-    }
-
-    bool ammo_by_charges = ammo_obj.is_ammo() || ammo_in_container || ammo->is_comestible();
-    int available_ammo = ammo_by_charges ? ammo_obj.charges : ammo_obj.ammo_remaining();
-    // constrain by available ammo, target capacity and other external factors (max_qty)
-    // @ref max_qty is currently set when reloading ammo belts and limits to available linkages
-    qty_ = std::min( { val, available_ammo, remaining_capacity, max_qty } );
-
-    // always expect to reload at least one charge
-    qty_ = std::max( qty_, 1 );
-
-}
 
 int item::casings_count() const
 {
@@ -10999,16 +10932,16 @@ detached_ptr<item> item::process_tool( detached_ptr<item> &&self, player *carrie
     const bool uses_UPS = self->has_flag( flag_USE_UPS );
     bool revert_destroy = false;
     if( self->type->tool->turns_per_charge > 0 ) {
-        if( self->type->tool->turns_active >= self->type->tool->turns_per_charge ) {
-            energy = std::max( self->ammo_required(), ticks );
-            self->type->tool->turns_active = 0;
+        while( self->type->tool->turns_active >= self->type->tool->turns_per_charge ) {
+            energy = std::max( self->ammo_required(), 1 );
+            self->type->tool->turns_active -= self->type->tool->turns_per_charge;
         }
         self->type->tool->turns_active += ticks;
     } else if( self->type->tool->power_draw > 0 ) {
         // power_draw in mW / 1000000 to give kJ (battery unit) per second
-        energy = ( self->type->tool->power_draw / 1000000 ) * ticks;
+        energy = ( ( self->type->tool->power_draw * ticks ) / 1000000 );
         // energy_bat remainder results in chance at additional charge/discharge
-        energy += x_in_y( self->type->tool->power_draw % 1000000, 1000000 ) ? ticks : 0;
+        energy += x_in_y( ( self->type->tool->power_draw * ticks ) % 1000000, 1000000 ) ? 1 : 0;
     }
 
     // If ammo_required is 0 we just skip over this and go to tick processing.

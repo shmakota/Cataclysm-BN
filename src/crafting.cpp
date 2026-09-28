@@ -1,21 +1,5 @@
 #include "crafting.h"
 
-#include <algorithm>
-#include <cassert>
-#include <climits>
-#include <cmath>
-#include <cstdlib>
-#include <functional>
-#include <limits>
-#include <map>
-#include <memory>
-#include <optional>
-#include <ranges>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "action_time_scale.h"
 #include "activity_actor_definitions.h"
 #include "activity_handlers.h"
@@ -23,9 +7,9 @@
 #include "avatar_functions.h"
 #include "bionics.h"
 #include "calendar.h"
+#include "cata_utility.h"
 #include "catalua_hooks.h"
 #include "catalua_sol.h"
-#include "cata_utility.h"
 #include "character.h"
 #include "character_functions.h"
 #include "color.h"
@@ -49,9 +33,9 @@
 #include "itype.h"
 #include "iuse.h"
 #include "line.h"
-#include "map.h"
-#include "map_selector.h"
-#include "mapdata.h"
+#include "map/map.h"
+#include "map/map_selector.h"
+#include "map/mapdata.h"
 #include "messages.h"
 #include "mutation.h"
 #include "npc.h"
@@ -76,11 +60,27 @@
 #include "ui.h"
 #include "units.h"
 #include "value_ptr.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vehicle_selector.h"
-#include "vpart_position.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vehicle_selector.h"
+#include "vehicle/vpart_position.h"
+
+#include <algorithm>
+#include <cassert>
+#include <climits>
+#include <cmath>
+#include <cstdlib>
+#include <functional>
+#include <limits>
+#include <map>
+#include <memory>
+#include <optional>
+#include <ranges>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 static const activity_id ACT_CRAFT( "ACT_CRAFT" );
 
@@ -627,9 +627,13 @@ const inventory &Character::crafting_inventory( const tripoint_bub_ms &src_pos, 
                                                 units::to_kilojoule( get_power_level() ) ), true );
         }
     }
-    if( has_trait( trait_BURROW ) ) {
-        cached_crafting_inventory.add_item( *item::spawn_temporary( "pickaxe", calendar::turn ), true );
-        cached_crafting_inventory.add_item( *item::spawn_temporary( "shovel", calendar::turn ), true );
+    for( const itype_id &it : enchantment_cache->get_fake_items() ) {
+        if( it->has_flag( flag_USES_BIONIC_POWER ) ) {
+            cached_crafting_inventory.add_item( *item::spawn_temporary( it, calendar::turn,
+                                                units::to_kilojoule( get_power_level() ) ), true );
+        } else {
+            cached_crafting_inventory.add_item( *item::spawn_temporary( it, calendar::turn ), true );
+        }
     }
 
     cached_moves = moves;
@@ -673,8 +677,8 @@ void Character::make_craft_with_command( const recipe_id &id_to_make, int batch_
 
 // @param offset is the index of the created item in the range [0, batch_size-1],
 // it makes sure that the used items are distributed equally among the new items.
-static void set_components( item &of, const std::vector<item *> &used,
-                            const int batch_size, const size_t offset )
+void set_components( item &of, const std::vector<item *> &used,
+                     const int batch_size, const size_t offset )
 {
     location_vector<item> &components = of.get_components();
     if( batch_size <= 1 ) {
@@ -1102,7 +1106,7 @@ static auto component_relative_rot( const item *component ) -> double
     return component != nullptr && component->goes_bad() ? component->get_relative_rot() : 0.0;
 }
 
-static auto highest_component_relative_rot( const std::vector<item *> &components ) -> double
+auto highest_component_relative_rot( const std::vector<item *> &components ) -> double
 {
     namespace ranges = std::ranges;
     using namespace std::views;

@@ -19,8 +19,8 @@
 #include "action_time_scale.h"
 // TODO (https://github.com/cataclysmbn/Cataclysm-BN/issues/1612):
 // Remove that include after repair_activity_actor.
-#include "activity_handlers.h"
 #include "active_tile_data_def.h"
+#include "activity_handlers.h"
 #include "ammo.h"
 #include "avatar.h"
 #include "avatar_action.h"
@@ -35,9 +35,7 @@
 #include "catalua.h"
 #include "character.h"
 #include "character_functions.h"
-#include "data_vars.h"
-#include "detached_ptr.h"
-#include "flag.h"
+#include "cloning_utils.h"
 #include "color.h"
 #include "construction.h"
 #include "construction_group.h"
@@ -45,15 +43,19 @@
 #include "craft_command.h"
 #include "cursesdef.h"
 #include "damage.h"
+#include "data_vars.h"
 #include "debug.h"
+#include "detached_ptr.h"
+#include "dimension_info.h"
 #include "distribution_grid.h"
 #include "effect.h"
 #include "enums.h"
 #include "event.h"
 #include "event_bus.h"
-#include "field_type.h"
+#include "flag.h"
 #include "flat_set.h"
 #include "flood_fill.h"
+#include "fluid_grid.h"
 #include "fungal_effects.h"
 #include "game.h"
 #include "game_constants.h"
@@ -70,38 +72,39 @@
 #include "iuse_actor.h"
 #include "line.h"
 #include "magic/magic_teleporter_list.h"
-#include "map.h"
-#include "map_iterator.h"
-#include "map_selector.h"
+#include "map/field_type.h"
+#include "map/map.h"
+#include "map/map_selector.h"
+#include "map/mapbuffer.h"
+#include "map/mapbuffer_registry.h"
+#include "map/mapdata.h"
+#include "map/submap.h"
 #include "map/utils/map_functions.h"
 #include "map/utils/map_utils.h"
-#include "mapdata.h"
-#include "mapbuffer.h"
-#include "mapbuffer_registry.h"
+#include "map_iterator.h"
 #include "material.h"
 #include "messages.h"
-#include "submap.h"
-#include "monster.h"
 #include "mongroup.h"
+#include "monster.h"
 #include "mtype.h"
 #include "mutation.h"
 #include "npc.h"
 #include "options.h"
 #include "output.h"
-#include "overmapbuffer.h"
+#include "overmap/overmap.h"
+#include "overmap/overmapbuffer.h"
 #include "pickup.h"
-#include "fluid_grid.h"
 #include "pimpl.h"
 #include "player.h"
 #include "player_activity.h"
 #include "pldata.h"
 #include "point.h"
 #include "recipe.h"
+#include "recipe_dictionary.h"
 #include "relic.h"
 #include "requirements.h"
 #include "rng.h"
 #include "sounds.h"
-#include "cloning_utils.h"
 #include "string_formatter.h"
 #include "string_id.h"
 #include "string_input_popup.h"
@@ -113,16 +116,13 @@
 #include "uistate.h"
 #include "units.h"
 #include "units_utility.h"
-#include "recipe_dictionary.h"
 #include "value_ptr.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vpart_position.h"
-#include "weather.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+#include "weather/weather.h"
 #include "world_type.h"
-#include "dimension_info.h"
-#include "overmap.h"
-#include "veh_type.h"
 
 static const activity_id ACT_ATM( "ACT_ATM" );
 static const activity_id ACT_CLEAR_RUBBLE( "ACT_CLEAR_RUBBLE" );
@@ -134,14 +134,18 @@ static const efftype_id effect_antibiotic( "antibiotic" );
 static const efftype_id effect_bite( "bite" );
 static const efftype_id effect_bleed( "bleed" );
 static const efftype_id effect_disinfected( "disinfected" );
+static const efftype_id effect_downed( "downed" );
 static const efftype_id effect_earphones( "earphones" );
+static const efftype_id effect_grabbed( "grabbed" );
 static const efftype_id effect_infected( "infected" );
 static const efftype_id effect_pblue( "pblue" );
 static const efftype_id effect_pkill2( "pkill2" );
 static const efftype_id effect_sleep( "sleep" );
 static const efftype_id effect_strong_antibiotic( "strong_antibiotic" );
+static const efftype_id effect_stunned( "stunned" );
 static const efftype_id effect_teleglow( "teleglow" );
 static const efftype_id effect_weak_antibiotic( "weak_antibiotic" );
+static const efftype_id effect_zapped( "zapped" );
 
 static const itype_id itype_2x4( "2x4" );
 static const itype_id itype_arm_splint( "arm_splint" );
@@ -212,6 +216,7 @@ static const trait_id trait_M_DEPENDENT( "M_DEPENDENT" );
 static const trait_id trait_M_FERTILE( "M_FERTILE" );
 static const trait_id trait_M_SPORES( "M_SPORES" );
 static const trait_id trait_PROBOSCIS( "PROBOSCIS" );
+static const trait_id trait_THRESH_FISH( "THRESH_FISH" );
 static const trait_id trait_THRESH_MARLOSS( "THRESH_MARLOSS" );
 static const trait_id trait_THRESH_MYCUS( "THRESH_MYCUS" );
 static const trait_id trait_WEB_BRIDGE( "WEB_BRIDGE" );
@@ -305,7 +310,7 @@ void iexamine::nanofab( player &p, const tripoint_bub_ms &examp )
     tripoint_bub_ms spawn_point;
     map &here = get_map();
     for( const auto &valid_location : here.points_in_radius( examp, 1 ) ) {
-        if( here.ter( valid_location ) == ter_str_id( "t_nanofab_body" ) ) {
+        if( here.has_flag( "NANOFAB_BODY", valid_location ) ) {
             spawn_point = valid_location;
             table_exists = true;
             break;
@@ -431,7 +436,7 @@ void iexamine::nanoforge( player &p, const tripoint_bub_ms &examp )
     tripoint_bub_ms spawn_point;
     map &here = get_map();
     for( const auto &valid_location : here.points_in_radius( examp, 1 ) ) {
-        if( here.ter( valid_location ) == ter_str_id( "t_nanoforge_body" ) ) {
+        if( here.has_flag( "NANOFORGE_BODY", valid_location ) ) {
             spawn_point = valid_location;
             table_exists = true;
             break;
@@ -4122,7 +4127,11 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                 }
                 detached_ptr<item> tmp = item::spawn( drink.typeId(), calendar::turn, charges_held );
                 tmp = pour_into_keg( examp, std::move( tmp ) );
-                p.use_charges( drink.typeId(), charges_held - tmp->charges );
+                if( tmp ) { // tmp->charges contains the charges left after pouring into the keg
+                    p.use_charges( drink.typeId(), charges_held - tmp->charges );
+                } else { // tmp being empty means all charges were used up
+                    p.use_charges( drink.typeId(), charges_held );
+                }
                 add_msg( _( "You fill the %1$s with %2$s." ), keg_name, drink_nname );
                 notify_contents_changed( examp );
                 p.moves -= to_moves<int>( 10_seconds );
@@ -5613,7 +5622,6 @@ static constexpr auto jump_over_tile_base_move_cost = 200;
 static constexpr auto jump_over_tile_min_strength = 4;
 static constexpr auto jump_over_tile_stamina_burn_ratio = 14;
 static const auto dashing_effect = efftype_id( "dashing" );
-static const auto effect_downed = efftype_id( "downed" );
 
 auto jump_over_tile_carried_weight_percentage( const player &p ) -> int
 {
@@ -5836,8 +5844,7 @@ auto confirm_crash_through_window( const player &p,
     return query_yn( _( "Crash through the %s?" ), obstacle_name );
 }
 
-auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
-                              const bool show_messages ) -> bool
+auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub ) -> bool
 {
     const auto jump_state = get_jump_over_tile_state( p, examp_bub );
     const auto dir = jump_state.examp - p.abs_pos();
@@ -5846,7 +5853,7 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
         return false;
     }
 
-    if( !iexamine::can_start_jump_over_tile( p, show_messages ) ) {
+    if( !iexamine::can_start_jump_over_tile( p ) ) {
         return false;
     }
 
@@ -5855,18 +5862,11 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
     const auto jumped_tile = abs_to_bub( jump_state.examp );
     if( here.impassable( jumped_tile ) &&
         !jump_over_tile_can_cross_impassable( here, p, jumped_tile ) ) {
-        if( show_messages ) {
-            add_msg( m_warning, _( "You cannot jump through the %s." ),
-                     here.obstacle_name( jumped_tile ) );
-        }
         return false;
     }
 
     if( const auto blocking_creature = buffer.creature_at( jump_state.examp ) ) {
         if( blocking_creature->get_size() >= p.get_size() ) {
-            if( show_messages ) {
-                add_msg( m_warning, _( "You cannot jump over %s." ), blocking_creature->disp_name() );
-            }
             return false;
         }
     }
@@ -5874,18 +5874,10 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
     const auto landing_tile = abs_to_bub( jump_state.dest );
     if( here.impassable( landing_tile ) &&
         !jump_over_tile_can_land_on_ledge( buffer, jump_state.dest ) ) {
-        if( show_messages ) {
-            add_msg( m_warning, _( "You cannot land there - the %s is blocking the way." ),
-                     here.obstacle_name( landing_tile ) );
-        }
         return false;
     }
 
     if( const auto blocking_creature = buffer.creature_at( jump_state.dest ) ) {
-        if( show_messages ) {
-            add_msg( m_warning, _( "You cannot jump over an obstacle - there is %s blocking the way." ),
-                     blocking_creature->disp_name() );
-        }
         return false;
     }
 
@@ -5894,20 +5886,44 @@ auto can_jump_over_tile_impl( const player &p, const tripoint_bub_ms &examp_bub,
 
 } // namespace
 
-auto iexamine::can_start_jump_over_tile( const player &p, const bool show_messages ) -> bool
+auto iexamine::can_start_jump_over_tile( const player &p ) -> bool
 {
     if( p.get_str() < jump_over_tile_min_strength ) {
-        if( show_messages ) {
-            add_msg( m_warning, _( "You are too weak to jump over an obstacle." ) );
-        }
+        p.add_msg_if_player( m_warning, _( "You are too weak to jump over an obstacle." ) );
         return false;
     }
 
     const auto stamina_cost = jump_over_tile_stamina_cost( p, jump_over_tile_move_cost( p ) );
     if( p.get_stamina() < stamina_cost ) {
-        if( show_messages ) {
-            add_msg( m_warning, _( "You're too exhausted to jump over an obstacle." ) );
-        }
+        p.add_msg_if_player( m_warning, _( "You're too exhausted to jump over an obstacle." ) );
+        return false;
+    }
+
+    if( p.get_working_leg_count() < 2 ) {
+        p.add_msg_if_player( m_bad, _( "You need two functional legs to jump." ) );
+        return false;
+    }
+
+    if( p.is_mounted() ) {
+        p.add_msg_if_player( m_warning, _( "Your steed cannot jump this far." ) );
+        return false;
+    }
+
+    // fish mutants get to act like dolphins
+    auto &here = get_map();
+    if( here.has_flag( "DEEP_WATER", p.bub_pos() ) && !p.has_trait( trait_THRESH_FISH ) ) {
+        p.add_msg_if_player( m_warning, _( "You cannot jump from water." ) );
+        return false;
+    }
+    // a generic return for things you generally can't jump from
+    if( p.has_effect( effect_grabbed ) || p.has_effect( effect_zapped ) ||
+        p.has_effect( effect_stunned ) ) {
+        p.add_msg_if_player( m_bad, _( "You can't jump in your current state!" ) );
+        return false;
+    }
+
+    if( p.has_effect( effect_downed ) || p.movement_mode_is( CMM_PRONE ) ) {
+        p.add_msg_if_player( m_bad, _( "You need to stand up in order to jump!" ) );
         return false;
     }
 
@@ -5916,7 +5932,7 @@ auto iexamine::can_start_jump_over_tile( const player &p, const bool show_messag
 
 auto iexamine::can_jump_over_tile( const player &p, const tripoint_bub_ms &examp ) -> bool
 {
-    return can_jump_over_tile_impl( p, examp, false );
+    return can_jump_over_tile_impl( p, examp );
 }
 
 auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
@@ -5928,7 +5944,7 @@ auto iexamine::jump_over_tile( player &p, const tripoint_bub_ms &examp ) -> bool
         }
     }
 
-    if( !can_jump_over_tile_impl( p, examp, true ) ) {
+    if( !can_jump_over_tile_impl( p, examp ) ) {
         return false;
     }
 
@@ -8416,7 +8432,7 @@ void iexamine::multicooker( player &p, const tripoint_bub_ms &pos )
 
         for( const auto &r : g->u.get_learned_recipes() ) {
             if( vars->get( "CATEGORYIDS", std::set<std::string>() ).contains( r->subcategory ) ||
-                vars->get( "RECIPEIDS", std::set<std::string>() ).contains( r->result().str() ) ) {
+                vars->get( "RECIPEIDS", std::set<std::string>() ).contains( r->ident().str() ) ) {
                 dishes.push_back( r );
                 const bool can_make = r->deduped_requirements().can_make_with_inventory(
                                           crafting_inv, r->get_component_filter() );

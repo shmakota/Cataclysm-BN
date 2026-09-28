@@ -1,42 +1,25 @@
 #include "explosion.h" // IWYU pragma: associated
-#include "fragment_cloud.h" // IWYU pragma: associated
-
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstddef>
-#include <limits>
-#include <map>
-#include <memory>
-#include <optional>
-#include <queue>
-#include <random>
-#include <ranges>
-#include <set>
-#include <utility>
-#include <variant>
-#include <vector>
 
 #include "animation.h"
 #include "avatar.h"
 #include "ballistics.h"
-#include "catalua_hooks.h"
-#include "catalua_sol.h"
 #include "bodypart.h"
 #include "calendar.h"
-#include "character.h"
-#include "catalua_coord.h"
 #include "cata_utility.h"
-#include "utils/algo.h"
+#include "catalua.h"
+#include "catalua_coord.h"
+#include "catalua_hooks.h"
+#include "catalua_sol.h"
+#include "character.h"
 #include "color.h"
 #include "creature.h"
 #include "damage.h"
 #include "debug.h"
 #include "enums.h"
 #include "explosion_queue.h"
-#include "field_type.h"
-#include "flat_set.h"
 #include "flag.h"
+#include "flat_set.h"
+#include "fragment_cloud.h" // IWYU pragma: associated
 #include "game.h"
 #include "game_constants.h"
 #include "int_id.h"
@@ -45,9 +28,10 @@
 #include "itype.h"
 #include "json.h"
 #include "line.h"
-#include "map.h"
+#include "map/field_type.h"
+#include "map/map.h"
+#include "map/mapdata.h"
 #include "map_iterator.h"
-#include "mapdata.h"
 #include "material.h"
 #include "math_defines.h"
 #include "messages.h"
@@ -68,13 +52,30 @@
 #include "translations.h"
 #include "trap.h"
 #include "type_id.h"
-#include "units.h"
 #include "ui_manager.h"
+#include "units.h"
 #include "units_mass.h"
 #include "units_volume.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vpart_position.h"
+#include "utils/algo.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <limits>
+#include <map>
+#include <memory>
+#include <optional>
+#include <queue>
+#include <random>
+#include <ranges>
+#include <set>
+#include <utility>
+#include <variant>
+#include <vector>
 
 static const ammo_effect_str_id ammo_effect_NULL_SOURCE( "NULL_SOURCE" );
 

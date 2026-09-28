@@ -1,5 +1,188 @@
 #include "game.h"
 
+#include "achievement.h"
+#include "action.h"
+#include "action_time_scale.h"
+#include "active_tile_data_def.h"
+#include "activity_actor.h"
+#include "activity_actor_definitions.h"
+#include "activity_handlers.h"
+#include "activity_time_cadence.h"
+#include "activity_type.h"
+#include "armor_layers.h"
+#include "artifact.h"
+#include "auto_note.h"
+#include "auto_pickup.h"
+#include "avatar.h"
+#include "avatar_action.h"
+#include "avatar_functions.h"
+#include "batch_turns.h"
+#include "bionics.h"
+#include "bodypart.h"
+#include "cached_options.h"
+#include "calendar.h"
+#include "cata_cartesian_product.h"
+#include "cata_utility.h"
+#include "catacharset.h"
+#include "catalua_bindings_coords_common.h"
+#include "catalua_hooks.h"
+#include "catalua_sol.h"
+#include "character.h"
+#include "character_display.h"
+#include "character_functions.h"
+#include "character_martial_arts.h"
+#include "character_turn.h"
+#include "clzones.h"
+#include "color.h"
+#include "computer_session.h"
+#include "construction.h"
+#include "construction_group.h"
+#include "coordinates.h"
+#include "crafting.h"
+#include "creature_throw.h"
+#include "creature_tracker.h"
+#include "cursesport.h"
+#include "damage.h"
+#include "debug.h"
+#include "dependency_tree.h"
+#include "diary.h"
+#include "distraction_manager.h"
+#include "distribution_grid.h"
+#include "drop_token.h"
+#include "editmap.h"
+#include "enchantments/enchantment_vision.h"
+#include "enums.h"
+#include "event.h"
+#include "event_bus.h"
+#include "explosion_queue.h"
+#include "faction.h"
+#include "filesystem.h"
+#include "fire_spread_loader.h"
+#include "flag.h"
+#include "flag_trait.h"
+#include "fluid_grid.h"
+#include "fstream_utils.h"
+#include "game_constants.h"
+#include "game_inventory.h"
+#include "game_ui.h"
+#include "gamemode.h"
+#include "gates.h"
+#include "harvest.h"
+#include "help.h"
+#include "iexamine.h"
+#include "init.h"
+#include "input.h"
+#include "int_id.h"
+#include "inventory.h"
+#include "item.h"
+#include "item_category.h"
+#include "item_contents.h"
+#include "item_functions.h"
+#include "item_stack.h"
+#include "itype.h"
+#include "iuse.h"
+#include "iuse_actor.h"
+#include "json.h"
+#include "kill_tracker.h"
+#include "line.h"
+#include "live_view.h"
+#include "loading_ui.h"
+#include "location_vector.h"
+#include "locations.h"
+#include "magic/magic.h"
+#include "map/field.h"
+#include "map/field_type.h"
+#include "map/lightmap.h"
+#include "map/map.h"
+#include "map/map_selector.h"
+#include "map/mapbuffer.h"
+#include "map/mapbuffer_registry.h"
+#include "map/mapdata.h"
+#include "map/submap.h"
+#include "map/submap_fields.h"
+#include "map/utils/map_functions.h"
+#include "map_item_stack.h"
+#include "map_iterator.h"
+#include "mapsharing.h"
+#include "memorial_logger.h"
+#include "memory_fast.h"
+#include "messages.h"
+#include "mission.h"
+#include "mod_manager.h"
+#include "monattack.h"
+#include "monexamine.h"
+#include "monfaction.h"
+#include "monster.h"
+#include "monster_action.h"
+#include "monster_hallucination.h"
+#include "monster_plan.h"
+#include "monstergenerator.h"
+#include "morale_types.h"
+#include "mtype.h"
+#include "mutation.h"
+#include "npc.h"
+#include "npc_class.h"
+#include "options.h"
+#include "output.h"
+#include "overmap/omdata.h"
+#include "overmap/overmap.h"
+#include "overmap/overmap_ui.h"
+#include "overmap/overmapbuffer.h"
+#include "panels.h"
+#include "path_info.h"
+#include "pathfinding.h"
+#include "pickup.h"
+#include "player.h"
+#include "player_activity.h"
+#include "point_float.h"
+#include "popup.h"
+#include "profession.h"
+#include "profile.h"
+#include "ranged.h"
+#include "recipe.h"
+#include "recipe_dictionary.h"
+#include "ret_val.h"
+#include "rng.h"
+#include "rot.h"
+#include "safemode_ui.h"
+#include "salvage.h"
+#include "scenario.h"
+#include "scent_map.h"
+#include "scores_ui.h"
+#include "sdltiles.h"
+#include "sounds.h"
+#include "start_location.h"
+#include "stats_tracker.h"
+#include "string_formatter.h"
+#include "string_id.h"
+#include "string_input_popup.h"
+#include "thread_pool.h"
+#include "tileray.h"
+#include "timed_event.h"
+#include "translations.h"
+#include "trap.h"
+#include "travel/travel_destination.h"
+#include "type_id.h"
+#include "ui.h"
+#include "ui_manager.h"
+#include "uistate.h"
+#include "units.h"
+#include "units_utility.h"
+#include "utils/pit_trap_helpers.h"
+#include "value_ptr.h"
+#include "vehicle/veh_interact.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_grab.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+#include "vehicle/vpart_range.h"
+#include "wcwidth.h"
+#include "weather/weather.h"
+#include "world.h"
+#include "world_type.h"
+#include "worldfactory.h"
+
 #include <algorithm>
 #include <bitset>
 #include <cassert>
@@ -32,188 +215,6 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
-#include "achievement.h"
-#include "action.h"
-#include "action_time_scale.h"
-#include "activity_time_cadence.h"
-#include "activity_actor.h"
-#include "activity_actor_definitions.h"
-#include "activity_handlers.h"
-#include "activity_type.h"
-#include "armor_layers.h"
-#include "artifact.h"
-#include "auto_note.h"
-#include "auto_pickup.h"
-#include "avatar.h"
-#include "avatar_action.h"
-#include "avatar_functions.h"
-#include "batch_turns.h"
-#include "bionics.h"
-#include "bodypart.h"
-#include "calendar.h"
-#include "catalua_bindings_coords_common.h"
-#include "cata_cartesian_product.h"
-#include "cata_utility.h"
-#include "catalua_hooks.h"
-#include "catalua_sol.h"
-#include "cached_options.h"
-#include "catacharset.h"
-#include "character.h"
-#include "character_display.h"
-#include "character_functions.h"
-#include "character_martial_arts.h"
-#include "character_turn.h"
-#include "clzones.h"
-#include "color.h"
-#include "computer_session.h"
-#include "construction.h"
-#include "construction_group.h"
-#include "coordinates.h"
-#include "crafting.h"
-#include "creature_throw.h"
-#include "creature_tracker.h"
-#include "monster_hallucination.h"
-#include "monster.h"
-#include "monster_action.h"
-#include "monster_plan.h"
-#include "thread_pool.h"
-#include "cursesport.h"
-#include "damage.h"
-#include "debug.h"
-#include "dependency_tree.h"
-#include "diary.h"
-#include "distraction_manager.h"
-#include "active_tile_data_def.h"
-#include "distribution_grid.h"
-#include "drop_token.h"
-#include "fluid_grid.h"
-#include "editmap.h"
-#include "enums.h"
-#include "event.h"
-#include "event_bus.h"
-#include "explosion_queue.h"
-#include "faction.h"
-#include "field.h"
-#include "field_type.h"
-#include "filesystem.h"
-#include "flag_trait.h"
-#include "flag.h"
-#include "fstream_utils.h"
-#include "game_constants.h"
-#include "game_inventory.h"
-#include "game_ui.h"
-#include "gamemode.h"
-#include "gates.h"
-#include "harvest.h"
-#include "help.h"
-#include "iexamine.h"
-#include "init.h"
-#include "input.h"
-#include "int_id.h"
-#include "inventory.h"
-#include "item.h"
-#include "item_category.h"
-#include "item_contents.h"
-#include "item_functions.h"
-#include "item_stack.h"
-#include "itype.h"
-#include "iuse.h"
-#include "iuse_actor.h"
-#include "json.h"
-#include "kill_tracker.h"
-#include "lightmap.h"
-#include "line.h"
-#include "live_view.h"
-#include "loading_ui.h"
-#include "locations.h"
-#include "npc.h"
-#include "magic/magic.h"
-#include "map.h"
-#include "map/utils/map_functions.h"
-#include "map_item_stack.h"
-#include "map_iterator.h"
-#include "map_selector.h"
-#include "mapbuffer.h"
-#include "mapbuffer_registry.h"
-#include "mapdata.h"
-#include "mapsharing.h"
-#include "memorial_logger.h"
-#include "memory_fast.h"
-#include "messages.h"
-#include "mission.h"
-#include "mod_manager.h"
-#include "monattack.h"
-#include "monexamine.h"
-#include "monfaction.h"
-#include "monstergenerator.h"
-#include "morale_types.h"
-#include "mtype.h"
-#include "mutation.h"
-#include "npc_class.h"
-#include "omdata.h"
-#include "options.h"
-#include "output.h"
-#include "overmap.h"
-#include "overmap_ui.h"
-#include "overmapbuffer.h"
-#include "panels.h"
-#include "path_info.h"
-#include "pathfinding.h"
-#include "pickup.h"
-#include "utils/pit_trap_helpers.h"
-#include "player.h"
-#include "player_activity.h"
-#include "point_float.h"
-#include "popup.h"
-#include "profession.h"
-#include "profile.h"
-#include "ranged.h"
-#include "recipe.h"
-#include "recipe_dictionary.h"
-#include "ret_val.h"
-#include "rng.h"
-#include "rot.h"
-#include "safemode_ui.h"
-#include "salvage.h"
-#include "scenario.h"
-#include "scent_map.h"
-#include "scores_ui.h"
-#include "sdltiles.h"
-#include "sounds.h"
-#include "start_location.h"
-#include "stats_tracker.h"
-#include "string_formatter.h"
-#include "string_id.h"
-#include "string_input_popup.h"
-#include "fire_spread_loader.h"
-#include "submap.h"
-#include "submap_fields.h"
-#include "type_id.h"
-#include "tileray.h"
-#include "timed_event.h"
-#include "translations.h"
-#include "travel/travel_destination.h"
-#include "trap.h"
-#include "ui.h"
-#include "ui_manager.h"
-#include "uistate.h"
-#include "units.h"
-#include "units_utility.h"
-#include "value_ptr.h"
-#include "veh_interact.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_grab.h"
-#include "vehicle_part.h"
-#include "vpart_position.h"
-#include "vpart_range.h"
-#include "wcwidth.h"
-#include "weather.h"
-#include "world_type.h"
-#include "worldfactory.h"
-#include "location_vector.h"
-#include "monfaction.h"
 class computer;
 
 #if defined(TILES)
@@ -316,6 +317,10 @@ auto fling_bash_damage( const Creature &c, const float flvel ) -> int
 
 static const activity_id ACT_OPERATION( "ACT_OPERATION" );
 static const activity_id ACT_AUTODRIVE( "ACT_AUTODRIVE" );
+static const activity_id ACT_CRAFT( "ACT_CRAFT" );
+static const activity_id ACT_VEHICLE_DECONSTRUCTION( "ACT_VEHICLE_DECONSTRUCTION" );
+static const activity_id ACT_VEHICLE_REPAIR( "ACT_VEHICLE_REPAIR" );
+
 
 static const skill_id skill_melee( "melee" );
 static const skill_id skill_dodge( "dodge" );
@@ -361,6 +366,7 @@ static const efftype_id effect_stunned( "stunned" );
 static const efftype_id effect_tied( "tied" );
 static const efftype_id dashing_effect( "dashing" );
 
+static const enchantment_value_id ench_val_MOTION_ALARM( "MOTION_ALARM" );
 namespace
 {
 
@@ -844,6 +850,17 @@ void game::load_map( const point_abs_sm &pos_sm, const bool pump_events )
     submap_loader.add_listener( this );
     submap_loader.add_listener( &m );
 
+    // m.load() above cleared map::funnel_locations_ and the map listener was
+    // only just registered, so the submaps loaded by m.load() never fired
+    // on_submap_loaded() for it.  Replay on_submap_loaded() for every
+    // currently-resident submap so funnel traps (e.g. gutter downspouts) are
+    // registered and fill_water_collectors() can find them (#10171).
+    for( auto &[raw_pos, sm_ptr] : MAPBUFFER_REGISTRY.get( new_dim_id ) ) {
+        if( sm_ptr ) {
+            m.on_submap_loaded( tripoint_abs_sm( raw_pos ), new_dim_id );
+        }
+    }
+
     const auto bubble_begin = pos_sm;
     const auto bubble_end = bubble_begin + point_rel_sm( g_mapsize, g_mapsize );
 
@@ -982,6 +999,12 @@ bool game::start_game()
                    _( "Try again?\n\nIt may require several attempts until the game finds a valid starting location." ) );
     };
 
+    //Reset character safe mode/pickup rules
+    get_auto_pickup().clear_character_rules();
+    get_safemode().clear_character_rules();
+    get_auto_notes_settings().clear();
+    get_auto_notes_settings().default_initialize();
+
     do {
         omtstart = start_loc.find_player_initial_location();
         if( omtstart == overmap::invalid_tripoint ) {
@@ -1052,16 +1075,11 @@ bool game::start_game()
         u.add_effect( effect_feral_killed_recently, 3_days );
     }
     u.process_turn(); // process_turn adds the initial move points
+    u.process_items();
     u.set_stamina( u.get_stamina_max() );
     get_weather().update_weather();
     u.next_climate_control_check = calendar::before_time_starts; // Force recheck at startup
     u.last_climate_control_ret = false;
-
-    //Reset character safe mode/pickup rules
-    get_auto_pickup().clear_character_rules();
-    get_safemode().clear_character_rules();
-    get_auto_notes_settings().clear();
-    get_auto_notes_settings().default_initialize();
 
     //Put some NPCs in there!
     if( get_option<std::string>( "STARTING_NPC" ) == "always" ||
@@ -1847,6 +1865,10 @@ bool game::cleanup_at_end()
     avatar &player_character = get_avatar();
     player_character = avatar();
 
+    // Unload active NPCs before cleaning up safe_reference records.
+    // Without this, cleanup_references() would find live mem_count entries.
+    unload_npcs();
+
     cleanup_references();
     cleanup_arenas();
     DynamicDataLoader::get_instance().unload_data();
@@ -2123,7 +2145,11 @@ bool game::do_turn()
     {
         ZoneScopedN( "do_turn_pre_action_updates" );
         perhaps_add_random_npc();
-        refresh_player_visibility_cache_if_needed();
+        if( ( ( !u.activity || !*u.activity || u.activity->complete() ) && !u.in_sleep_state() ) ||
+            !get_option<bool>( "ACTIVITY_SKIP_VISIBILITY" ) ) {
+            // If map cache needs to be updated visibility cache will handle it.
+            refresh_player_visibility_cache_if_needed( true, true );
+        }
         process_voluntary_act_interrupt();
         process_activity();
         update_performance_bubble();
@@ -2279,7 +2305,7 @@ bool game::do_turn()
     // consider a stripped down cache just for monsters.
     {
         ZoneScopedN( "do_turn_monster_visibility_cache" );
-        m.build_map_cache( get_levz(), true );
+        m.build_map_cache( get_levz(), false );
     }
     // This has to be done after updating our map caches, as sound propagation relies on terrain.
     if( !soundperf ) {
@@ -2341,6 +2367,7 @@ bool game::do_turn()
     {
         ZoneScopedN( "do_turn_player_process_turn" );
         u.process_turn();
+        u.process_items();
     }
 
     {
@@ -2557,12 +2584,32 @@ auto game::has_activity_skip_relevant_vehicle() -> bool
 {
     return std::ranges::any_of( m.get_vehicles(), []( const wrapped_vehicle & wrapped ) {
         const vehicle *veh = wrapped.v;
-        return veh != nullptr &&
-               ( veh->is_moving() || veh->vertical_velocity != 0 || veh->skidding ||
-                 veh->is_falling || veh->engine_on || veh->is_autodriving ||
-                 veh->is_following || veh->is_patrolling || veh->autopilot_on ||
-                 veh->is_alarm_on || veh->check_environmental_effects ||
-                 veh->total_accessory_epower_w() < 0 );
+        if( !log_activity_skip_state ) {
+            return veh != nullptr &&
+                   ( veh->is_moving() || veh->vertical_velocity != 0 || veh->skidding ||
+                     veh->is_falling || veh->is_autodriving || veh->is_following ||
+                     veh->is_patrolling || veh->autopilot_on || veh->is_alarm_on );
+        }
+        if( veh == nullptr ) {
+            return false;
+        }
+        if( veh->is_moving() || veh->vertical_velocity != 0 || veh->is_falling ) {
+            add_msg( "Vehicles are actively moving, cannot skip time" );
+            return true;
+        }
+        if( veh->skidding ) {
+            add_msg( "Vehicles are skidding, cannot skip time" );
+            return true;
+        }
+        if( veh->is_autodriving || veh->is_following || veh->is_patrolling || veh->autopilot_on ) {
+            add_msg( "Vehicles are autodriving, cannot skip time" );
+            return true;
+        }
+        if( veh->is_alarm_on ) {
+            add_msg( "Vehicle alarm is actively going off..." );
+            return true;
+        }
+        return false;
     } );
 }
 
@@ -2605,33 +2652,71 @@ auto game::has_activity_skip_active_fire() -> bool
 auto game::can_activity_fixed_window_skip( const time_duration &duration ) -> bool
 {
     if( new_game || queue_screenshot || uquit == QUIT_WATCH ) {
+        if( log_activity_skip_state ) {
+            add_msg( "Preparing quitting or screenshot, skip state impossible" );
+        }
         return false;
     }
     if( duration <= 0_turns || !get_weather().weather_id ||
         get_weather().nextweather <= calendar::turn ) {
+        if( log_activity_skip_state ) {
+            add_msg( "Need to process weather" );
+        }
         return false;
     }
     if( debug_infinite_speed_can_freeze_time() ) {
+        if( log_activity_skip_state ) {
+            add_msg( "Time is frozen" );
+        }
         return false;
     }
     if( !u.in_sleep_state() ) {
         if( !u.activity || !*u.activity || u.activity->complete() || u.has_destination() ||
             u.is_mounted() ) {
+            if( log_activity_skip_state ) {
+                if( !u.activity || !*u.activity || u.activity->complete() ) {
+                    add_msg( "Activity is null" );
+                }
+                if( u.has_destination() ) {
+                    add_msg( "You have autowalk target" );
+                }
+                if( u.is_mounted() ) {
+                    add_msg( "You are currently mounted on something" );
+                }
+            }
             return false;
         }
-        if( u.activity->id() == ACT_AUTODRIVE || !u.activity->rooted() ||
-            !u.activity->has_idle_bubble_effect() || u.activity->has_special_turns() ||
-            !u.activity->assistants().empty() ) {
+        const auto act_id = u.activity->id();
+        // It should be given autodrive does not
+        if( act_id == ACT_AUTODRIVE ) {
             return false;
+        }
+        // Craft has special turns but is safe.
+        if( act_id != ACT_CRAFT && act_id != ACT_VEHICLE_DECONSTRUCTION &&
+            act_id != ACT_VEHICLE_REPAIR ) {
+            if( !u.activity->has_idle_bubble_effect() || u.activity->has_special_turns() ) {
+                if( log_activity_skip_state ) {
+                    add_msg( "Activity cannot be time skipped" );
+                }
+                return false;
+            }
+            if( !u.activity->assistants().empty() ) {
+                if( log_activity_skip_state ) {
+                    add_msg( "Assistants prevent time skip" );
+                }
+            }
         }
     }
     if( u.in_vehicle && u.controlling_vehicle ) {
-        return false;
-    }
-    if( m.field_at( u.bub_pos() ).field_count() > 0 ) {
+        if( log_activity_skip_state ) {
+            add_msg( "You are controlling a vehicle" );
+        }
         return false;
     }
     if( has_activity_skip_active_fire() ) {
+        if( log_activity_skip_state ) {
+            add_msg( "Fire is being processed, cannot skip time" );
+        }
         return false;
     }
     if( has_activity_skip_relevant_vehicle() ) {
@@ -2639,9 +2724,15 @@ auto game::can_activity_fixed_window_skip( const time_duration &duration ) -> bo
     }
     if( const std::optional<time_point> event_time = timed_events.next_event_time();
         event_time && *event_time <= calendar::turn + duration ) {
+        if( log_activity_skip_state ) {
+            add_msg( "Upcoming timed event, cannot skip time" );
+        }
         return false;
     }
     if( has_activity_skip_blocking_npc_state() ) {
+        if( log_activity_skip_state ) {
+            add_msg( "New NPCs generated, cannot skip time" );
+        }
         return false;
     }
     return true;
@@ -2676,6 +2767,9 @@ auto game::execute_activity_fixed_window_skip( const time_duration &duration ) -
     const auto requested_turns = to_turns<int>( duration );
     while( skipped_turns < requested_turns ) {
         if( is_game_over() || ( ( !u.activity || !*u.activity ) && !u.in_sleep_state() ) ) {
+            if( log_activity_skip_state ) {
+                add_msg( "Activity lost, cannot skip time" );
+            }
             break;
         }
 
@@ -2715,22 +2809,33 @@ auto game::execute_activity_fixed_window_skip( const time_duration &duration ) -
         perhaps_add_random_npc();
         if( npcs_dirty || critter_tracker->size() != monster_count ) {
             activity_fixed_window_force_normal_turn_ = true;
+            if( log_activity_skip_state ) {
+                add_msg( "NPC added, cannot skip time" );
+            }
             break;
         }
 
         debug_hour_timer.print_time();
-        u.update_body( action_time_scale::calendar_duration_this_tick() );
         process_voluntary_act_interrupt();
         if( ( ( !u.activity || !*u.activity ) && !u.in_sleep_state() ) ) {
+            if( log_activity_skip_state ) {
+                add_msg( "Lost activity, cannot skip time" );
+            }
             break;
         }
 
         process_activity();
         if( is_game_over() ) {
+            if( log_activity_skip_state ) {
+                add_msg( "You died, cannot skip time" );
+            }
             break;
         }
         if( npcs_dirty || critter_tracker->size() != monster_count ) {
             activity_fixed_window_force_normal_turn_ = true;
+            if( log_activity_skip_state ) {
+                add_msg( "NPC or monster added, cannot skip time" );
+            }
             break;
         }
         const auto activity_continues = ( u.activity && *u.activity &&
@@ -2749,20 +2854,59 @@ auto game::execute_activity_fixed_window_skip( const time_duration &duration ) -
             return guy && !guy->is_dead();
         } );
         if( critter_tracker->size() > 0 || has_active_npcs ) {
-            sounds::process_sounds();
-            m.build_map_cache( get_levz(), true );
+            if( !activity_skip_sound_skip ) {
+                sounds::process_sounds();
+            }
+            if( ( critter_tracker->size() > 0 && !activity_skip_mon_skip ) ||
+                ( has_active_npcs && !activity_skip_npc_skip ) ) {
+                m.build_map_cache( get_levz(), true );
+            }
             if( critter_tracker->size() > 0 ) {
-                monmove( monster_activity_ai_mode::activity_skip, &activity_monsters );
-                if( critter_tracker->size() != monster_count ) {
-                    activity_fixed_window_force_normal_turn_ = true;
-                    break;
+                if( !activity_skip_mon_skip ) {
+                    monmove( monster_activity_ai_mode::activity_skip, &activity_monsters );
+                    if( critter_tracker->size() != monster_count ) {
+                        activity_fixed_window_force_normal_turn_ = true;
+                        if( log_activity_skip_state ) {
+                            add_msg( "Monster added, cannot skip time" );
+                        }
+                        break;
+                    }
+                } else {
+                    for( const shared_ptr_fast<monster> &mon_ptr : critter_tracker->get_monsters_list() ) {
+                        // Solves the lack of processing for pets issue
+                        if( mon_ptr && !mon_ptr->is_dead() ) {
+                            mon_ptr->process_items();
+                        }
+                    }
                 }
             }
             if( has_active_npcs ) {
-                npcmove();
-                if( npcs_dirty || critter_tracker->size() != monster_count ) {
-                    activity_fixed_window_force_normal_turn_ = true;
-                    break;
+                if( !activity_skip_npc_skip ) {
+                    npcmove();
+                    if( npcs_dirty || critter_tracker->size() != monster_count ) {
+                        activity_fixed_window_force_normal_turn_ = true;
+                        if( log_activity_skip_state ) {
+                            add_msg( "NPC or monster added, cannot skip time" );
+                        }
+                        break;
+                    }
+                } else {
+                    for( npc &guy : g->all_npcs() ) {
+                        // Don't process NPCs in unloaded submaps like a LEMON
+                        ZoneScopedN( "activity_skip_npc_process_turn" );
+                        if( !guy.is_simulated() ) {
+                            continue;
+                        }
+                        if( !guy.has_effect( effect_npc_suspend ) ) {
+                            // A bit more expensive then players & idle, but still
+                            // A ton cheaper then NPCs normally
+                            // While not messing any activities up
+                            guy.process_turn();
+                            if( guy.has_player_activity() ) {
+                                guy.execute_action( "npc_player_activity" );
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2779,7 +2923,7 @@ auto game::execute_activity_fixed_window_skip( const time_duration &duration ) -
         cleanup_dead();
 
         if( get_levz() >= 0 && !u.is_underwater() ) {
-            handle_weather_effects( weather.weather_id );
+            handle_weather_effects( weather.weather_id, false );
         }
         u.update_bodytemp( m, weather );
         character_funcs::update_body_wetness( u, get_weather().get_precise() );
@@ -2790,6 +2934,7 @@ auto game::execute_activity_fixed_window_skip( const time_duration &duration ) -
             break;
         }
     }
+    handle_bulk_weather_field_decay( weather.weather_id, skipped_turns );
     run_activity_skip_batch_turns( skipped_turns );
     return skipped_turns;
 }
@@ -2816,6 +2961,21 @@ auto game::run_activity_skip_batch_turns( const int skipped_turns ) -> void
     {
         ZoneScopedN( "do_map_process_items" );
         m.process_items( skipped_turns );
+    }
+
+    {
+        u.update_body( time_duration::from_turns( skipped_turns ) );
+    }
+
+    {
+        ZoneScopedN( "do_player_process_items" );
+        u.process_items( skipped_turns );
+    }
+    if( activity_skip_npc_skip ) {
+        ZoneScopedN( "do_npc_process_items" );
+        for( npc &guy : g->all_npcs() ) {
+            guy.process_items( skipped_turns );
+        }
     }
 
     {
@@ -2858,12 +3018,23 @@ auto game::try_activity_fixed_window_skip() -> bool
     ZoneScopedN( "activity_fixed_window_try" );
     if( activity_fixed_window_force_normal_turn_ ) {
         activity_fixed_window_force_normal_turn_ = false;
+        if( log_activity_skip_state ) {
+            add_msg( "Forced Normal Turn" );
+        }
         return false;
     }
     if( ( !u.activity || !*u.activity ) && !u.in_sleep_state() ) {
+        if( log_activity_skip_state ) {
+            add_msg( "No Activity" );
+        }
         return false;
     }
     if( calendar::turn < next_activity_fixed_window_check_ ) {
+        if( log_activity_skip_state ) {
+            add_msg(
+                string_format( "Before Next Fixed Window Check in %s turns",
+                               ( next_activity_fixed_window_check_ - calendar::turn ) / 1_turns ) );
+        }
         return false;
     }
     const auto duration = activity_fixed_window_duration();
@@ -2874,6 +3045,9 @@ auto game::try_activity_fixed_window_skip() -> bool
     const auto skipped_turns = execute_activity_fixed_window_skip( duration );
     if( skipped_turns <= 0 ) {
         next_activity_fixed_window_check_ = calendar::turn + 1_minutes;
+        if( log_activity_skip_state ) {
+            add_msg( "No Turns Were Skipped" );
+        }
         return false;
     }
     TracyPlot( "Activity Fixed Window Skipped Turns", int64_t{ skipped_turns } );
@@ -4012,11 +4186,6 @@ bool game::load( const save_t &name )
     validate_npc_followers();
     validate_mounted_npcs();
     validate_linked_vehicles();
-    // Re-read the bubble-size option for the submap-loader request.
-    // Do NOT call m.resize() here — the grid is already filled by unserialize().
-    // setup() already called init_bubble_config() + m.resize().
-    init_bubble_config();
-    reality_bubble_radius_ = g_half_mapsize;
     // Old saves can have duplicate authority for in-bubble monsters: one copy in
     // active_monsters and another in overmap monster_map.  Purge the stale overmap
     // buckets before update_map() gets a chance to spawn newly-entered submaps.
@@ -4755,7 +4924,8 @@ static void draw_critter_internal( const catacurses::window &w, const Creature &
         return;
     }
 
-    if( u.sees_with_infrared( critter ) || u.sees_with_specials( critter ) ) {
+    if( u.sees_with_infrared( critter ) ||
+        u.sees_with_specials( critter ) != enchantment_vision_id::NULL_ID() ) {
         mvwputch( w, point( mx, my ), c_red, '?' );
     }
 }
@@ -4789,7 +4959,8 @@ auto game::visibility_cache_z() -> int
     return is_looking ? u.bub_pos().z() : ter_view_p.z();
 }
 
-auto game::refresh_player_visibility_cache_if_needed( const bool player_map_cache_current ) -> void
+auto game::refresh_player_visibility_cache_if_needed( const bool player_map_cache_current,
+        const bool skip_lightmap ) -> void
 {
 #if defined( CATA_SDL )
     ZoneScopedN( "refresh_player_visibility_cache_if_needed" );
@@ -4807,7 +4978,7 @@ auto game::refresh_player_visibility_cache_if_needed( const bool player_map_cach
     }
 
     if( !player_map_cache_current ) {
-        m.build_map_cache( zlev );
+        m.build_map_cache( zlev, skip_lightmap );
     }
     if( needs_visibility_refresh() ) {
         m.update_visibility_cache( zlev );
@@ -5469,32 +5640,36 @@ auto game::mon_info_update() -> void
             }
         }
 
-        //Safemode monster check
-        const auto safemode_state = get_safemode().check_monster( critter.name(), player_attitude,
-                                    mon_dist );
+        // Safemode monster check
+        // Dont do different z-level -> They are not threats, yet can be seen
+        // Via special vision effects such as `ANTENNAE` or `DRONE_CAM`
+        if( critter.bub_pos().z() == u.bub_pos().z() ) {
+            const auto safemode_state = get_safemode().check_monster( critter.name(), player_attitude,
+                                        mon_dist );
 
-        if( ( !safemode_empty && safemode_state == RULE_BLACKLISTED ) || ( safemode_empty &&
-                ( MATT_ATTACK == matt || MATT_FOLLOW == matt ) ) ) {
-            if( index < 8 && critter.sees( g->u ) ) {
-                dangerous[index] = true;
-            }
-
-            if( !safemode_empty || mon_dist <= iProxyDist ) {
-                auto passmon = false;
-                if( critter.ignoring > 0 ) {
-                    if( safe_mode != SAFE_MODE_ON ) {
-                        critter.ignoring = 0;
-                    } else if( ( sm_ignored_time == 0_seconds || ( critter.lastseen_turn &&
-                                 *critter.lastseen_turn > calendar::turn - sm_ignored_time ) ) &&
-                               ( mon_dist > critter.ignoring / 2 || mon_dist < 6 ) ) {
-                        passmon = true;
-                    }
-                    critter.lastseen_turn = calendar::turn;
+            if( ( !safemode_empty && safemode_state == RULE_BLACKLISTED ) || ( safemode_empty &&
+                    ( MATT_ATTACK == matt || MATT_FOLLOW == matt ) ) ) {
+                if( index < 8 && critter.sees( g->u ) ) {
+                    dangerous[index] = true;
                 }
 
-                if( !passmon ) {
-                    newseen++;
-                    new_seen_mon.push_back( mon_ptr );
+                if( !safemode_empty || mon_dist <= iProxyDist ) {
+                    auto passmon = false;
+                    if( critter.ignoring > 0 ) {
+                        if( safe_mode != SAFE_MODE_ON ) {
+                            critter.ignoring = 0;
+                        } else if( ( sm_ignored_time == 0_seconds || ( critter.lastseen_turn &&
+                                     *critter.lastseen_turn > calendar::turn - sm_ignored_time ) ) &&
+                                   ( mon_dist > critter.ignoring / 2 || mon_dist < 6 ) ) {
+                            passmon = true;
+                        }
+                        critter.lastseen_turn = calendar::turn;
+                    }
+
+                    if( !passmon ) {
+                        newseen++;
+                        new_seen_mon.push_back( mon_ptr );
+                    }
                 }
             }
         }
@@ -6339,12 +6514,22 @@ void game::monmove( const monster_activity_ai_mode mode, activity_monmove_cache 
     // static const: string_id hash lookup happens once, not every turn.
     static const bionic_id bio_alarm( "bio_alarm" );
     const auto check_bio_alarm = [&]( const monster & critter ) {
-        if( !critter.is_dead() &&
-            u.has_active_bionic( bio_alarm ) &&
-            u.get_power_level() >= bio_alarm->power_trigger &&
-            rl_dist( u.bub_pos(), critter.bub_pos() ) <= 5 &&
-            !critter.is_hallucination() ) {
-            u.mod_power_level( -bio_alarm->power_trigger );
+        bool do_alarm = false;
+        if( !critter.is_dead() && !critter.is_hallucination() ) {
+            if( u.has_active_bionic( bio_alarm ) &&
+                u.get_power_level() >= bio_alarm->power_trigger &&
+                rl_dist( u.bub_pos(), critter.bub_pos() ) <= 5 ) {
+                u.mod_power_level( -bio_alarm->power_trigger );
+                do_alarm = true;
+            } else {
+                int ench_range = u.bonus_from_enchantments( 0.0, ench_val_MOTION_ALARM );
+                if( ench_range >= 1 &&
+                    rl_dist( u.bub_pos(), critter.bub_pos() ) <= ench_range ) {
+                    do_alarm = true;
+                }
+            }
+        }
+        if( do_alarm ) {
             add_msg( m_warning, _( "Your motion alarm goes off!" ) );
             cancel_activity_or_ignore_query( distraction_type::alert,
                                              _( "Your motion alarm goes off!" ) );
@@ -6615,6 +6800,7 @@ void game::npcmove()
             ZoneScopedN( "npc_process_turn" );
             if( !guy.has_effect( effect_npc_suspend ) ) {
                 guy.process_turn();
+                guy.process_items();
             }
         }
         while( !guy.is_dead() && guy.moves > 0 && turns < 10 &&
@@ -6716,6 +6902,7 @@ void game::sleep_skip_npc_process()
         m.creature_in_field( guy );
         if( !guy.has_effect( effect_npc_suspend ) ) {
             guy.process_turn();
+            guy.process_items();
         }
         guy.npc_update_body();
     }
@@ -8836,10 +9023,16 @@ void game::print_all_tile_info( const tripoint_bub_ms &lp, const catacurses::win
 
             if( creature != nullptr ) {
                 std::vector<std::string> buf;
-                if( u.sees_with_infrared( *creature ) ) {
+                enchantment_vision_id special = u.sees_with_specials( *creature );
+                if( special != enchantment_vision_id::NULL_ID() ) {
+                    if( special->use_normal_mon_tile() ) {
+                        int vLines = last_line - line;
+                        line = creature->print_info( w_look, ++line, vLines, column );
+                    } else {
+                        buf.emplace_back( special->get_mon_desc( *creature ) );
+                    }
+                } else if( u.sees_with_infrared( *creature ) ) {
                     creature->describe_infrared( buf );
-                } else if( u.sees_with_specials( *creature ) ) {
-                    creature->describe_specials( buf );
                 }
                 for( const std::string &s : buf ) {
                     mvwprintw( w_look, point( 1, ++line ), s );
@@ -11811,12 +12004,14 @@ static void butcher_submenu( const std::vector<item *> &corpses, int corpse = -1
     avatar &you = get_avatar();
     const inventory &inv = you.crafting_inventory();
 
-    const int factor = inv.max_quality( quality_id( "BUTCHER" ) );
+    const int factor = std::max( you.max_quality( quality_id( "BUTCHER" ) ),
+                                 inv.max_quality( quality_id( "BUTCHER" ) ) );
     const std::string msg_inv = factor > INT_MIN
                                 ? string_format( _( "Your best tool has <color_cyan>%d butchering</color>." ), factor )
                                 :  _( "You have no butchering tool." );
 
-    const int factor_diss = inv.max_quality( quality_id( "CUT_FINE" ) );
+    const int factor_diss = std::max( you.max_quality( quality_id( "CUT_FINE" ) ),
+                                      inv.max_quality( quality_id( "CUT_FINE" ) ) );
     const std::string msg_inv_diss = factor_diss > INT_MIN
                                      ? string_format( _( "Your best tool has <color_cyan>%d fine cutting</color>." ), factor_diss )
                                      :  _( "You have no fine cutting tool." );
@@ -12754,8 +12949,19 @@ bool game::walk_move( const tripoint_bub_ms &dest_loc, const bool via_ramp )
     }
     if( !u.has_artifact_with( AEP_STEALTH ) &&
         !u.has_enchantment_flag( enchantment_flag_id( "SILENT" ) ) ) {
-        int volume = u.is_stealthy() ? 30 : 50;
-        volume *= u.mutation_value( "noise_modifier" );
+        int volume = u.is_stealthy() ? 40 : 60;
+        // Used to be a multiplier on tile distance, this approximates that
+        double noisemod = u.mutation_value( "noise_modifier" );
+        if( noisemod < 1 ) {
+            // Just in case someone goes below 0...
+            if( noisemod == 0 ) {
+                volume = 0;
+            } else if( noisemod > 0 ) {
+                volume -= ( 3.0 / noisemod );
+            }
+        } else {
+            volume += ( ( noisemod - 1 ) * 6.0 );
+        }
         volume += u.bonus_from_enchantments( volume, enchantment_value_id( "NOISE" ) );
         if( volume > 0 ) {
             if( u.movement_mode_is( CMM_RUN ) ) {
@@ -13723,6 +13929,7 @@ void game::resize_reality_bubble_to( int new_size )
     // Compute the new top-left abs_sub so load_map centers on the player.
     const auto new_abs_sub = player_abs_sm.xy() +
                              point_rel_sm( -g_half_mapsize, -g_half_mapsize );
+    sounds::shift_sound_positions( project_to<coords::ms>( m.get_abs_sub() - new_abs_sub ) );
 
     // Reload the map around the player; this fills the submap cache, recreates load requests,
     // rebuilds distribution_grid_tracker and fluid_grid.
@@ -14446,13 +14653,22 @@ void game::vertical_move( int movez, bool force, bool peeking )
             }
         }
     } else {
-        u.moves -= move_cost;
         // Risk of failing, simple stuff like ladders are exempt
         if( climbing && movez == 1 && m.climb_difficulty( u.bub_pos() ) > 1 ) {
-            if( g->slip_down() ) {
+            // Only check for and burn stamina on climbing that has a failure risk.
+            if( u.get_stamina() < move_cost * 3 ) {
+                add_msg( m_bad, _( "You are too exhausted to climb." ) );
                 return;
             }
+            if( g->slip_down() ) {
+                move_cost = std::max( 100, rng( 1, move_cost ) );
+                u.moves -= move_cost;
+                u.mod_stamina( -move_cost * 3 );
+                return;
+            }
+            u.mod_stamina( -move_cost * 3 );
         }
+        u.moves -= move_cost;
     }
     for( const auto &np : npcs_to_bring ) {
         if( np->in_vehicle ) {
@@ -14641,6 +14857,10 @@ auto game::travel_to_dimension( const dimension_id &dim_id,
                                 const std::optional<tripoint_abs_sm> &load_pos,
                                 const std::function<void()> &pre_load_callback ) -> bool
 {
+    if( get_active_world()->info->world_save_format == save_format::V1 ) {
+        popup( "Dimensions are currently disfunctional in v1 saves. Please migrate this save to v2 or dont use the feature." );
+        return true;
+    }
     // Flush any items pending deferred deletion before switching dimensions.
     // Without this, zombie item pointers in cata_arena can persist across the
     // dimension transition and cause use-after-free crashes when the new

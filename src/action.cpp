@@ -1,15 +1,5 @@
 #include "action.h"
 
-#include <algorithm>
-#include <climits>
-#include <istream>
-#include <iterator>
-#include <memory>
-#include <optional>
-#include <ranges>
-#include <set>
-#include <utility>
-
 #include "avatar.h"
 #include "cata_utility.h"
 #include "catacharset.h"
@@ -26,9 +16,9 @@
 #include "item.h"
 #include "item_functions.h"
 #include "lua_action_menu.h"
-#include "map.h"
+#include "map/map.h"
+#include "map/mapdata.h"
 #include "map_iterator.h"
-#include "mapdata.h"
 #include "messages.h"
 #include "options.h"
 #include "output.h"
@@ -41,10 +31,20 @@
 #include "type_id.h"
 #include "ui.h"
 #include "ui_manager.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vpart_position.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+
+#include <algorithm>
+#include <climits>
+#include <istream>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <ranges>
+#include <set>
+#include <utility>
 
 static const quality_id qual_BUTCHER( "BUTCHER" );
 static const quality_id qual_CUT_FINE( "CUT_FINE" );
@@ -831,7 +831,7 @@ bool can_examine_at( const tripoint_bub_ms &p )
     }
 
     Creature *c = g->critter_at( p );
-    if( c != nullptr && p != u.bub_pos() ) {
+    if( c != nullptr && ( p != u.bub_pos() || u.is_mounted() ) ) {
         return true;
     }
 
@@ -974,7 +974,7 @@ action_id handle_action_menu()
             action_weightings[ACTION_CYCLE_MOVE] = 400;
         }
         // Only prioritize fire weapon options if we're wielding a ranged weapon.
-        if( g->u.primary_weapon().is_gun() || g->u.primary_weapon().has_flag( flag_REACH_ATTACK ) ) {
+        if( g->u.primary_weapon().is_gun() || g->u.primary_weapon().reach_range( g->u ) > 1 ) {
             action_weightings[ACTION_FIRE] = 350;
         }
     }

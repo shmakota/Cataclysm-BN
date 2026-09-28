@@ -1,17 +1,3 @@
-#include "game.h" // IWYU pragma: associated
-
-#include <algorithm>
-#include <cctype>
-#include <charconv>
-#include <chrono>
-#include <cstdint>
-#include <cstdlib>
-#include <initializer_list>
-#include <optional>
-#include <set>
-#include <sstream>
-#include <utility>
-
 #include "action.h"
 #include "advanced_inv.h"
 #include "animation.h"
@@ -21,12 +7,13 @@
 #include "avatar.h"
 #include "avatar_action.h"
 #include "avatar_functions.h"
-#include "bodypart.h"
 #include "bionics.h"
 #include "bionics_ui.h"
+#include "bodypart.h"
 #include "calendar.h"
-#include "catalua.h"
 #include "catacharset.h"
+#include "catalua.h"
+#include "catalua_hooks.h"
 #include "character.h"
 #include "character_display.h"
 #include "character_martial_arts.h"
@@ -42,10 +29,9 @@
 #include "diary.h"
 #include "distraction_manager.h"
 #include "faction.h"
-#include "field.h"
-#include "field_type.h"
 #include "flag.h"
 #include "fstream_utils.h"
+#include "game.h" // IWYU pragma: associated
 #include "game_constants.h"
 #include "game_inventory.h"
 #include "gamemode.h"
@@ -61,13 +47,15 @@
 #include "item_hauling.h"
 #include "itype.h"
 #include "iuse.h"
-#include "lightmap.h"
 #include "line.h"
 #include "magic/magic.h"
 #include "make_static.h"
-#include "map.h"
-#include "map_selector.h"
-#include "mapdata.h"
+#include "map/field.h"
+#include "map/field_type.h"
+#include "map/lightmap.h"
+#include "map/map.h"
+#include "map/map_selector.h"
+#include "map/mapdata.h"
 #include "mapsharing.h"
 #include "messages.h"
 #include "monster.h"
@@ -77,7 +65,7 @@
 #include "npc.h"
 #include "options.h"
 #include "output.h"
-#include "overmap_ui.h"
+#include "overmap/overmap_ui.h"
 #include "panels.h"
 #include "player.h"
 #include "player_activity.h"
@@ -90,29 +78,42 @@
 #include "scores_ui.h"
 #include "sounds.h"
 #include "string_formatter.h"
-#include "string_utils.h"
 #include "string_id.h"
 #include "string_input_popup.h"
+#include "string_utils.h"
 #include "translations.h"
-#include "type_id.h"
 #include "travel/travel_destination.h"
+#include "type_id.h"
 #include "ui.h"
 #include "ui_manager.h"
-#include "utils/url.h"
 #include "units.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_grab.h"
-#include "vehicle_part.h"
-#include "vehicle_wait.h"
-#include "vpart_position.h"
-#include "vpart_range.h"
-#include "weather.h"
+#include "utils/url.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_grab.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vehicle_wait.h"
+#include "vehicle/vpart_position.h"
+#include "vehicle/vpart_range.h"
+#include "weather/weather.h"
 #include "worldfactory.h"
+
+#include <algorithm>
+#include <cctype>
+#include <charconv>
+#include <chrono>
+#include <cstdint>
+#include <cstdlib>
+#include <initializer_list>
+#include <optional>
+#include <set>
+#include <sstream>
+#include <utility>
 
 static const activity_id ACT_FERTILIZE_PLOT( "ACT_FERTILIZE_PLOT" );
 static const activity_id ACT_MOVE_LOOT( "ACT_MOVE_LOOT" );
 static const activity_id ACT_MULTIPLE_BUTCHER( "ACT_MULTIPLE_BUTCHER" );
+static const activity_id ACT_MULTIPLE_DISSECT( "ACT_MULTIPLE_DISSECT" );
 static const activity_id ACT_MULTIPLE_CHOP_PLANKS( "ACT_MULTIPLE_CHOP_PLANKS" );
 static const activity_id ACT_MULTIPLE_CHOP_TREES( "ACT_MULTIPLE_CHOP_TREES" );
 static const activity_id ACT_MULTIPLE_CONSTRUCTION( "ACT_MULTIPLE_CONSTRUCTION" );
@@ -138,6 +139,8 @@ static const itype_id itype_pistol_lanyard( "pistol_lanyard" );
 static const skill_id skill_melee( "melee" );
 
 static const quality_id qual_CUT( "CUT" );
+
+static const enchantment_value_id ench_val_REACH_RANGE_UNARMED( "REACH_RANGE_UNARMED" );
 
 namespace
 {
@@ -728,7 +731,7 @@ static void close()
 static auto jump() -> void
 {
     auto &you = get_avatar();
-    if( !iexamine::can_start_jump_over_tile( you, true ) ) {
+    if( !iexamine::can_start_jump_over_tile( you ) ) {
         return;
     }
 
@@ -1405,7 +1408,8 @@ static void loot()
         Multideconvehicle = 1024,
         Multirepairvehicle = 2048,
         MultiButchery = 4096,
-        MultiMining = 8192
+        MultiMining = 8192,
+        MultiDissect = 16384
     };
 
     player &u = g->u;
@@ -1433,6 +1437,7 @@ static void loot()
     flags |= g->check_near_zone( zone_type_id( "VEHICLE_REPAIR" ),
                                  u.bub_pos() ) ? Multirepairvehicle : 0;
     flags |= g->check_near_zone( zone_type_id( "LOOT_CORPSE" ), u.bub_pos() ) ? MultiButchery : 0;
+    flags |= g->check_near_zone( zone_type_id( "LOOT_CORPSE" ), u.bub_pos() ) ? MultiDissect : 0;
     flags |= g->check_near_zone( zone_type_id( "MINING" ), u.bub_pos() ) ? MultiMining : 0;
     if( flags == 0 ) {
         add_msg( m_info, _( "There is no compatible zone nearby." ) );
@@ -1485,10 +1490,15 @@ static void loot()
         menu.addentry_desc( MultiButchery, true, 'B', _( "Butcher corpses" ),
                             _( "Auto-butcher anything in corpse loot zones - auto-fetch tools." ) );
     }
+    if( flags & MultiDissect ) {
+        menu.addentry_desc( MultiDissect, true, 'D', _( "Dissect corpses" ),
+                            _( "Auto-dissect anything in corpse loot zones - auto-fetch tools." ) );
+    }
     if( flags & MultiMining ) {
         menu.addentry_desc( MultiMining, true, 'M', _( "Mine Area" ),
                             _( "Auto-mine anything in mining zone - auto-fetch tools." ) );
     }
+
 
     menu.query();
     flags = ( menu.ret >= 0 ) ? menu.ret : None;
@@ -1523,6 +1533,9 @@ static void loot()
             break;
         case MultiButchery:
             u.assign_activity( ACT_MULTIPLE_BUTCHER );
+            break;
+        case MultiDissect:
+            u.assign_activity( ACT_MULTIPLE_DISSECT );
             break;
         case MultiMining:
             u.assign_activity( ACT_MULTIPLE_MINE );
@@ -1582,7 +1595,12 @@ static void reach_attack( avatar &you )
 {
     g->temp_exit_fullscreen();
 
-    target_handler::trajectory traj = target_handler::mode_reach( you, you.primary_weapon() );
+    target_handler::trajectory traj;
+    if( you.is_armed() ) {
+        traj = target_handler::mode_reach( you, you.primary_weapon() );
+    } else {
+        traj = target_handler::mode_unarmed_reach( you );
+    }
 
     if( !traj.empty() ) {
         you.reach_attack( traj.back() );
@@ -1615,13 +1633,31 @@ static void fire()
         std::vector<std::string> options;
         std::vector<std::function<void()>> actions;
 
+        if( u.bonus_from_enchantments( 0, ench_val_REACH_RANGE_UNARMED, true ) > 0 ) {
+            options.push_back( _( "Unarmed Reach Attack" ) );
+            actions.emplace_back( [&] {
+                if( u.has_effect( effect_relax_gas ) )
+                {
+                    if( one_in( 8 ) ) {
+                        add_msg( m_good, _( "Your willpower asserts itself, and so do you!" ) );
+                        reach_attack( u );
+                    } else {
+                        u.moves -= rng( 2, 8 ) * 10;
+                        add_msg( m_bad, _( "You're too pacified to strike anything…" ) );
+                    }
+                } else
+                {
+                    reach_attack( u );
+                }
+            } );
+        }
         bool do_autofire = false;
         for( auto &w : u.worn ) {
             if( w->type->can_use( "holster" ) && !w->has_flag( flag_NO_QUICKDRAW ) &&
                 !w->contents.empty() && w->contents.front().is_gun() ) {
                 //~ draw (first) gun contained in holster
                 //~ %1$s: weapon name, %2$s: container name, %3$d: remaining ammo count
-                options.push_back( "Draw: " + string_format( pgettext( "holster", "%1$s from %2$s (%3$d)" ),
+                options.push_back( _( "Draw: " ) + string_format( pgettext( "holster", "%1$s from %2$s (%3$d)" ),
                                    w->contents.front().tname(),
                                    w->type_name(),
                                    w->contents.front().ammo_remaining() ) );
@@ -1629,16 +1665,16 @@ static void fire()
                 actions.emplace_back( [&] { u.invoke_item( w, "holster" ); } );
 
             } else if( w->is_gun() && w->has_flag( flag_WORN_GUN ) ) {
-                options.push_back( "Fire: " + w->display_name() );
+                options.push_back( _( "Fire: " ) + w->display_name() );
                 actions.emplace_back( [&] { avatar_action::fire_ranged_gear( u, w ); } );
                 do_autofire = true;
             } else if( w->is_gun() && w->gunmod_find( itype_shoulder_strap ) ) {
                 // wield item currently worn using shoulder strap
-                options.push_back( "Wield: " + w->display_name() );
+                options.push_back( _( "Wield: " ) + w->display_name() );
                 actions.emplace_back( [&] { u.wield( *w ); } );
             } else if( w->is_gun() && w->gunmod_find( itype_pistol_lanyard ) ) {
                 // wield item currently worn using pistol lanyard
-                options.push_back( "Wield: " + w->display_name() );
+                options.push_back( _( "Wield: " ) + w->display_name() );
                 actions.emplace_back( [&] { u.wield( *w ); } );
             }
         }
@@ -1769,6 +1805,16 @@ auto try_cast_spell( player &u, spell &sp ) -> bool
         add_msg( game_message_params{ m_bad, gmf_bypass_cooldown },
                  _( "You cannot cast Blood Magic without a cutting implement." ) );
         return false;
+    }
+
+    const auto hook_results = cata::run_hooks( "on_spell_try_cast", [&]( sol::table & params ) {
+        params["char"] = &u;
+        params["spell"] = &sp;
+    } );
+    if( !hook_results.get_or( "allowed", true ) ) { return false; }
+
+    if( sp.type->lua_callbacks ) {
+        if( !sp.type->lua_callbacks->call_on_try_cast( *u.as_character(), sp ) ) { return false;}
     }
 
     start_spellcasting_activity( u, sp );

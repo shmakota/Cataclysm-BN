@@ -42,15 +42,15 @@
 #include "int_id.h"
 #include "inventory.h"
 #include "json.h"
-#include "lightmap.h"
-#include "npc_class.h"
 #include "magic/magic.h"
 #include "make_static.h"
+#include "map/lightmap.h"
 #include "mapsharing.h"
 #include "martialarts.h"
 #include "monster.h"
 #include "mutation.h"
 #include "name.h"
+#include "npc_class.h"
 #include "options.h"
 #include "output.h"
 #include "path_info.h"
@@ -74,7 +74,7 @@
 #include "ui.h"
 #include "ui_manager.h"
 #include "units_utility.h"
-#include "veh_type.h"
+#include "vehicle/veh_type.h"
 #include "worldfactory.h"
 
 static const std::string flag_CHALLENGE( "CHALLENGE" );
@@ -3765,7 +3765,15 @@ tab_direction set_description( avatar &you, const bool allow_reroll,
                                 c_white, "\t" + string_format( _( "%s level %d" ), spell_pair.first->name, spell_pair.second ) );
                 pos++;
             }
-        } else {
+        }
+        if( you.magic->knows_spell() ) {
+            for( const spell *spell : you.magic->get_spells() ) {
+                trim_and_print( w_bionics, point( 0, pos ), getmaxx( w_bionics ) - 1,
+                                c_white, "\t" + string_format( _( "%s level %d" ), spell->id()->name, spell->get_level() ) );
+                pos++;
+            }
+        }
+        if( you.prof->spells().empty() && !you.magic->knows_spell() ) {
             wprintz( w_bionics, c_light_red, _( "None!" ) );
         }
 

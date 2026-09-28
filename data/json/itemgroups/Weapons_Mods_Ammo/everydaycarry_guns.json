@@ -708,6 +708,30 @@
     ]
   },
   {
+    "id": "everyday_hk_ump45_retool_40",
+    "type": "item_group",
+    "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
+    "subtype": "collection",
+    "entries": [
+      { "item": "hk_ump45_retool_40", "ammo-group": "on_hand_40", "charges": [ 0, 30 ] },
+      { "item": "ump40mag", "charges-min": 0, "prob": 80, "ammo-group": "on_hand_40" },
+      { "item": "ump40mag", "charges-min": 0, "ammo-group": "on_hand_40", "prob": 50 },
+      { "group": "on_hand_40", "prob": 25, "charges": [ 10, 20 ], "count": [ 1, 2 ] }
+    ]
+  },
+  {
+    "id": "everyday_hk_ump45_retool_9mm",
+    "type": "item_group",
+    "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
+    "subtype": "collection",
+    "entries": [
+      { "item": "hk_ump45_retool_9mm", "ammo-group": "on_hand_9mm", "charges": [ 0, 30 ] },
+      { "item": "ump9mag", "charges-min": 0, "prob": 80, "ammo-group": "on_hand_9mm" },
+      { "item": "ump9mag", "charges-min": 0, "ammo-group": "on_hand_9mm", "prob": 50 },
+      { "group": "on_hand_9mm", "prob": 25, "charges": [ 10, 20 ], "count": [ 1, 2 ] }
+    ]
+  },
+  {
     "id": "everyday_mac_10",
     "type": "item_group",
     "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
@@ -1120,8 +1144,8 @@
     "subtype": "collection",
     "entries": [
       { "item": "iwi_tavor_x95_300blk", "ammo-group": "on_hand_300BLK", "charges": [ 0, 30 ] },
-      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 80 },
-      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 50 },
+      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 80, "ammo-group": "on_hand_300BLK" },
+      { "group": "nested_stanag_mag_300", "charges-min": 0, "ammo-group": "on_hand_300BLK", "prob": 50 },
       { "group": "on_hand_300BLK", "prob": 25, "charges": [ 10, 20 ], "count": [ 1, 2 ] }
     ]
   },
@@ -1449,9 +1473,9 @@
     "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
     "subtype": "collection",
     "entries": [
-      { "item": "acr_300blk", "charges": [ 0, 30 ] },
-      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 80 },
-      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 50 },
+      { "item": "acr_300blk", "ammo-group": "on_hand_300BLK", "charges": [ 0, 30 ] },
+      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 80, "ammo-group": "on_hand_300BLK" },
+      { "group": "nested_stanag_mag_300", "charges-min": 0, "ammo-group": "on_hand_300BLK", "prob": 50 },
       { "group": "on_hand_300BLK", "prob": 25, "charges": [ 10, 20 ], "count": [ 1, 2 ] }
     ]
   },
@@ -1461,9 +1485,9 @@
     "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
     "subtype": "collection",
     "entries": [
-      { "item": "sig_mcx", "charges": [ 0, 30 ] },
-      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 80 },
-      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 50 },
+      { "item": "sig_mcx", "ammo-group": "on_hand_300BLK", "charges": [ 0, 30 ] },
+      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 80, "ammo-group": "on_hand_300BLK" },
+      { "group": "nested_stanag_mag_300", "charges-min": 0, "ammo-group": "on_hand_300BLK", "prob": 50 },
       { "group": "on_hand_300BLK", "prob": 25, "charges": [ 10, 20 ], "count": [ 1, 2 ] }
     ]
   },
@@ -1473,9 +1497,9 @@
     "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
     "subtype": "collection",
     "entries": [
-      { "item": "sig_mcx", "charges": [ 0, 30 ], "contents-group": "swat_accessories" },
-      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 80 },
-      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 50 },
+      { "item": "sig_mcx", "ammo-group": "on_hand_300BLK", "charges": [ 0, 30 ], "contents-group": "swat_accessories" },
+      { "group": "nested_stanag_mag_300", "charges-min": 0, "prob": 80, "ammo-group": "on_hand_300BLK" },
+      { "group": "nested_stanag_mag_300", "charges-min": 0, "ammo-group": "on_hand_300BLK", "prob": 50 },
       { "group": "on_hand_300BLK", "prob": 25, "charges": [ 10, 20 ], "count": [ 1, 2 ] }
     ]
   },

@@ -1,43 +1,26 @@
-#include "npc.h" // IWYU pragma: associated
-
-#include <algorithm>
-#include <cfloat>
-#include <climits>
-#include <cmath>
-#include <cstdlib>
-#include <iterator>
-#include <memory>
-#include <numeric>
-#include <ostream>
-#include <tuple>
-#include <unordered_set>
-#include <unordered_map>
-
 #include "action_time_scale.h"
 #include "active_item_cache.h"
 #include "activity_handlers.h"
-#include "creature_tracker.h"
 #include "bionics.h"
 #include "bodypart.h"
-#include "utils/algo.h"
+#include "calendar.h"
+#include "catalua.h"
 #include "catalua_coord.h"
 #include "catalua_hooks.h"
+#include "catalua_impl.h"
 #include "catalua_sol.h"
 #include "character.h"
 #include "character_functions.h"
-#include "character_turn.h"
 #include "character_id.h"
+#include "character_turn.h"
 #include "clzones.h"
-#include "catalua.h"
-#include "catalua_impl.h"
+#include "creature_tracker.h"
 #include "damage.h"
 #include "debug.h"
 #include "dispersion.h"
 #include "effect.h"
 #include "enums.h"
 #include "explosion.h"
-#include "field.h"
-#include "field_type.h"
 #include "flag.h"
 #include "game.h"
 #include "game_constants.h"
@@ -51,26 +34,30 @@
 #include "iuse.h"
 #include "iuse_actor.h"
 #include "line.h"
-#include "map.h"
+#include "map/field.h"
+#include "map/field_type.h"
+#include "map/map.h"
+#include "map/mapdata.h"
 #include "map_iterator.h"
-#include "mapdata.h"
 #include "messages.h"
 #include "mission.h"
 #include "monster.h"
 #include "mtype.h"
+#include "npc.h" // IWYU pragma: associated
 #include "npc_class.h"
 #include "npctalk.h"
 #include "options.h"
-#include "overmap.h"
-#include "overmap_location.h"
-#include "overmapbuffer.h"
-#include "overmapbuffer_registry.h"
-#include "calendar.h"
+#include "overmap/overmap.h"
+#include "overmap/overmap_location.h"
+#include "overmap/overmapbuffer.h"
+#include "overmap/overmapbuffer_registry.h"
 #include "player_activity.h"
 #include "pldata.h"
 #include "profile.h"
 #include "projectile.h"
 #include "ranged.h"
+#include "reload/reload.h"
+#include "reload/reload_selection.h"
 #include "ret_val.h"
 #include "rng.h"
 #include "sounds.h"
@@ -78,13 +65,27 @@
 #include "translations.h"
 #include "type_id.h"
 #include "units.h"
+#include "utils/algo.h"
 #include "value_ptr.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+#include "vehicle/vpart_range.h"
 #include "visitable.h"
-#include "vpart_position.h"
-#include "vpart_range.h"
+
+#include <algorithm>
+#include <cfloat>
+#include <climits>
+#include <cmath>
+#include <cstdlib>
+#include <iterator>
+#include <memory>
+#include <numeric>
+#include <ostream>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace
 {
@@ -326,7 +327,7 @@ static bool clear_shot_reach( const tripoint_bub_ms &from, const tripoint_bub_ms
         Creature *inter = g->critter_at( p );
         if( check_ally && inter != nullptr ) {
             return false;
-        } else if( get_map().impassable( p ) ) {
+        } else if( get_map().impassable( p ) && !get_map().has_flag( "MOUNTABLE", p ) ) {
             return false;
         } else if( get_map().obstructed_by_vehicle_rotation( last_point, p ) ) {
             return false;
@@ -1833,7 +1834,7 @@ void npc::check_or_reload_cbm()
     if( !checklist.empty() ) {
         for( auto& [bid, itm] : checklist ) {
             bionic &bio = get_bionic_state( bid );
-            const item *it_loc = character_funcs::select_ammo( *this, *itm ).ammo;
+            const item *it_loc = reload_selection::prepare( *this, *itm ).selected.ammo;
             if( it_loc && wants_to_reload_with( *itm, *it_loc, ai_cache.danger > 0 ) ) {
                 do_reload( *itm );
                 bio.ammo_loaded =
@@ -1865,7 +1866,7 @@ item &npc::find_reloadable()
         if( !wants_to_reload( *this, *node ) ) {
             return VisitResponse::NEXT;
         }
-        const auto it_loc = character_funcs::select_ammo( *this, *node ).ammo;
+        const auto it_loc = reload_selection::prepare( *this, *node ).selected.ammo;
         if( it_loc && wants_to_reload_with( *node, *it_loc, ai_cache.danger > 0 ) ) {
             reloadable = node;
             return VisitResponse::ABORT;
@@ -1902,7 +1903,7 @@ item *npc::find_usable_ammo( item &weap )
         return nullptr;
     }
 
-    auto loc = character_funcs::select_ammo( *this, weap ).ammo;
+    auto loc = reload_selection::prepare( *this, weap ).selected.ammo;
     if( !loc || !wants_to_reload_with( weap, *loc, ai_cache.danger > 0 ) ) {
         return nullptr;
     }
@@ -5024,7 +5025,7 @@ void npc::do_reload( item &it )
         move_pause();
         return;
     }
-    item_reload_option reload_opt = character_funcs::select_ammo( *this, it );
+    auto reload_opt = reload_selection::prepare( *this, it ).selected;
 
     if( !reload_opt ) {
         debugmsg( "do_reload failed: no usable ammo for %s", it.tname() );

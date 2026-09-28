@@ -1,3 +1,7 @@
+#include "../src/map/map.h"
+#include "../src/overmap/overmap.h"
+#include "../src/overmap/overmapbuffer.h"
+#include "../src/vehicle/vehicle_part.h"
 #include "activity_actor_definitions.h"
 #include "avatar.h"
 #include "avatar_functions.h"
@@ -14,12 +18,9 @@
 #include "item.h"
 #include "itype.h"
 #include "iuse.h"
-#include "map.h"
 #include "map_helpers.h"
 #include "npc.h"
 #include "options_helpers.h"
-#include "overmap.h"
-#include "overmapbuffer.h"
 #include "player_activity.h"
 #include "player_helpers.h"
 #include "recipe.h"
@@ -29,9 +30,8 @@
 #include "string_id.h"
 #include "type_id.h"
 #include "value_ptr.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "weather.h"
+#include "vehicle/vehicle.h"
+#include "weather/weather.h"
 
 #include <algorithm>
 #include <climits>
@@ -326,8 +326,9 @@ static time_point midday = calendar::turn_zero + 12_hours;
 
 // This tries to actually run the whole craft activity, which is more thorough,
 // but slow
-static int actually_test_craft(
-    const recipe_id& rid, std::vector<detached_ptr<item>>& tools, int interrupt_after_turns) {
+static auto actually_test_craft(
+    const recipe_id& rid, std::vector<detached_ptr<item>>& tools, int interrupt_after_turns)
+    -> int {
     avatar& you = get_avatar();
     prep_craft(rid, tools, true);
     set_time(midday); // Ensure light for crafting
@@ -503,7 +504,7 @@ TEST_CASE("Component same as tool", "[crafting][tool]") {
 }
 
 // Resume the first in progress craft found in the player's inventory
-static int resume_craft() {
+static auto resume_craft() -> int {
     avatar& you = get_avatar();
     std::vector<item*> crafts = you.items_with([](const item& itm) { return itm.is_craft(); });
     REQUIRE(crafts.size() == 1);
