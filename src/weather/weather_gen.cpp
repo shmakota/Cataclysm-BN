@@ -125,8 +125,8 @@ static auto season_temp(const weather_generator& wg, double year_fraction) -> un
 }
 
 static auto weather_temperature_from_common_data(
-    const weather_generator& wg, const weather_gen_common& common,
-    const time_point& t) -> units::temperature {
+    const weather_generator& wg, const weather_gen_common& common, const time_point& t)
+    -> units::temperature {
     const double x(common.x);
     const double y(common.y);
     const double z(common.z);
@@ -247,8 +247,8 @@ auto weather_generator::choose_representative_weather(
 }
 
 auto weather_generator::get_weather_conditions(
-    const tripoint_abs_ms& location, const time_point& t,
-    unsigned seed) const -> const weather_type_id& {
+    const tripoint_abs_ms& location, const time_point& t, unsigned seed) const
+    -> const weather_type_id& {
     w_point w(get_weather(location, t, seed));
     return get_weather_conditions(w);
 }
