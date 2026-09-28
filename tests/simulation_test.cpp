@@ -151,6 +151,9 @@ TEST_CASE("water_puddles_extinguish_fire_on_the_same_tile", "[simulation][field]
     put_player_underground();
 
     auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    const auto cleanup = on_out_of_scope([]() {
+        MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    });
     REQUIRE(sm != nullptr);
 
     const auto fire_pt = point_sm_ms{5, 5};
@@ -161,12 +164,19 @@ TEST_CASE("water_puddles_extinguish_fire_on_the_same_tile", "[simulation][field]
     auto& dummy = get_avatar();
     process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
 
+    const auto* newborn_fire = sm->get_field(fire_pt).find_field(fd_fire);
+    REQUIRE(newborn_fire != nullptr);
+    CHECK(newborn_fire->get_field_age() == 1_turns);
+    const auto* newborn_puddle = sm->get_field(fire_pt).find_field(water_field);
+    REQUIRE(newborn_puddle != nullptr);
+    CHECK(newborn_puddle->get_field_intensity() == 3);
+
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
     CHECK(sm->get_field(fire_pt).find_field(fd_fire) == nullptr);
     const auto* puddle_after = sm->get_field(fire_pt).find_field(water_field);
     REQUIRE(puddle_after != nullptr);
     CHECK(puddle_after->get_field_intensity() == 2);
-
-    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
 
 TEST_CASE(
