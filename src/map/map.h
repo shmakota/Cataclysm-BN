@@ -1752,7 +1752,8 @@ public:
     /**
      * Apply field effects to the creature when it's on a square with fields.
      */
-    void creature_in_field(Creature& critter);
+    /// With movement_only, apply only character slipping; otherwise apply ongoing effects.
+    auto creature_in_field(Creature& critter, bool movement_only = false) -> void;
     /**
      * Apply trap effects to the creature, similar to @ref creature_in_field.
      * If there is no trap at the creatures location, nothing is done.

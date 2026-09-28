@@ -539,7 +539,7 @@ void map::player_in_field(player& u) {
     }
 }
 
-void map::creature_in_field(Creature& critter) {
+auto map::creature_in_field(Creature& critter, const bool movement_only) -> void {
     static const auto effect_downed = efftype_id("downed");
     static const auto flag_NOSLIP = flag_id("NOSLIP");
     static const auto ench_flag_NOSLIP = enchantment_flag_id("NOSLIP");
@@ -549,7 +549,7 @@ void map::creature_in_field(Creature& critter) {
     bool in_vehicle = false;
     bool inside_vehicle = false;
     player* u = critter.as_player();
-    if (critter.is_monster()) {
+    if (critter.is_monster() && !movement_only) {
         monster_in_field(*static_cast<monster*>(&critter));
     } else {
         if (u) {
@@ -565,7 +565,7 @@ void map::creature_in_field(Creature& critter) {
                     }
                 }
             }
-            player_in_field(*u);
+            if (!movement_only) { player_in_field(*u); }
         }
     }
 
@@ -576,6 +576,8 @@ void map::creature_in_field(Creature& critter) {
         const field_type_id cur_field_id = cur_field_entry.get_field_type();
 
         for (const auto& fe : cur_field_entry.field_effects()) {
+            const auto slipping = fe.id == effect_downed && critter.as_character() != nullptr;
+            if (slipping != movement_only) { continue; }
             if (in_vehicle && fe.immune_in_vehicle) { continue; }
             if (inside_vehicle && fe.immune_inside_vehicle) { continue; }
             if (!inside_vehicle && fe.immune_outside_vehicle) { continue; }

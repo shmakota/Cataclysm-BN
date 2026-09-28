@@ -56,7 +56,7 @@ TEST_CASE("noslip clothing prevents field-based slipping", "[avatar],[field]") {
     SECTION("slippery fields down the avatar without noslip footwear") {
         REQUIRE(here.add_field(target_location, field_test_fd_slip));
 
-        here.creature_in_field(you);
+        here.creature_in_field(you, /*movement_only=*/true);
 
         CHECK(you.has_effect(effect_downed));
     }
@@ -65,7 +65,7 @@ TEST_CASE("noslip clothing prevents field-based slipping", "[avatar],[field]") {
         REQUIRE_FALSE(you.wear_item(item::spawn("test_noslip_boots"), false));
         REQUIRE(here.add_field(target_location, field_test_fd_slip));
 
-        here.creature_in_field(you);
+        here.creature_in_field(you, /*movement_only=*/true);
 
         CHECK_FALSE(you.has_effect(effect_downed));
     }
@@ -74,8 +74,34 @@ TEST_CASE("noslip clothing prevents field-based slipping", "[avatar],[field]") {
         REQUIRE_FALSE(you.wear_item(item::spawn("test_socks_of_noslip"), false));
         REQUIRE(here.add_field(target_location, field_test_fd_slip));
 
-        here.creature_in_field(you);
+        here.creature_in_field(you, /*movement_only=*/true);
 
         CHECK_FALSE(you.has_effect(effect_downed));
     }
+}
+
+TEST_CASE("waiting in slippery fields does not knock characters down", "[avatar],[field]") {
+    clear_all_state();
+    auto& here = get_map();
+    auto& you = get_avatar();
+    you.setpos(tripoint_bub_ms(5, 5, 0));
+    const auto origin = you.abs_pos();
+    const auto destination = origin + tripoint_rel_ms(1, 0, 0);
+    REQUIRE(
+        here.add_field(you.bub_pos() + tripoint_rel_ms(1, 0, 0), field_type_id("test_fd_slip")));
+    CHECK_FALSE(you.has_effect(effect_downed));
+
+    g->place_player(abs_to_bub(destination));
+    REQUIRE(you.has_effect(effect_downed));
+    you.remove_effect(effect_downed);
+
+    for (const auto turn : {1, 2, 3}) {
+        INFO("Waiting turn " << turn);
+        here.creature_in_field(you);
+        CHECK_FALSE(you.has_effect(effect_downed));
+    }
+
+    g->place_player(abs_to_bub(origin));
+    g->place_player(abs_to_bub(destination));
+    CHECK(you.has_effect(effect_downed));
 }
