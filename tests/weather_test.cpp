@@ -174,7 +174,7 @@ TEST_CASE("weather_pattern_requirements_gate_weather_selection", "[weather][json
 }
 
 TEST_CASE("region_overlay_changes_base_weather", "[weather][json]") {
-    auto region = region_settings_map.at("default");
+    auto region = regional_settings();
     auto input = std::istringstream(R"({"base_weather":"test_weather_base"})");
     auto reader = JsonIn(input);
     apply_region_overlay(reader.get_object(), region);
