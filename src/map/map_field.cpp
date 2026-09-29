@@ -1151,8 +1151,14 @@ auto ignite_fuel_field(
     if (fuel.intensity <= 0) { return nullptr; }
     const auto fuel_intensity = fuel.intensity;
     const auto fire_intensity = fuel_field_fire_intensity(fuel_intensity);
-    const auto age = fire_age == 0_turns ? 0_turns : fuel_field_fire_age(fuel_intensity);
-    auto* fire = sub_add_field(dst, fd_fire, fire_intensity, age);
+    auto* fire = dst.get_field().find_field(fd_fire);
+    if (fire) {
+        fire->set_field_intensity(std::max(fire->get_field_intensity(), fire_intensity));
+        fire->mod_field_age(fuel_field_fire_age(fuel_intensity));
+    } else {
+        const auto age = fire_age == 0_turns ? 0_turns : fuel_field_fire_age(fuel_intensity);
+        fire = sub_add_field(dst, fd_fire, fire_intensity, age);
+    }
     for (const auto type : fuel.types) { sub_remove_field(ctx, dst, type); }
     return fire;
 }
@@ -1363,6 +1369,8 @@ auto process_fields_in_submap(
                     cur.set_field_intensity(0);
                     cur.set_field_age(0_turns);
                 } else {
+                    auto self = SubTile{.sm = &sm, .local = local, .abs_sm = pos};
+                    ignite_fuel_field(dirty_context, self, cur.get_field_age());
                     const auto can_spread = !ter_furn_has_flag(ter, frn, TFLAG_FIRE_CONTAINER);
                     const auto no_floor = ter.has_flag(TFLAG_NO_FLOOR);
                     const auto can_burn =

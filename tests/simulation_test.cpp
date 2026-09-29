@@ -115,6 +115,123 @@ TEST_CASE("adjacent_fire_ignites_fuel_fields", "[simulation][field][fire]") {
 }
 
 TEST_CASE(
+    "fire_consumes_fuel_on_its_own_tile_and_preserves_inert_fields",
+    "[simulation][field][fire][liquid][fluid_regression]") {
+    clear_all_state();
+    put_player_underground();
+
+    const auto cleanup = on_out_of_scope([]() {
+        MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    });
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    REQUIRE(sm != nullptr);
+
+    const auto fire_pt = point_sm_ms{5, 5};
+    const auto control_pt = point_sm_ms{9, 9};
+    const auto fuel_field = field_type_id(
+        GENERATE("fd_fuel", "fd_sticky_fuel", "test_fd_flammable"));
+    const auto inert_field = field_type_id("test_fd_nonflammable");
+    const auto furniture = furn_id(GENERATE("f_null", "f_brazier"));
+    const auto fuel_before_fire = GENERATE(true, false);
+    CAPTURE(fuel_field.id().str(), furniture.id().str(), fuel_before_fire);
+    sm->set_ter(fire_pt, ter_id("t_rock_floor"));
+    sm->set_ter(control_pt, ter_id("t_rock_floor"));
+    sm->set_furn(fire_pt, furniture);
+
+    if (fuel_before_fire) { plant_field(*sm, fire_pt, fuel_field); }
+    plant_field(*sm, fire_pt, inert_field);
+    plant_fire(*sm, fire_pt);
+    plant_fire(*sm, control_pt);
+    if (!fuel_before_fire) { plant_field(*sm, fire_pt, fuel_field); }
+    REQUIRE(sm->field_count == 4);
+
+    auto& dummy = get_avatar();
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+    REQUIRE(sm->get_field(fire_pt).find_field(fuel_field) != nullptr);
+    REQUIRE(sm->get_field(fire_pt).find_field(inert_field) != nullptr);
+    const auto* newborn_fire = sm->get_field(fire_pt).find_field(fd_fire);
+    REQUIRE(newborn_fire != nullptr);
+    CHECK(newborn_fire->get_field_age() == 1_turns);
+
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    CHECK(sm->get_field(fire_pt).find_field(fuel_field) == nullptr);
+    CHECK(sm->get_field(fire_pt).find_field(inert_field) != nullptr);
+    const auto* fueled_fire = sm->get_field(fire_pt).find_field(fd_fire);
+    const auto* control_fire = sm->get_field(control_pt).find_field(fd_fire);
+    REQUIRE(fueled_fire != nullptr);
+    REQUIRE(control_fire != nullptr);
+    CHECK(fueled_fire->get_field_intensity() >= 2);
+    CHECK(fueled_fire->get_field_age() < control_fire->get_field_age());
+    CHECK(sm->field_count == 3);
+    CHECK(sm->field_cache.size() == 2);
+}
+
+TEST_CASE(
+    "contained_fire_does_not_ignite_adjacent_fuel", "[simulation][field][fire][fluid_regression]") {
+    clear_all_state();
+    put_player_underground();
+
+    const auto cleanup = on_out_of_scope([]() {
+        MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    });
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    REQUIRE(sm != nullptr);
+
+    const auto fire_pt = point_sm_ms{5, 5};
+    const auto fuel_pt = point_sm_ms{6, 5};
+    const auto fuel_field = field_type_id("test_fd_flammable");
+    sm->set_ter(fire_pt, ter_id("t_rock_floor"));
+    sm->set_furn(fire_pt, furn_id("f_brazier"));
+    plant_fire(*sm, fire_pt);
+    plant_field(*sm, fuel_pt, fuel_field);
+
+    auto& dummy = get_avatar();
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    CHECK(sm->get_field(fuel_pt).find_field(fuel_field) != nullptr);
+    CHECK(sm->get_field(fuel_pt).find_field(fd_fire) == nullptr);
+    CHECK(sm->get_field(fire_pt).find_field(fd_fire) != nullptr);
+}
+
+TEST_CASE(
+    "fuel_extends_an_already_strong_fire", "[simulation][field][fire][liquid][fluid_regression]") {
+    clear_all_state();
+    put_player_underground();
+
+    const auto cleanup = on_out_of_scope([]() {
+        MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    });
+    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    REQUIRE(sm != nullptr);
+
+    const auto fire_pt = point_sm_ms{5, 5};
+    const auto control_pt = point_sm_ms{9, 9};
+    const auto fuel_field = field_type_id("test_fd_flammable");
+    for (const auto pt : {fire_pt, control_pt}) {
+        sm->set_ter(pt, ter_id("t_rock_floor"));
+        sm->set_furn(pt, furn_id("f_brazier"));
+        plant_fire(*sm, pt, 3);
+        auto* fire = sm->get_field(pt).find_field(fd_fire);
+        REQUIRE(fire != nullptr);
+        fire->set_field_age(-2_hours);
+    }
+    plant_field(*sm, fire_pt, fuel_field);
+
+    auto& dummy = get_avatar();
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+
+    CHECK(sm->get_field(fire_pt).find_field(fuel_field) == nullptr);
+    const auto* fueled_fire = sm->get_field(fire_pt).find_field(fd_fire);
+    const auto* control_fire = sm->get_field(control_pt).find_field(fd_fire);
+    REQUIRE(fueled_fire != nullptr);
+    REQUIRE(control_fire != nullptr);
+    CHECK(fueled_fire->get_field_intensity() == 3);
+    CHECK(fueled_fire->get_field_age() < control_fire->get_field_age());
+}
+
+TEST_CASE(
     "adjacent_fire_propagates_through_fuel_over_multiple_ticks", "[simulation][field][fire]") {
     clear_all_state();
     put_player_underground();
