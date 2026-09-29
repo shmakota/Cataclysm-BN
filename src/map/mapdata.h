@@ -455,6 +455,7 @@ protected:
 
 private:
     std::set<std::string> flags; // string flags which possibly refer to what's documented above.
+    std::optional<bool> flammable_override;
     bool flammable_ash = false;
     bool flammable_hard = false;
     std::bitset<NUM_TERFLAGS> bitflags; // bitfield of -certain- string flags which are heavily

@@ -1,4 +1,5 @@
 #include "../src/map/map.h"
+#include "../src/map/mapdata.h"
 #include "../src/map/submap.h"
 #include "../src/map/submap_load_manager.h"
 #include "avatar.h"
@@ -780,6 +781,49 @@ TEST_CASE(
     here.ter_set(pos, ter_str_id("t_test_flammable_hard_removed").id());
     REQUIRE_FALSE(here.has_flag("FLAMMABLE_HARD", pos));
     CHECK_FALSE(here.is_flammable(pos));
+}
+
+TEST_CASE(
+    "replacing_inherited_flammable_flag_updates_fire_classification",
+    "[map][fire][fluid_regression]") {
+    const auto& terrain = ter_str_id("t_test_flammable_hard_replaced_with_ash").obj();
+
+    REQUIRE_FALSE(terrain.has_flag("FLAMMABLE_HARD"));
+    REQUIRE(terrain.has_flag("FLAMMABLE_ASH"));
+    CHECK(terrain.is_flammable());
+    CHECK(terrain.is_ash_flammable());
+    CHECK_FALSE(terrain.is_hard_flammable());
+    CHECK_FALSE(terrain.is_basic_flammable());
+}
+
+TEST_CASE(
+    "explicit_terrain_flammability_survives_inheritance_and_flag_changes",
+    "[map][fire][fluid_regression]") {
+    const auto& inherited_true = ter_str_id("t_test_flammable_true_child").obj();
+    CHECK(inherited_true.is_flammable());
+    CHECK(inherited_true.is_basic_flammable());
+
+    const auto& explicit_false = ter_str_id("t_test_flammable_false_override").obj();
+    REQUIRE(explicit_false.has_flag("FLAMMABLE_HARD"));
+    CHECK_FALSE(explicit_false.is_flammable());
+    CHECK_FALSE(explicit_false.is_hard_flammable());
+
+    const auto& inherited_false = ter_str_id("t_test_flammable_false_child").obj();
+    REQUIRE(inherited_false.has_flag("FLAMMABLE_HARD"));
+    CHECK_FALSE(inherited_false.is_flammable());
+    CHECK_FALSE(inherited_false.is_hard_flammable());
+
+    const auto& inherited_false_with_changed_flags =
+        ter_str_id("t_test_flammable_false_grandchild").obj();
+    REQUIRE_FALSE(inherited_false_with_changed_flags.has_flag("FLAMMABLE_HARD"));
+    REQUIRE(inherited_false_with_changed_flags.has_flag("FLAMMABLE_ASH"));
+    CHECK_FALSE(inherited_false_with_changed_flags.is_flammable());
+    CHECK_FALSE(inherited_false_with_changed_flags.is_ash_flammable());
+
+    const auto& explicit_true = ter_str_id("t_test_flammable_true_override").obj();
+    REQUIRE(explicit_true.has_flag("FLAMMABLE_ASH"));
+    CHECK(explicit_true.is_flammable());
+    CHECK(explicit_true.is_ash_flammable());
 }
 
 TEST_CASE(
