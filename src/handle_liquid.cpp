@@ -307,6 +307,10 @@ auto get_liquid_target( item &liquid, const int radius, liquid_dest_opt &target 
         }
         target.dest_opt = LD_GROUND;
     } );
+    if( liquid.rotten() ) {
+        // Default to pouring all rotten liquid, even when partial pouring is available.
+        menu.selected = menu.entries.size() - 1;
+    }
     if( can_partially_pour_on_ground( liquid ) ) {
         menu.addentry( -1, true, 'G', _( "Pour some on the ground" ) );
         actions.emplace_back( [&]() {
@@ -335,11 +339,6 @@ auto get_liquid_target( item &liquid, const int radius, liquid_dest_opt &target 
             target.dest_opt = LD_GROUND;
             target.amount = chosen_amount;
         } );
-    }
-
-    if( liquid.rotten() ) {
-        // Pre-select this one as it is the most likely one for rotten liquids
-        menu.selected = menu.entries.size() - 1;
     }
 
     if( menu.entries.empty() ) {
