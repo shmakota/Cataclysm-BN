@@ -1144,8 +1144,8 @@ auto sub_remove_field(field_cache_dirty_context const& ctx, SubTile& dst, const 
 }
 
 auto ignite_fuel_field(
-    field_cache_dirty_context const& ctx, SubTile& dst,
-    const time_duration& fire_age) -> field_entry* {
+    field_cache_dirty_context const& ctx, SubTile& dst, const time_duration& fire_age)
+    -> field_entry* {
     if (!dst.valid()) { return nullptr; }
     const auto fuel = flammable_fields(dst.get_field());
     if (fuel.intensity <= 0) { return nullptr; }
