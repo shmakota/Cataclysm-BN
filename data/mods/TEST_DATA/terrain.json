@@ -166,5 +166,26 @@
     "move_cost": 2,
     "flags": [ "TRANSPARENT", "FLAT" ],
     "flammable": true
+  },
+  {
+    "type": "terrain",
+    "id": "t_test_flammable_hard_parent",
+    "name": "flammable test floor",
+    "description": "A test-only floor with a legacy flammability flag.",
+    "looks_like": "t_floor",
+    "symbol": ".",
+    "color": "red",
+    "move_cost": 2,
+    "flags": [ "TRANSPARENT", "FLAT", "FLAMMABLE_HARD" ]
+  },
+  {
+    "type": "terrain",
+    "id": "t_test_flammable_hard_removed",
+    "copy-from": "t_test_flammable_hard_parent",
+    "name": "nonflammable test floor",
+    "description": "A test-only floor that removes its inherited flammability flag.",
+    "symbol": ".",
+    "color": "red",
+    "delete": { "flags": [ "FLAMMABLE_HARD" ] }
   }
 ]

@@ -19,6 +19,7 @@
 #include "map/field_type.h"
 #include "map/mapbuffer.h"
 #include "map/mapbuffer_registry.h"
+#include "map/submap_fields.h"
 #include "map_helpers.h"
 #include "mapgen/mapgen_constructor.h"
 #include "messages.h"
@@ -761,6 +762,72 @@ TEST_CASE("json_flammable_terrain_counts_as_flammable", "[map][fire]") {
 
     CHECK(here.is_flammable(pos));
     CHECK_FALSE(here.has_flag("FLAMMABLE", pos));
+}
+
+TEST_CASE(
+    "removing_inherited_flammable_flag_clears_terrain_flammability",
+    "[map][fire][fluid_regression]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([]() { clear_all_state(); });
+
+    auto& here = get_map();
+    const auto pos = tripoint_bub_ms{60, 60, 0};
+    here.furn_set(pos, f_null);
+    here.ter_set(pos, ter_str_id("t_test_flammable_hard_parent").id());
+    REQUIRE(here.has_flag("FLAMMABLE_HARD", pos));
+    CHECK(here.is_flammable(pos));
+
+    here.ter_set(pos, ter_str_id("t_test_flammable_hard_removed").id());
+    REQUIRE_FALSE(here.has_flag("FLAMMABLE_HARD", pos));
+    CHECK_FALSE(here.is_flammable(pos));
+}
+
+TEST_CASE(
+    "gasoline_spilled_on_fire_fuels_the_same_tile",
+    "[map][field][fire][liquid][fluid_regression]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([]() { clear_all_state(); });
+
+    auto& here = get_map();
+    const auto pos = tripoint_bub_ms{60, 60, 0};
+    const auto furniture = furn_id(GENERATE("f_null", "f_brazier"));
+    const auto fuel_before_fire = GENERATE(true, false);
+    const auto fuel_field = field_type_id("fd_fuel");
+    CAPTURE(furniture.id().str(), fuel_before_fire);
+    here.ter_set(pos, ter_id("t_rock_floor"));
+    here.furn_set(pos, furniture);
+
+    auto* sm = here.get_submap_at(pos);
+    REQUIRE(sm != nullptr);
+    const auto abs_sm = project_to<coords::sm>(map_local_to_abs(here, pos));
+    const auto process_fields = [&]() {
+        process_fields_in_submap(get_avatar().get_dimension(), *sm, abs_sm, MAPBUFFER);
+    };
+
+    if (!fuel_before_fire) {
+        REQUIRE(here.add_field(pos, fd_fire, 1));
+        process_fields();
+    }
+
+    auto gasoline = item::spawn("gasoline", calendar::turn);
+    gasoline->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(pos, std::move(gasoline), false));
+    REQUIRE(here.get_field(pos, fuel_field) != nullptr);
+    CHECK(here.i_at(pos).empty());
+
+    if (fuel_before_fire) {
+        REQUIRE(here.add_field(pos, fd_fire, 1));
+        process_fields();
+    }
+
+    REQUIRE(here.get_field(pos, fd_fire) != nullptr);
+    const auto fire_age_before = here.get_field(pos, fd_fire)->get_field_age();
+    process_fields();
+
+    CHECK(here.get_field(pos, fuel_field) == nullptr);
+    const auto* fire_after = here.get_field(pos, fd_fire);
+    REQUIRE(fire_after != nullptr);
+    CHECK(fire_after->get_field_age() != fire_age_before);
 }
 
 TEST_CASE("mapbuffer_resident_lookup_uses_absolute_coordinates") {
