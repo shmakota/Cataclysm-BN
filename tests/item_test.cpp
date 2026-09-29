@@ -140,6 +140,22 @@ TEST_CASE("common_liquids_define_spill_fields", "[item][liquid][field]") {
     CHECK(field_type_id("fd_plutonium_slurry").obj().get_extra_radiation_max(2) == 1);
 }
 
+TEST_CASE("field_tints_follow_json_inheritance", "[field][fluid_regression]") {
+    const auto& rgb = field_type_id("test_fd_rgb_tint").obj();
+    const auto& inherited_rgb = field_type_id("test_fd_rgb_tint_inherited").obj();
+    REQUIRE(rgb.get_tint_rgb() == RGBColor::try_parse("#123456"));
+    CHECK(inherited_rgb.get_tint_rgb() == rgb.get_tint_rgb());
+    CHECK(inherited_rgb.get_tint() == rgb.get_tint());
+
+    const auto& palette = field_type_id("test_fd_palette_tint").obj();
+    const auto& inherited_palette = field_type_id("test_fd_palette_tint_inherited").obj();
+    REQUIRE(palette.get_tint() == c_red);
+    CHECK(palette.get_tint_rgb() == RGBColor::try_parse("red"));
+    CHECK(inherited_palette.get_tint() == palette.get_tint());
+    CHECK(inherited_palette.get_tint_rgb() == palette.get_tint_rgb());
+    CHECK_FALSE(field_type_id("test_fd_nonflammable").obj().get_tint_rgb().has_value());
+}
+
 TEST_CASE("super_soaker_uses_water_without_mount_restrictions", "[item][gun]") {
     item& squirt_gun = *item::spawn_temporary("super_soaker");
 

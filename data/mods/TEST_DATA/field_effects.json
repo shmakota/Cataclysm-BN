@@ -64,5 +64,21 @@
     "phase": "liquid",
     "display_field": true,
     "tint": "#123456"
+  },
+  {
+    "id": "test_fd_rgb_tint_inherited",
+    "type": "field_type",
+    "copy-from": "test_fd_rgb_tint"
+  },
+  {
+    "id": "test_fd_palette_tint",
+    "type": "field_type",
+    "copy-from": "test_fd_rgb_tint",
+    "tint": "red"
+  },
+  {
+    "id": "test_fd_palette_tint_inherited",
+    "type": "field_type",
+    "copy-from": "test_fd_palette_tint"
   }
 ]
