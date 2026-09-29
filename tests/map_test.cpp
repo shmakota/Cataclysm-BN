@@ -35,6 +35,7 @@
 #include "units.h"
 #include "vehicle/vehicle.h"
 
+#include <algorithm>
 #include <memory>
 #include <ranges>
 #include <vector>
@@ -649,6 +650,53 @@ TEST_CASE("repeated_liquid_spills_intensify_before_expanding", "[map][item][liqu
     auto center_items = here.i_at(center);
     CHECK(center_items.empty());
     CHECK(count_field_tiles_in_radius(here, center, 2, water_field) > 1);
+}
+
+TEST_CASE(
+    "liquid_drop_on_independent_map_consumes_its_source_item",
+    "[map][item][liquid][field][fluid_regression]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([]() { clear_all_state(); });
+    g->place_player(tripoint_bub_ms(60, 60, 0));
+
+    auto independent = map(2);
+    independent.load(get_map().get_abs_sub(), false);
+    const auto center = tripoint_bub_ms(13, 13, 0);
+    const auto water_field = field_type_id("fd_water");
+    REQUIRE(&independent != &get_map());
+    REQUIRE(independent.get_submap_at(center) != nullptr);
+    for (const auto& tile : independent.points_in_radius(center, 2)) {
+        independent.ter_set(tile, ter_id("t_floor"));
+        independent.furn_set(tile, f_null);
+        independent.i_clear(tile);
+        independent.remove_field(tile, water_field);
+    }
+
+    auto direct_water = item::spawn("water_clean", calendar::turn);
+    direct_water->charges = 1;
+    const auto direct_result =
+        independent.add_item_or_charges(center, std::move(direct_water), false);
+    REQUIRE_FALSE(direct_result);
+    CHECK_FALSE(direct_water);
+    CHECK(independent.get_field(center, water_field) != nullptr);
+    CHECK(independent.i_at(center).empty());
+
+    independent.remove_field(center, water_field);
+    independent.furn_set(center, furn_id("f_grave_stone"));
+    REQUIRE(independent.has_flag("NOITEM", center));
+    REQUIRE(independent.passable(center));
+
+    auto overflow_water = item::spawn("water_clean", calendar::turn);
+    overflow_water->charges = 1;
+    const auto overflow_result =
+        independent.add_item_or_charges(center, std::move(overflow_water), true);
+    REQUIRE_FALSE(overflow_result);
+    CHECK_FALSE(overflow_water);
+    CHECK(independent.get_field(center, water_field) == nullptr);
+    CHECK(count_field_tiles_in_radius(independent, center, 1, water_field) == 1);
+    CHECK(std::ranges::all_of(independent.points_in_radius(center, 1), [&](const auto& tile) {
+        return independent.i_at(tile).empty();
+    }));
 }
 
 TEST_CASE(

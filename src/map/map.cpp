@@ -5170,7 +5170,10 @@ auto map::add_item_or_charges(const tripoint_bub_ms& pos, detached_ptr<item>&& o
         // Pass map into on_drop, because this map may not be the global map object (in mapgen, for
         // instance).
         if (obj->made_of(LIQUID) || !obj->has_flag(flag_DROP_ACTION_ONLY_IF_LIQUID)) {
-            if (obj->on_drop(pos, *this)) { return detached_ptr<item>(); }
+            if (obj->on_drop(pos, *this)) {
+                obj = detached_ptr<item>();
+                return detached_ptr<item>();
+            }
         }
         // If tile can contain items place here...
         place_item(pos);
@@ -5191,7 +5194,10 @@ auto map::add_item_or_charges(const tripoint_bub_ms& pos, detached_ptr<item>&& o
             // must be a path to the target tile
             if (route(pos, e, setting).empty()) { continue; }
             if (obj->made_of(LIQUID) || !obj->has_flag(flag_DROP_ACTION_ONLY_IF_LIQUID)) {
-                if (obj->on_drop(e, *this)) { return detached_ptr<item>(); }
+                if (obj->on_drop(e, *this)) {
+                    obj = detached_ptr<item>();
+                    return detached_ptr<item>();
+                }
             }
 
             if (!valid_tile(e) || !valid_limits(e) || has_flag("NOITEM", e)
