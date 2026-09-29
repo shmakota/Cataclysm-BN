@@ -89,12 +89,16 @@ TEST_CASE("adjacent_fire_ignites_fuel_fields", "[simulation][field][fire]") {
     clear_all_state();
     put_player_underground();
 
+    const auto cleanup = on_out_of_scope([]() {
+        MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    });
     auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
     REQUIRE(sm != nullptr);
 
     const auto fire_pt = point_sm_ms{5, 5};
     const auto fuel_pt = point_sm_ms{6, 5};
-    const auto fuel_field = field_type_id("fd_fuel");
+    const auto fuel_field = field_type_id(
+        GENERATE("fd_fuel", "fd_sticky_fuel", "test_fd_flammable"));
     plant_fire(*sm, fire_pt);
     plant_field(*sm, fuel_pt, fuel_field);
 
@@ -108,8 +112,6 @@ TEST_CASE("adjacent_fire_ignites_fuel_fields", "[simulation][field][fire]") {
     const auto* fuel_fire = sm->get_field(fuel_pt).find_field(fd_fire);
     REQUIRE(fuel_fire != nullptr);
     CHECK(fuel_fire->get_field_intensity() >= 2);
-
-    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
 
 TEST_CASE(
@@ -117,13 +119,17 @@ TEST_CASE(
     clear_all_state();
     put_player_underground();
 
+    const auto cleanup = on_out_of_scope([]() {
+        MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    });
     auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
     REQUIRE(sm != nullptr);
 
     const auto fire_pt = point_sm_ms{5, 5};
     const auto first_fuel_pt = point_sm_ms{6, 5};
     const auto second_fuel_pt = point_sm_ms{7, 5};
-    const auto fuel_field = field_type_id("fd_fuel");
+    const auto fuel_field = field_type_id(
+        GENERATE("fd_fuel", "fd_sticky_fuel", "test_fd_flammable"));
     plant_fire(*sm, fire_pt);
     plant_field(*sm, first_fuel_pt, fuel_field);
     plant_field(*sm, second_fuel_pt, fuel_field);
@@ -142,8 +148,6 @@ TEST_CASE(
     CHECK(sm->get_field(second_fuel_pt).find_field(fuel_field) == nullptr);
     REQUIRE(sm->get_field(first_fuel_pt).find_field(fd_fire) != nullptr);
     REQUIRE(sm->get_field(second_fuel_pt).find_field(fd_fire) != nullptr);
-
-    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
 
 TEST_CASE("water_puddles_extinguish_fire_on_the_same_tile", "[simulation][field][fire][liquid]") {
@@ -180,16 +184,20 @@ TEST_CASE("water_puddles_extinguish_fire_on_the_same_tile", "[simulation][field]
 }
 
 TEST_CASE(
-    "adjacent_electricity_energizes_salt_water_fields", "[simulation][field][electric][liquid]") {
+    "adjacent_electricity_energizes_conductive_fields", "[simulation][field][electric][liquid]") {
     clear_all_state();
     put_player_underground();
 
+    const auto cleanup = on_out_of_scope([]() {
+        MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    });
     auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
     REQUIRE(sm != nullptr);
 
     const auto electricity_pt = point_sm_ms{5, 5};
     const auto salt_water_pt = point_sm_ms{6, 5};
-    const auto salt_water_field = field_type_id("fd_salt_water");
+    const auto salt_water_field = field_type_id(
+        GENERATE("fd_salt_water", "test_fd_conductive_pool"));
     plant_field(*sm, electricity_pt, fd_electricity, 3);
     plant_field(*sm, salt_water_pt, salt_water_field, 2);
 
@@ -203,40 +211,57 @@ TEST_CASE(
     REQUIRE(energized != nullptr);
     CHECK(energized->get_field_intensity() >= 2);
     REQUIRE(sm->get_field(salt_water_pt).find_field(salt_water_field) != nullptr);
-
-    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
 }
 
 TEST_CASE(
-    "adjacent_electricity_propagates_through_salt_water_over_multiple_ticks",
-    "[simulation][field][electric][liquid]") {
+    "electricity_energizes_a_connected_puddle_once", "[simulation][field][electric][liquid]") {
     clear_all_state();
     put_player_underground();
-
-    auto* sm = make_blank_submap(MAPBUFFER, FAR_SM_POS);
-    REQUIRE(sm != nullptr);
-
-    const auto electricity_pt = point_sm_ms{5, 5};
-    const auto first_salt_water_pt = point_sm_ms{6, 5};
-    const auto second_salt_water_pt = point_sm_ms{7, 5};
-    const auto salt_water_field = field_type_id("fd_salt_water");
-    plant_field(*sm, electricity_pt, fd_electricity, 3);
-    plant_field(*sm, first_salt_water_pt, salt_water_field, 2);
-    plant_field(*sm, second_salt_water_pt, salt_water_field, 2);
-
-    auto& dummy = get_avatar();
-    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
-    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
-
-    REQUIRE(sm->get_field(first_salt_water_pt).find_field(fd_electricity) != nullptr);
-    CHECK(sm->get_field(second_salt_water_pt).find_field(fd_electricity) == nullptr);
-
-    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
-
-    // The first tile can lose its remaining charge to decay after passing it on.
-    REQUIRE(sm->get_field(second_salt_water_pt).find_field(fd_electricity) != nullptr);
-
-    MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    auto restore_rng = restore_on_out_of_scope<cata_default_random_engine>(rng_get_engine());
+    rng_set_engine_seed(12345);
+    const auto cleanup = on_out_of_scope([]() {
+        MAPBUFFER.unload_omt(project_to<coords::omt>(FAR_SM_POS), false);
+    });
+    auto* first = make_blank_submap(MAPBUFFER, FAR_SM_POS);
+    const auto next_pos = FAR_SM_POS + tripoint_rel_sm(1, 0, 0);
+    auto* second = make_blank_submap(MAPBUFFER, next_pos);
+    REQUIRE(first != nullptr);
+    REQUIRE(second != nullptr);
+    const auto pool = field_type_id(GENERATE("fd_salt_water", "test_fd_conductive_pool"));
+    const auto intensity = GENERATE(1, 3);
+    for (const auto x : std::views::iota(1, SEEX + 5)) {
+        auto& sm = x < SEEX ? *first : *second;
+        plant_field(sm, point_sm_ms(x % SEEX, 5), pool, 2);
+    }
+    const auto disconnected = point_sm_ms(5, 8);
+    plant_field(*first, disconnected, pool, 2);
+    plant_field(*first, point_sm_ms(0, 5), fd_electricity, intensity);
+    const auto& dim = get_avatar().get_dimension();
+    process_fields_in_submap(dim, *first, FAR_SM_POS, MAPBUFFER);
+    process_fields_in_submap(dim, *first, FAR_SM_POS, MAPBUFFER);
+    for (const auto x : std::views::iota(1, SEEX + 5)) {
+        const auto& sm = x < SEEX ? *first : *second;
+        const auto* spark = sm.get_field(point_sm_ms(x % SEEX, 5)).find_field(fd_electricity);
+        REQUIRE(spark != nullptr);
+        CHECK(spark->get_field_intensity() == intensity);
+    }
+    CHECK(first->get_field(disconnected).find_field(fd_electricity) == nullptr);
+    for (const auto tick : std::views::iota(0, 30)) {
+        CAPTURE(tick);
+        process_fields_in_submap(dim, *first, FAR_SM_POS, MAPBUFFER);
+        process_fields_in_submap(dim, *second, next_pos, MAPBUFFER);
+    }
+    for (const auto x : std::views::iota(1, SEEX + 5)) {
+        const auto& sm = x < SEEX ? *first : *second;
+        const auto& fields = sm.get_field(point_sm_ms(x % SEEX, 5));
+        CHECK(fields.find_field(fd_electricity) == nullptr);
+        REQUIRE(fields.find_field(pool) != nullptr);
+    }
+    // A later external discharge can energize the same pool again.
+    plant_field(*first, point_sm_ms(0, 5), fd_electricity, intensity);
+    process_fields_in_submap(dim, *first, FAR_SM_POS, MAPBUFFER);
+    process_fields_in_submap(dim, *first, FAR_SM_POS, MAPBUFFER);
+    CHECK(second->get_field(point_sm_ms(4, 5)).find_field(fd_electricity) != nullptr);
 }
 
 TEST_CASE(
@@ -273,7 +298,9 @@ TEST_CASE(
             CHECK(sm->get_field(tile).find_field(fd_electricity) == nullptr);
         }
     }
-    auto previous_charge = 3;
+    // The pulse energizes the whole pool once, then its total intensity only decreases.
+    process_fields_in_submap(dummy.get_dimension(), *sm, FAR_SM_POS, MAPBUFFER);
+    auto previous_charge = 3 * static_cast<int>(pool_tiles.size());
     auto spread = false;
     for (const auto tick : std::views::iota(0, 300)) {
         CAPTURE(tick);

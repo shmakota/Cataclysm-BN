@@ -12,6 +12,7 @@
     "stack_size": 200,
     "category": "chems",
     "phase": "liquid",
+    "spill_field": "fd_alcohol_strong",
     "container": "bottle_glass",
     "material": "alcohol",
     "symbol": "~",
@@ -186,7 +187,7 @@
     "symbol": "=",
     "color": "yellow",
     "material": "hydrocarbons",
-    "spill_field": "fd_fuel",
+    "spill_field": "fd_oil",
     "ammo_type": "lamp_oil",
     "fuel": {
       "//": "Roughly equivalent to LPG",
@@ -243,6 +244,7 @@
     "symbol": "=",
     "color": "light_red",
     "ammo_type": "flammable",
+    "spill_field": "fd_sticky_fuel",
     "damage": { "damage_type": "heat", "amount": 15, "armor_penetration": 30 },
     "range": 6,
     "effects": [ "FLAME", "STREAM_BIG", "INCENDIARY", "NEVER_MISFIRES" ]
@@ -256,6 +258,7 @@
     "price": "4 USD",
     "price_postapoc": "5 USD",
     "ammo_type": "flammable",
+    "spill_field": "fd_sticky_fuel",
     "damage": { "damage_type": "heat", "amount": 10, "armor_penetration": 10 },
     "range": 3
   },
@@ -268,6 +271,7 @@
     "price": "4 USD",
     "price_postapoc": "5 USD",
     "ammo_type": "flammable",
+    "spill_field": "fd_fuel",
     "range": 0
   },
   {

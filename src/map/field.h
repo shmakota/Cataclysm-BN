@@ -99,6 +99,9 @@ public:
     auto field_effects() const -> std::vector<field_effect>;
     auto is_moppable() const -> bool { return type.obj().moppable; }
 
+    /// Conducted electricity fades in place instead of starting another pulse.
+    bool electricity_conducted = false;
+
 private:
     // The field identifier.
     field_type_id type;

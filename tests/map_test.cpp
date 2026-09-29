@@ -14,6 +14,8 @@
 #include "game_constants.h"
 #include "iexamine.h"
 #include "item.h"
+#include "iuse_actor.h"
+#include "map/field.h"
 #include "map/field_type.h"
 #include "map/mapbuffer.h"
 #include "map/mapbuffer_registry.h"
@@ -25,6 +27,7 @@
 #include "options.h"
 #include "options_helpers.h"
 #include "player_helpers.h"
+#include "projectile.h"
 #include "state_helpers.h"
 #include "type_id.h"
 #include "units.h"
@@ -1353,4 +1356,44 @@ TEST_CASE("bash_through_roof_can_destroy_multiple_times") {
             }
         }
     }
+}
+
+TEST_CASE("flammable_fields_can_be_ignited", "[map][field][fire]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([]() { clear_all_state(); });
+    auto& here = get_map();
+    const auto pos = tripoint_bub_ms(60, 60, 0);
+    here.ter_set(pos, ter_str_id("t_rock_floor").id());
+    here.furn_set(pos, f_null);
+    const auto fuel = field_type_id(
+        GENERATE("fd_fuel", "fd_sticky_fuel", "fd_oil", "fd_alcohol_strong", "test_fd_flammable"));
+    const auto inert = field_type_id(GENERATE("test_fd_nonflammable", "fd_alcohol"));
+    REQUIRE(here.add_field(pos, inert));
+    CHECK_FALSE(here.is_flammable(pos));
+    const auto intensity = GENERATE(1, 2, 3);
+    REQUIRE(here.add_field(pos, fuel, intensity));
+    CHECK(here.is_flammable(pos));
+
+    SECTION("firestarter") { firestarter_actor::resolve_firestarter_use(get_avatar(), pos); }
+    SECTION("heat projectile") {
+        auto shot = projectile{};
+        shot.impact.add_damage(DT_HEAT, 1);
+        here.shoot(pos, pos, shot, false);
+    }
+    SECTION("mixed combustible fields") {
+        const auto other_fuel =
+            fuel == field_type_id("test_fd_flammable")
+                ? field_type_id("fd_fuel")
+                : field_type_id("test_fd_flammable");
+        REQUIRE(here.add_field(pos, other_fuel, intensity));
+        firestarter_actor::resolve_firestarter_use(get_avatar(), pos);
+        CHECK(here.get_field(pos, other_fuel) == nullptr);
+    }
+
+    CHECK(here.get_field(pos, fuel) == nullptr);
+    CHECK(here.get_field(pos, inert) != nullptr);
+    const auto* fire = here.get_field(pos, fd_fire);
+    REQUIRE(fire != nullptr);
+    CHECK(fire->get_field_intensity() == std::max(2, intensity));
+    CHECK(fire->get_field_age() == -10_minutes * intensity);
 }

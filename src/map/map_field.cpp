@@ -98,7 +98,6 @@ static const trait_id trait_THRESH_MARLOSS("THRESH_MARLOSS");
 static const trait_id trait_THRESH_MYCUS("THRESH_MYCUS");
 static const trait_id trait_WEB_WALKER("WEB_WALKER");
 
-static const auto fd_fuel_field = field_type_str_id("fd_fuel");
 static const auto fd_soapy_water_field = field_type_str_id("fd_soapy_water");
 static const auto fd_water_field = field_type_str_id("fd_water");
 
@@ -1145,15 +1144,16 @@ auto sub_remove_field(field_cache_dirty_context const& ctx, SubTile& dst, const 
 }
 
 auto ignite_fuel_field(
-    field_cache_dirty_context const& ctx, SubTile& dst, const time_duration& fire_age)
-    -> field_entry* {
-    auto* fuel = dst.valid() ? dst.get_field().find_field(fd_fuel_field.id()) : nullptr;
-    if (fuel == nullptr) { return nullptr; }
-    const auto fuel_intensity = fuel->get_field_intensity();
+    field_cache_dirty_context const& ctx, SubTile& dst,
+    const time_duration& fire_age) -> field_entry* {
+    if (!dst.valid()) { return nullptr; }
+    const auto fuel = flammable_fields(dst.get_field());
+    if (fuel.intensity <= 0) { return nullptr; }
+    const auto fuel_intensity = fuel.intensity;
     const auto fire_intensity = fuel_field_fire_intensity(fuel_intensity);
     const auto age = fire_age == 0_turns ? 0_turns : fuel_field_fire_age(fuel_intensity);
     auto* fire = sub_add_field(dst, fd_fire, fire_intensity, age);
-    sub_remove_field(ctx, dst, fd_fuel_field.id());
+    for (const auto type : fuel.types) { sub_remove_field(ctx, dst, type); }
     return fire;
 }
 
@@ -1167,21 +1167,44 @@ auto conductive_field_intensity(const field& fields) -> int {
     return max_intensity;
 }
 
-auto energize_conductive_field(SubTile& dst, field_entry& source) -> void {
-    if (!dst.valid() || source.get_field_intensity() <= 1
-        || dst.get_field().find_field(fd_electricity) != nullptr) {
-        return;
+auto energize_conductive_fields(SubTile origin, field_entry& source, mapbuffer& mb) -> void {
+    if (source.electricity_conducted) { return; }
+    const auto offsets = std::array{
+        point{-1, -1}, point{0, -1}, point{1, -1}, point{-1, 0},
+        point{1, 0},   point{-1, 1}, point{0, 1},  point{1, 1}};
+    auto pending = std::queue<SubTile>{};
+    auto visited = std::set<tripoint_abs_ms>{};
+    const auto enqueue = [&](SubTile tile) {
+        if (!tile.valid() || conductive_field_intensity(tile.get_field()) <= 0) { return; }
+        const auto pos =
+            project_to<coords::ms>(tile.abs_sm)
+            + tripoint_rel_ms(tile.local.x(), tile.local.y(), 0);
+        if (visited.insert(pos).second) { pending.push(tile); }
+    };
+    enqueue(origin);
+    for (const auto& offset : offsets) {
+        enqueue(neighbor_tile(origin.sm, origin.abs_sm, origin.local, offset, mb));
     }
-
-    const auto max_conductive_intensity = conductive_field_intensity(dst.get_field());
-    if (max_conductive_intensity <= 0) { return; }
-
-    // Conduction transfers a finite charge; the puddle must not supply new energy.
-    const auto electricity_intensity = std::
-        min(source.get_field_intensity() - 1,
-            conductive_field_electricity_intensity(max_conductive_intensity));
-    if (sub_add_field(dst, fd_electricity, electricity_intensity, 0_turns) != nullptr) {
-        source.set_field_intensity(source.get_field_intensity() - electricity_intensity);
+    if (pending.empty()) { return; }
+    source.electricity_conducted = true;
+    const auto intensity = source.get_field_intensity();
+    while (!pending.empty()) {
+        auto tile = pending.front();
+        pending.pop();
+        // Only a fresh discharge reaches this traversal; pulse fields cannot retrigger it.
+        auto* electricity = tile.get_field().find_field(fd_electricity);
+        if (electricity == nullptr) {
+            electricity = sub_add_field(tile, fd_electricity, intensity, 0_turns);
+        }
+        if (electricity != nullptr) {
+            electricity->set_field_intensity(
+                std::max(intensity, electricity->get_field_intensity()));
+            electricity->set_field_age(0_turns);
+            electricity->electricity_conducted = true;
+        }
+        for (const auto& offset : offsets) {
+            enqueue(neighbor_tile(tile.sm, tile.abs_sm, tile.local, offset, mb));
+        }
     }
 }
 
@@ -1637,12 +1660,9 @@ auto process_fields_in_submap(
 
             // ---- fd_electricity ------------------------------------------
             if (!is_newborn && cur_fd_type_id == fd_electricity) {
-                std::ranges::for_each(eight_dirs_sm, [&](const point& d) {
-                    auto dst = neighbor_tile(&sm, pos, local, d, mb);
-                    energize_conductive_field(dst, cur);
-                });
+                energize_conductive_fields({.sm = &sm, .local = local, .abs_sm = pos}, cur, mb);
 
-                if (!one_in(5)) {
+                if (!cur.electricity_conducted && !one_in(5)) {
                     auto self = SubTile{&sm, local, pos};
                     if (!sub_passable(self) && cur.get_field_intensity() > 1) {
                         auto tries = 0;

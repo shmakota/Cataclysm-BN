@@ -1666,7 +1666,11 @@
   {
     "id": "fd_alcohol",
     "type": "field_type",
-    "intensity_levels": [ { "name": "alcohol splatter", "sym": "~" }, { "name": "alcohol puddle" }, { "name": "pool of alcohol" } ],
+    "intensity_levels": [
+      { "name": "weak alcohol splatter", "sym": "~" },
+      { "name": "weak alcohol puddle" },
+      { "name": "pool of weak alcohol" }
+    ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
     "accelerated_decay": true,
@@ -1675,6 +1679,26 @@
     "phase": "liquid",
     "moppable": true,
     "tint": "brown",
+    "display_field": true,
+    "looks_like": "fd_water"
+  },
+  {
+    "id": "fd_alcohol_strong",
+    "flammable": true,
+    "type": "field_type",
+    "intensity_levels": [
+      { "name": "strong alcohol splatter", "sym": "~" },
+      { "name": "strong alcohol puddle" },
+      { "name": "pool of strong alcohol" }
+    ],
+    "description_affix": "covered_in_a",
+    "is_splattering": true,
+    "accelerated_decay": true,
+    "half_life": "90 minutes",
+    "underwater_age_speedup": "15 minutes",
+    "phase": "liquid",
+    "moppable": true,
+    "tint": "light_gray",
     "display_field": true,
     "looks_like": "fd_water"
   },
@@ -1717,11 +1741,12 @@
     "looks_like": "fd_water"
   },
   {
-    "id": "fd_motor_oil",
+    "id": "fd_oil",
+    "flammable": true,
     "type": "field_type",
     "intensity_levels": [
       {
-        "name": "motor oil splatter",
+        "name": "oil splatter",
         "sym": "~",
         "color": "dark_gray",
         "dangerous": true,
@@ -1735,14 +1760,14 @@
             "immune_in_vehicle": true,
             "chance_outside_vehicle": 8,
             "is_environmental": false,
-            "message": "You slip on the motor oil!",
-            "message_npc": "<npcname> slips on the motor oil!",
+            "message": "You slip on the oil!",
+            "message_npc": "<npcname> slips on the oil!",
             "message_type": "bad"
           }
         ]
       },
-      { "name": "motor oil puddle" },
-      { "name": "pool of motor oil", "color": "light_gray" }
+      { "name": "oil puddle" },
+      { "name": "pool of oil", "color": "light_gray" }
     ],
     "description_affix": "covered_in_a",
     "is_splattering": true,
@@ -1930,6 +1955,7 @@
   },
   {
     "id": "fd_fuel",
+    "flammable": true,
     "type": "field_type",
     "legacy_enum_id": 53,
     "intensity_levels": [
@@ -1950,11 +1976,28 @@
   },
   {
     "id": "fd_sticky_fuel",
+    "flammable": true,
     "type": "field_type",
     "legacy_enum_id": 53,
     "intensity_levels": [
       { "name": "sticky fuel splatter", "sym": "~", "color": "light_red" },
-      { "name": "sticky fuel smear" },
+      {
+        "name": "sticky fuel smear",
+        "effects": [
+          {
+            "effect_id": "sap",
+            "body_part": "torso",
+            "intensity": 3,
+            "min_duration": "5 seconds",
+            "max_duration": "5 seconds",
+            "immune_in_vehicle": true,
+            "is_environmental": false,
+            "message": "The sticky fuel sticks to you!",
+            "message_npc": "The sticky fuel sticks to <npcname>!",
+            "message_type": "bad"
+          }
+        ]
+      },
       { "name": "sticky fuel glob", "color": "yellow" }
     ],
     "description_affix": "covered_in_a",
@@ -1967,25 +2010,6 @@
     "tint": "yellow",
     "display_field": true,
     "looks_like": "fd_blood"
-  },
-  {
-    "id": "fd_oil",
-    "type": "field_type",
-    "intensity_levels": [
-      { "name": "oil splatter", "sym": "~", "color": "dark_gray" },
-      { "name": "oil smear" },
-      { "name": "oil slick", "color": "light_gray" }
-    ],
-    "description_affix": "covered_in_a",
-    "is_splattering": true,
-    "accelerated_decay": true,
-    "half_life": "2 hours",
-    "underwater_age_speedup": "10 minutes",
-    "phase": "liquid",
-    "moppable": true,
-    "tint": "brown",
-    "display_field": true,
-    "looks_like": "fd_fuel"
   },
   {
     "id": "fd_gas_remover",

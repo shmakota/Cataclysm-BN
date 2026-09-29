@@ -1,5 +1,18 @@
 [
   {
+    "id": "test_fd_flammable",
+    "type": "field_type",
+    "flammable": true,
+    "intensity_levels": [ { "name": "test fuel", "sym": "~", "color": "red" }, { "name": "test fuel pool" }, { "name": "test deep fuel pool" } ],
+    "half_life": "0 turns"
+  },
+  {
+    "id": "test_fd_nonflammable",
+    "copy-from": "test_fd_flammable",
+    "type": "field_type",
+    "flammable": false
+  },
+  {
     "id": "test_fd_conductive_pool",
     "type": "field_type",
     "conductive": true,

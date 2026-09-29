@@ -3238,12 +3238,11 @@ auto map::flammable_items_at(const tripoint_bub_ms& p, int threshold) -> bool {
 }
 
 auto map::is_flammable(const tripoint_bub_ms& p) -> bool {
-    static const auto fd_fuel = field_type_str_id("fd_fuel");
     if (flammable_items_at(p)) { return true; }
 
     if (ter(p).obj().is_flammable() || furn(p).obj().is_flammable()) { return true; }
 
-    if (get_field_intensity(p, fd_fuel.id()) > 0) { return true; }
+    if (flammable_fields(get_field(p)).intensity > 0) { return true; }
 
     if (get_field_intensity(p, fd_web) > 0) { return true; }
 
@@ -4506,10 +4505,10 @@ void map::shoot(
 
     // Check fields?
     if (inc) {
-        static const auto fd_fuel = field_type_str_id("fd_fuel");
-        const auto fuel_intensity = get_field_intensity(p, fd_fuel.id());
+        const auto fuel = flammable_fields(get_field(p));
+        const auto fuel_intensity = fuel.intensity;
         if (fuel_intensity > 0) {
-            remove_field(p, fd_fuel.id());
+            for (const auto type : fuel.types) { remove_field(p, type); }
             add_field(p, fd_fire, fuel_field_fire_intensity(fuel_intensity),
                       fuel_field_fire_age(fuel_intensity));
         }

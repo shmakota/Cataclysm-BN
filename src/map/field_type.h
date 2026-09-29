@@ -167,6 +167,7 @@ public:
     phase_id phase = PNULL;
     bool accelerated_decay = false;
     bool conductive = false;
+    bool flammable = false;
     bool display_items = true;
     bool display_field = false;
     bool moppable = false;

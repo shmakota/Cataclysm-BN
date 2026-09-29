@@ -259,6 +259,7 @@ void field_type::load(const JsonObject& jo, const std::string&) {
     optional(jo, was_loaded, "display_items", display_items, true);
     optional(jo, was_loaded, "display_field", display_field, false);
     optional(jo, was_loaded, "moppable", moppable, false);
+    optional(jo, was_loaded, "flammable", flammable, false);
     tint = c_unset;
     tint_rgb.reset();
     load_field_tint(jo, "tint", tint, tint_rgb);
