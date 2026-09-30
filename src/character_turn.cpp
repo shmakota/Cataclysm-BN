@@ -214,7 +214,7 @@ void Character::recalc_speed_bonus()
         mod_speed_mult( speed_modifier - 1 );
     }
     {
-        ZoneScopedN( "enchantment_speed" )
+        ZoneScopedN( "enchantment_speed" );
         double ench_bonus = enchantment_cache->calc_bonus( enchantment_value_id( "SPEED" ), get_speed() );
         mod_speed_bonus( ench_bonus );
     }
@@ -436,7 +436,7 @@ void Character::process_one_effect( effect &it, bool is_new )
 
     // Handle miss messages
     {
-        ZoneScopedN( "miss_messages" )
+        ZoneScopedN( "miss_messages" );
         auto msgs = it.get_miss_msgs();
         if( !msgs.empty() ) {
             for( const auto &i : msgs ) {

@@ -3187,7 +3187,7 @@ units::mass Character::weight_carried_reduced_by( const excluded_stacks &without
 
     // Wielded item
     {
-        ZoneScopedN( "weapon_weight" )
+        ZoneScopedN( "weapon_weight" );
         units::mass weaponweight = 0_gram;
         int subtract_count = 0;
         item &weapon = primary_weapon();
