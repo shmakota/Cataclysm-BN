@@ -1111,7 +1111,7 @@
       [ "string_6", 4 ],
       [ "sugar", 7 ],
       [ "sugar_beet", 2 ],
-      [ "superglue", 8 ],
+      { "item": "superglue", "prob": 8, "charges": 1 },
       [ "suppressor", 1 ],
       [ "survival_book", 3 ],
       [ "survnote", 3 ],
