@@ -1,5 +1,12 @@
 [
   {
+    "id": "WEAPON_TETHER",
+    "type": "json_flag",
+    "context": [ "GUNMOD" ],
+    "info": "When attached to a wielded weapon, this tether <good>prevents zombie technicians from pulling it away</good>.",
+    "inherit": false
+  },
+  {
     "id": "GRAB",
     "type": "json_flag",
     "context": [  ]

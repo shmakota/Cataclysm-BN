@@ -4659,7 +4659,7 @@ int item::get_free_mod_locations( const gunmod_location &location ) const
     int result = loc->second;
     for( const item *elem : contents.all_items_top() ) {
         const cata::value_ptr<islot_gunmod> &mod = elem->type->gunmod;
-        if( mod && mod->location == location ) {
+        if( mod && mod->location == location && !elem->has_flag( flag_id( "WEAPON_TETHER" ) ) ) {
             result--;
         }
     }
@@ -8930,6 +8930,19 @@ ret_val<bool> item::is_gunmod_compatible( const item &mod ) const
     }
     const islot_gunmod &g_mod = *mod.type->gunmod;
 
+    if( mod.has_flag( flag_id( "WEAPON_TETHER" ) ) ) {
+        namespace ranges = std::ranges;
+        if( is_null() || is_gunmod() || !( is_gun() || is_melee() ) || has_flag( flag_NO_UNWIELD ) ) {
+            return ret_val<bool>::make_failure( _( "isn't a compatible weapon" ) );
+        }
+        if( ranges::any_of( gunmods(), []( const auto *installed ) {
+            return installed->has_flag( flag_id( "WEAPON_TETHER" ) );
+        } ) ) {
+            return ret_val<bool>::make_failure( _( "already has a weapon tether" ) );
+        }
+        return ret_val<bool>::make_success();
+    }
+
     if( !is_gun() ) {
         return ret_val<bool>::make_failure( _( "isn't a weapon" ) );
 
@@ -9129,7 +9142,7 @@ void item::gun_cycle_mode()
 
 bool item::has_use() const
 {
-    return type->has_use();
+    return type->has_use() || !gunmods().empty();
 }
 
 const use_function *item::get_use( const std::string &use_name ) const
@@ -9152,6 +9165,10 @@ const use_function *item::get_use( const std::string &use_name ) const
 
 const use_function *item::get_use_internal( const std::string &use_name ) const
 {
+    if( use_name == "detach_gunmods" && !gunmods().empty() ) {
+        static const auto detach = use_function( std::make_unique<detach_gunmods_actor>() );
+        return &detach;
+    }
     if( type != nullptr ) {
         return type->get_use( use_name );
     }
