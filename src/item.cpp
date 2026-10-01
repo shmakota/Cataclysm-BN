@@ -4659,7 +4659,7 @@ int item::get_free_mod_locations( const gunmod_location &location ) const
     int result = loc->second;
     for( const item *elem : contents.all_items_top() ) {
         const cata::value_ptr<islot_gunmod> &mod = elem->type->gunmod;
-        if( mod && mod->location == location && !elem->has_flag( flag_id( "WEAPON_TETHER" ) ) ) {
+        if( mod && mod->location == location && !elem->has_flag( flag_id( "UNIVERSAL_WEAPON_TETHER" ) ) ) {
             result--;
         }
     }
@@ -8924,21 +8924,23 @@ const item *item::gunmod_find( const itype_id &mod ) const
 
 ret_val<bool> item::is_gunmod_compatible( const item &mod ) const
 {
+    namespace ranges = std::ranges;
     if( !mod.is_gunmod() ) {
         debugmsg( "Tried checking compatibility of non-gunmod" );
         return ret_val<bool>::make_failure();
     }
     const islot_gunmod &g_mod = *mod.type->gunmod;
 
-    if( mod.has_flag( flag_id( "WEAPON_TETHER" ) ) ) {
-        namespace ranges = std::ranges;
+    const auto already_has_tether = ranges::any_of( gunmods(), []( const auto *installed ) {
+        return installed->has_flag( flag_id( "WEAPON_TETHER" ) );
+    } );
+    if( mod.has_flag( flag_id( "WEAPON_TETHER" ) ) && already_has_tether ) {
+        return ret_val<bool>::make_failure( _( "already has a weapon tether" ) );
+    }
+
+    if( mod.has_flag( flag_id( "UNIVERSAL_WEAPON_TETHER" ) ) ) {
         if( is_null() || is_gunmod() || !( is_gun() || is_melee() ) || has_flag( flag_NO_UNWIELD ) ) {
             return ret_val<bool>::make_failure( _( "isn't a compatible weapon" ) );
-        }
-        if( ranges::any_of( gunmods(), []( const auto *installed ) {
-            return installed->has_flag( flag_id( "WEAPON_TETHER" ) );
-        } ) ) {
-            return ret_val<bool>::make_failure( _( "already has a weapon tether" ) );
         }
         return ret_val<bool>::make_success();
     }

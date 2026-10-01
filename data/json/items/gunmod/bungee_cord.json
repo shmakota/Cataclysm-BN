@@ -12,7 +12,7 @@
     "symbol": ":",
     "color": "yellow",
     "location": "sling",
-    "flags": [ "WEAPON_TETHER" ],
+    "flags": [ "WEAPON_TETHER", "UNIVERSAL_WEAPON_TETHER" ],
     "install_time": "1 s"
   }
 ]

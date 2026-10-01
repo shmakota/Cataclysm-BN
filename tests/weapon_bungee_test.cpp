@@ -95,3 +95,35 @@ TEST_CASE("unmodified_items_do_not_gain_mod_removal_actions", "[item][bungee]") 
     CHECK_FALSE(object->has_use());
     CHECK(object->get_use("detach_gunmods") == nullptr);
 }
+
+TEST_CASE("shoulder_strap_prevents_zombie_technicians_from_pulling_rifle", "[monster][gunmod]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope(clear_all_state);
+    auto& you = get_avatar();
+    const auto target_pos = tripoint_bub_ms{60, 60, 0};
+    you.setpos(target_pos);
+    you.remove_primary_weapon();
+    you.wield(item::spawn("m4a1"));
+    auto& rifle = you.primary_weapon();
+    const auto sling_slots = rifle.get_free_mod_locations(gunmod_location("sling"));
+    auto* strap = &you.i_add(item::spawn("shoulder_strap"));
+    REQUIRE(strap != nullptr);
+    REQUIRE(rifle.is_gunmod_compatible(*strap).success());
+
+    auto activity = player_activity(activity_id("ACT_GUNMOD_ADD"));
+    activity.targets.emplace_back(&rifle);
+    activity.targets.emplace_back(strap);
+    activity.values = {0, 100, 0, 0};
+    activity_handlers::gunmod_add_finish(&activity, &you);
+    REQUIRE(rifle.gunmod_find("shoulder_strap") == strap);
+    CHECK(rifle.get_free_mod_locations(gunmod_location("sling")) == sling_slots - 1);
+
+    const auto bungee = item::spawn("bungee_cord");
+    CHECK_FALSE(rifle.is_gunmod_compatible(*bungee).success());
+
+    auto& technician = spawn_test_monster("mon_zombie_technician", target_pos + tripoint_east);
+    technician.set_goal(target_pos);
+    REQUIRE(technician.attack_target() == &you);
+    CHECK(mattack::pull_metal_weapon(&technician));
+    CHECK(you.primary_weapon().typeId() == itype_id("m4a1"));
+}

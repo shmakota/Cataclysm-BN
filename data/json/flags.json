@@ -7,6 +7,13 @@
     "inherit": false
   },
   {
+    "id": "UNIVERSAL_WEAPON_TETHER",
+    "type": "json_flag",
+    "context": [ "GUNMOD" ],
+    "info": "Allows a weapon tether to attach to any gun or melee weapon without using a gunmod slot.",
+    "inherit": false
+  },
+  {
     "id": "GRAB",
     "type": "json_flag",
     "context": [  ]

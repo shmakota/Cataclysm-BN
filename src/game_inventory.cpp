@@ -952,7 +952,7 @@ class gunmod_inventory_preset : public inventory_selector_preset
 
         bool is_shown( const item *loc ) const override {
             return !loc->is_gunmod() && ( loc->is_gun() ||
-                                          ( gunmod.has_flag( flag_id( "WEAPON_TETHER" ) ) && loc->is_melee() ) );
+                                          ( gunmod.has_flag( flag_id( "UNIVERSAL_WEAPON_TETHER" ) ) && loc->is_melee() ) );
         }
 
         std::string get_denial( const item *loc ) const override {
@@ -998,7 +998,7 @@ class gunmod_inventory_preset : public inventory_selector_preset
 
 item *game_menus::inv::gun_to_modify( player &p, const item &gunmod )
 {
-    const auto tether = gunmod.has_flag( flag_id( "WEAPON_TETHER" ) );
+    const auto tether = gunmod.has_flag( flag_id( "UNIVERSAL_WEAPON_TETHER" ) );
     return inv_internal( p, gunmod_inventory_preset( p, gunmod ),
                          tether ? _( "Select weapon to modify" ) : _( "Select gun to modify" ), -1,
                          tether ? _( "You don't have any weapons to modify." ) :
