@@ -1,15 +1,18 @@
 #pragma once
 
-#include "iuse.h"
 #include "catalua_sol.h"
+#include "coordinates.h"
+#include "iuse.h"
 #include "ret_val.h"
 #include "type_id.h"
 
 #include <string>
 
+class spell;
 class Character;
 class Creature;
 class item;
+class monster;
 struct bionic;
 struct dealt_damage_instance;
 struct tripoint;
@@ -27,8 +30,9 @@ class lua_iuse_actor : public iuse_actor
                         sol::protected_function &&can_use_func );
         ~lua_iuse_actor() override;
         void load( const JsonObject &obj ) override;
-        int use( player &who, item &itm, bool tick, const tripoint &pos ) const override;
-        ret_val<bool> can_use( const Character &, const item &, bool, const tripoint & ) const override;
+        int use( player &who, item &itm, bool tick, const tripoint_bub_ms &pos ) const override;
+        ret_val<bool> can_use( const Character &, const item &, bool,
+                               const tripoint_bub_ms & ) const override;
         std::unique_ptr<iuse_actor> clone() const override;
 };
 
@@ -120,17 +124,20 @@ class lua_istate_actor : public lua_icallback_actor_base
         sol::protected_function on_tick_func;
         sol::protected_function on_pickup_func;
         sol::protected_function on_drop_func;
+        sol::protected_function on_puff_func;
 
     public:
         lua_istate_actor( const std::string &item_id,
                           sol::protected_function &&on_tick,
                           sol::protected_function &&on_pickup,
-                          sol::protected_function &&on_drop );
+                          sol::protected_function &&on_drop,
+                          sol::protected_function &&on_puff );
 
         bool has_on_tick() const;
-        int call_on_tick( Character &who, item &it, const tripoint &pos ) const;
+        auto call_on_tick( Character &who, item &it, const tripoint_bub_ms &pos ) const -> void;
         void call_on_pickup( Character &who, item &it ) const;
-        bool call_on_drop( Character &who, item &it, const tripoint &pos ) const;
+        void call_on_puff( Character &who, item &it ) const;
+        bool call_on_drop( Character &who, item &it, const tripoint_bub_ms &pos ) const;
 };
 
 /** Lua callbacks for melee combat events. */
@@ -176,7 +183,7 @@ class lua_iranged_actor : public lua_icallback_actor_base
 
         /** Called after firing. Returns false to force all shots to miss. */
         bool call_on_fire( Character &who, item &gun,
-                           const tripoint &target, int shots ) const;
+                           const tripoint_bub_ms &target, int shots ) const;
         void call_on_reload( Character &who, item &it ) const;
         /** Returns false to block firing entirely (before any ammo is consumed). */
         bool call_can_fire( const Character &who, const item &gun ) const;
@@ -228,4 +235,109 @@ class lua_mutation_callback_actor
         void call_on_deactivate( Character &who, const trait_id &tid ) const;
         void call_on_gain( Character &who, const trait_id &tid ) const;
         void call_on_loss( Character &who, const trait_id &tid ) const;
+};
+
+/** Lua callbacks for trap events. */
+class lua_itrap_actor : public lua_icallback_actor_base
+{
+    private:
+        sol::protected_function can_trigger_func;
+        sol::protected_function on_trigger_func;
+        sol::protected_function on_trigger_aftermath_func;
+
+
+
+    public:
+        lua_itrap_actor( const std::string &item_id,
+                         sol::protected_function &&can_trigger_func,
+                         sol::protected_function &&on_trigger_func,
+                         sol::protected_function &&on_trigger_aftermath_func
+                       );
+
+        /** Returns false to prevent triggering the trap. */
+        bool call_can_trigger( const Character &who, const trap &trap, const tripoint_bub_ms &loc ) const;
+        /** Called after triggering. */
+        void call_on_trigger( Character &who, trap &trap, const tripoint_bub_ms &loc ) const;
+        /** Called after trap aftermath. */
+        void call_on_trigger_aftermath( Character &who, trap &trap, const tripoint_bub_ms &loc ) const;
+
+};
+
+
+struct lua_menu_entry {
+    std::string menu_id;
+    std::string menu_label;
+
+    bool valid() const {
+        return !menu_id.empty() && !menu_label.empty();
+    }
+};
+
+class lua_monster_callback_actor
+{
+    private:
+        std::string mon_str_id;
+        sol::protected_function on_tame_func;
+        sol::protected_function get_examine_menu_entries_func;
+        sol::protected_function on_examine_menu_entry_func;
+
+    public:
+        lua_monster_callback_actor( const std::string &mon_str_id,
+                                    sol::protected_function &&on_tame_func,
+                                    sol::protected_function &&get_examine_menu_entries,
+                                    sol::protected_function &&on_examine_menu_entry_func
+                                  );
+
+        void call_on_tame( Character &who, monster &pet ) const;
+        std::vector<lua_menu_entry>  call_get_examine_menu_entries( Character &who,
+                monster &monster ) const;
+        void call_on_examine_menu_entry( Character &who, monster &monster, std::string entry ) const;
+
+        std::string get_mon_str_id() const;
+};
+
+
+/** Lua callbacks for spell related events. */
+class lua_ispell_actor
+{
+    private:
+        std::string spell_str_id;
+        sol::protected_function on_try_cast_func;
+        sol::protected_function on_cast_func;
+
+    public:
+        lua_ispell_actor( const std::string &spell_str_id,
+                          sol::protected_function &&on_try_cast,
+                          sol::protected_function &&on_cast
+                        );
+
+        /** Returns false to block casting. */
+        bool call_on_try_cast( Character &who, spell &sp ) const;
+        void call_on_cast( Character &who, spell &sp, tripoint_bub_ms &target_pos ) const;
+};
+
+
+/** Lua callbacks for recipe / crafting related events. */
+class lua_recipe_actor
+{
+    private:
+        std::string recipe_str_id;
+        sol::protected_function on_craft_func;
+
+    public:
+        lua_recipe_actor( const std::string &recipe_str_id,
+                          sol::protected_function &&on_craft
+                        );
+
+        struct RecipeCraftResult {
+            Character &crafter;
+            item &craft;
+            item &food_contained;
+            const recipe &recipe;
+            const int &batch_size;
+            const bool &hot_result;
+            const bool &dehydrated_result;
+        };
+        /** Returns false to block casting. */
+        void call_on_craft( const RecipeCraftResult &craft_result ) const;
 };

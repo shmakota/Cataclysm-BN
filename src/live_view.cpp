@@ -1,18 +1,18 @@
 #include "live_view.h"
 
-#include <algorithm> // min & max
-#include <memory>
-
 #include "color.h"
 #include "cursesdef.h"
 #include "cursesport.h"
 #include "game.h"
-#include "map.h"
+#include "map/map.h"
 #include "options.h"
 #include "output.h"
 #include "panels.h"
 #include "translations.h"
 #include "ui_manager.h"
+
+#include <algorithm> // min & max
+#include <memory>
 
 namespace
 {
@@ -35,7 +35,7 @@ void live_view::hide()
     ui = nullptr;
 }
 
-void live_view::show( const tripoint &p )
+void live_view::show( const tripoint_bub_ms &p )
 {
     mouse_position = p;
     if( !ui ) {

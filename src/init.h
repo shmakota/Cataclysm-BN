@@ -134,10 +134,12 @@ class DynamicDataLoader
          * that file, don't check extension).
          * @param src String identifier for mod this data comes from
          * @param ui Finalization status display.
+         * @param mod_interactions Ignore or load folders under `mod_interactions`
          * @throws std::exception on all kind of errors.
          */
         /*@{*/
-        void load_data_from_path( const std::string &path, const std::string &src, loading_ui &ui );
+        void load_data_from_path( const std::string &path, const std::string &src, loading_ui &ui,
+                                  const bool mod_interactions = true );
         /*@}*/
         /**
          * Deletes and unloads all the data previously loaded with
@@ -208,15 +210,22 @@ void load_world_modfiles( loading_ui &ui, const world *world, const std::string 
  */
 void load_soundpack_files( const std::string &soundpack_path );
 
+enum class check_mods_mode {
+    default_mods,
+    all_mods,
+};
+
 /**
  * Check mods for errors.
  *
  * Does so by individually loading & finalizing each mod with all its dependencies.
  * @param ui structure for load progress display
- * @param opts check specific mods (or all if empty)
+ * @param opts check specific mods (or mode-selected mods if empty)
+ * @param mode which mods to check when opts is empty
  * @return whether all mods were successfully loaded and had no errors
  */
-bool check_mods_for_errors( loading_ui &ui, const std::vector<mod_id> &opts );
+auto check_mods_for_errors( loading_ui &ui, const std::vector<mod_id> &opts,
+                            check_mods_mode mode ) -> bool;
 
 } // namespace init
 

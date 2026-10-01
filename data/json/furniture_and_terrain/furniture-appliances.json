@@ -39,6 +39,34 @@
   },
   {
     "type": "furniture",
+    "id": "f_nanofab_portable",
+    "name": "portable nanofabricator unit",
+    "description": "An ugly amalgamation, grafted together from a nanofabricator body, its control panel, and a huge plutonium fuel cell to power it.  Needless to say, it's significantly more fragile, but more compact and portable.  Somewhat.",
+    "symbol": "%",
+    "bgcolor": "white",
+    "looks_like": "f_control_station",
+    "move_cost_mod": -1,
+    "coverage": 55,
+    "required_str": -1,
+    "examine_action": "nanofab",
+    "flags": [ "PLACE_ITEM", "NANOFAB_BODY" ],
+    "deconstruct": { "items": [ { "item": "portable_nanofab", "count": 1 } ] },
+    "bash": {
+      "str_min": 18,
+      "str_max": 50,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "items": [
+        { "item": "scrap", "count": [ 20, 70 ] },
+        { "item": "e_scrap", "count": [ 20, 70 ] },
+        { "item": "plut_cell", "count": [ 10, 20 ] }
+      ],
+      "//": "Variable reduction since might hit more or less material.",
+      "ranged": { "reduction": [ 9, 18 ], "destroy_threshold": 50 }
+    }
+  },
+  {
+    "type": "furniture",
     "id": "f_air_filter",
     "name": "central air filter",
     "description": "Cleans out dust mites, smoke particles, and more!",
@@ -719,6 +747,47 @@
       "CATEGORYIDS": "[ \"CSC_FOOD_MEAT\", \"CSC_FOOD_VEGGI\", \"CSC_FOOD_PASTA\" ]",
       "CHARGE_PER_MIN": "10",
       "CHARGE_START": "10"
+    }
+  },
+  {
+    "type": "furniture",
+    "id": "f_multicooker_improved",
+    "name": "improved multi cooker",
+    "looks_like": "f_oven",
+    "symbol": "#",
+    "description": "Used for automatic cooking food with electricity.",
+    "color": "dark_gray",
+    "move_cost_mod": 2,
+    "coverage": 60,
+    "required_str": 10,
+    "crafting_pseudo_item": "fake_oven",
+    "flags": [ "PLACE_ITEM", "TRANSPARENT", "FIRE_CONTAINER", "CONTAINER", "BLOCKSDOOR", "MOUNTABLE", "EASY_DECONSTRUCT" ],
+    "examine_action": "multicooker",
+    "deconstruct": { "items": [ { "item": "multi_cooker_improved", "count": 1 } ] },
+    "max_volume": "40 L",
+    "bash": {
+      "str_min": 8,
+      "str_max": 30,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "items": [
+        { "item": "sheet_metal", "count": [ 1, 4 ] },
+        { "item": "sheet_metal_small", "count": [ 8, 12 ] },
+        { "item": "steel_chunk", "count": [ 0, 3 ] },
+        { "item": "scrap", "count": [ 0, 6 ] },
+        { "item": "element", "count": [ 1, 3 ] },
+        { "item": "cable", "charges": [ 1, 3 ] },
+        { "item": "pilot_light", "count": 1 }
+      ],
+      "//": "Variable reduction since might hit more or less material.",
+      "ranged": { "reduction": [ 4, 8 ], "destroy_threshold": 30, "block_unaimed_chance": "50%" }
+    },
+    "default_vars": {
+      "RECIPEIDS": "[ \"water_clean\" ]",
+      "CATEGORYIDS": "[ \"CSC_FOOD_MEAT\", \"CSC_FOOD_VEGGI\", \"CSC_FOOD_PASTA\" ]",
+      "CHARGE_PER_MIN": "5",
+      "CHARGE_START": "5",
+      "TIME_MULT": "0.75"
     }
   },
   {
@@ -1523,7 +1592,7 @@
     "color": "red",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_gridwelder",
     "examine_action": "use_furn_fake_item",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
@@ -1538,6 +1607,29 @@
   },
   {
     "type": "furniture",
+    "id": "f_gridsmallgunkit",
+    "looks_like": "small_repairkit",
+    "name": "grid firearm repair kit",
+    "symbol": "#",
+    "description": "A firearm repair kit connected to an electrical grid.",
+    "color": "red",
+    "move_cost_mod": -1,
+    "coverage": 10,
+    "required_str": 1,
+    "crafting_pseudo_item": "fake_gridsmallgunkit",
+    "examine_action": "use_furn_fake_item",
+    "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
+    "deconstruct": { "items": [ { "item": "small_repairkit", "count": 1 } ] },
+    "bash": {
+      "str_min": 4,
+      "str_max": 30,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "items": [ { "item": "small_repairkit", "count": 1 } ]
+    }
+  },
+  {
+    "type": "furniture",
     "id": "f_gridgunkit",
     "looks_like": "large_repairkit",
     "name": "grid gunsmith repair kit",
@@ -1546,7 +1638,7 @@
     "color": "red",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_gridgunkit",
     "examine_action": "use_furn_fake_item",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
@@ -1557,6 +1649,28 @@
       "sound": "metal screeching!",
       "sound_fail": "clang!",
       "items": [ { "item": "large_repairkit", "count": 1 } ]
+    }
+  },
+  {
+    "type": "furniture",
+    "id": "f_gridcon_mix",
+    "looks_like": "con_mix",
+    "name": "grid concrete mixer",
+    "symbol": "U",
+    "description": "A portable concrete mixer wired into a building's electrical grid.  Has a built-in heater for cold-weather use.",
+    "color": "dark_gray",
+    "move_cost_mod": -1,
+    "coverage": 10,
+    "required_str": -1,
+    "crafting_pseudo_item": "fake_gridcon_mix",
+    "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
+    "deconstruct": { "items": [ { "item": "con_mix", "count": 1 } ] },
+    "bash": {
+      "str_min": 8,
+      "str_max": 16,
+      "sound": "crunch!",
+      "sound_fail": "whump.",
+      "items": [ { "item": "con_mix", "count": 1 } ]
     }
   },
   {
@@ -1605,7 +1719,7 @@
     "color": "red",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_gridforge",
     "examine_action": "use_furn_fake_item",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
@@ -1675,7 +1789,7 @@
     "color": "light_red",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_gridkiln",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
     "deconstruct": {
@@ -1710,7 +1824,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_griddehydrator",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "dehydrator", "count": 1 } ] },
@@ -1732,7 +1846,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_gridfood_processor",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "food_processor", "count": 1 } ] },
@@ -1746,6 +1860,28 @@
   },
   {
     "type": "furniture",
+    "id": "f_gridcoffeemaker",
+    "looks_like": "coffeemaker",
+    "name": "grid coffeemaker",
+    "symbol": "=",
+    "description": "A coffeemaker connected to an electrical grid, providing hot water for coffee and other drinks.",
+    "color": "light_gray",
+    "move_cost_mod": -1,
+    "coverage": 10,
+    "required_str": 1,
+    "crafting_pseudo_item": "fake_gridcoffeemaker",
+    "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
+    "deconstruct": { "items": [ { "item": "coffeemaker", "count": 1 } ] },
+    "bash": {
+      "str_min": 8,
+      "str_max": 30,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "items": [ { "item": "coffeemaker", "count": 1 } ]
+    }
+  },
+  {
+    "type": "furniture",
     "id": "f_gridsoda_machine",
     "looks_like": "food_processor",
     "name": "soda machine",
@@ -1754,7 +1890,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_gridsoda_machine",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "soda_machine", "count": 1 } ] },
@@ -1776,7 +1912,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_gridvac_sealer",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "vac_sealer", "count": 1 } ] },
@@ -1790,6 +1926,28 @@
   },
   {
     "type": "furniture",
+    "id": "f_gridmakeshift_sealer",
+    "looks_like": "makeshift_sealer",
+    "name": "grid makeshift vacuum sealer",
+    "symbol": "U",
+    "description": "A portable homemade heat sealer unit, connected to a electrical grid.  It could be used for vacuum-packing food to preserve it.",
+    "color": "blue",
+    "move_cost_mod": -1,
+    "coverage": 10,
+    "required_str": 1,
+    "crafting_pseudo_item": "fake_gridmakeshift_sealer",
+    "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
+    "deconstruct": { "items": [ { "item": "makeshift_sealer", "count": 1 } ] },
+    "bash": {
+      "str_min": 8,
+      "str_max": 16,
+      "sound": "crunch!",
+      "sound_fail": "whump.",
+      "items": [ { "item": "makeshift_sealer", "count": 1 } ]
+    }
+  },
+  {
+    "type": "furniture",
     "id": "f_craftrig",
     "looks_like": "craftrig",
     "name": "grid FOODCO kitchen buddy",
@@ -1798,7 +1956,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 60,
-    "required_str": -1,
+    "required_str": 5,
     "crafting_pseudo_item": [ "fake_gridfood_processor", "fake_griddehydrator", "fake_gridvac_sealer", "fake_gridwater_purifier", "press" ],
     "flags": [ "BLOCKSDOOR", "MINEABLE", "EASY_DECONSTRUCT", "TRANSPARENT" ],
     "deconstruct": {
@@ -1834,7 +1992,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_gridelectrolysis_kit",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "electrolysis_kit", "count": 1 } ] },
@@ -1856,7 +2014,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": [ "fake_oven", "fake_chemistry_set" ],
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "chemistry_set", "count": 1 } ] },
@@ -1879,6 +2037,7 @@
     "color": "blue",
     "crafting_pseudo_item": [ "fake_oven", "fake_chemistry_set", "fake_gridelectrolysis_kit" ],
     "coverage": 60,
+    "required_str": 5,
     "deconstruct": {
       "items": [
         { "item": "solder_wire", "charges": 20 },
@@ -1905,6 +2064,28 @@
   },
   {
     "type": "furniture",
+    "id": "f_gridhotplate",
+    "looks_like": "hotplate",
+    "name": "grid hotplate",
+    "symbol": "=",
+    "description": "A small heating element on a stand, plugged into the electrical grid.",
+    "color": "green",
+    "move_cost_mod": -1,
+    "coverage": 10,
+    "required_str": 1,
+    "crafting_pseudo_item": "fake_oven",
+    "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
+    "deconstruct": { "items": [ { "item": "hotplate", "count": 1 } ] },
+    "bash": {
+      "str_min": 8,
+      "str_max": 30,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "items": [ { "item": "hotplate", "count": 1 } ]
+    }
+  },
+  {
+    "type": "furniture",
     "id": "f_gridsolderingiron",
     "looks_like": "soldering_iron",
     "name": "grid soldering iron",
@@ -1913,7 +2094,7 @@
     "color": "light_gray",
     "move_cost_mod": 1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": "fake_gridsolderingiron",
     "examine_action": "use_furn_fake_item",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
@@ -1936,7 +2117,7 @@
     "color": "light_cyan",
     "move_cost_mod": -1,
     "coverage": 90,
-    "required_str": -1,
+    "required_str": 10,
     "flags": [ "CONTAINER", "PLACE_ITEM", "BLOCKSDOOR", "MINEABLE", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "fridge", "count": 1 } ] },
     "max_volume": "200 L",
@@ -2224,7 +2405,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 30,
-    "required_str": -1,
+    "required_str": 5,
     "flags": [ "TRANSPARENT", "CONTAINER", "PLACE_ITEM", "BLOCKSDOOR", "MINEABLE", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "minifreezer", "count": 1 } ] },
     "max_volume": "75 L",
@@ -2307,7 +2488,7 @@
     "move_cost_mod": 3,
     "coverage": 60,
     "crafting_pseudo_item": "gridautoclave",
-    "required_str": -1,
+    "required_str": 10,
     "looks_like": "f_autoclave",
     "flags": [ "CONTAINER", "PLACE_ITEM", "BLOCKSDOOR", "FLAT_SURF", "EASY_DECONSTRUCT" ],
     "examine_action": "autoclave_empty",
@@ -2438,7 +2619,7 @@
     "name": "abstract space heater",
     "description": "Abstract furniture.  If you see this, something went wrong.",
     "move_cost_mod": 2,
-    "required_str": -1,
+    "required_str": 1,
     "flags": [ "TRANSPARENT", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "small_space_heater", "count": 1 } ] },
     "bash": {
@@ -2628,7 +2809,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": [ "fake_3d_printer" ],
     "examine_action": "use_furn_fake_item",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
@@ -2651,7 +2832,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 1,
     "crafting_pseudo_item": [ "fake_3d_printer_advanced" ],
     "examine_action": "use_furn_fake_item",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
@@ -2685,7 +2866,7 @@
     "color": "blue",
     "move_cost_mod": -1,
     "coverage": 30,
-    "required_str": -1,
+    "required_str": 10,
     "crafting_pseudo_item": [ "press_workbench", "fake_oven" ],
     "flags": [ "BLOCKSDOOR", "MINEABLE", "EASY_DECONSTRUCT", "TRANSPARENT" ],
     "deconstruct": {
@@ -2767,7 +2948,7 @@
     "copy-from": "f_olight_base",
     "name": "ceiling lamp (on)",
     "description": "A working lamp installed on the ceiling, this one is turned on.",
-    "extend": { "flags": [ "L_ON" ] },
+    "extend": { "flags": [ "L_ON", "LOCAL_LIGHT" ] },
     "examine_action": "transform",
     "transforms_into": "f_olight_off",
     "prompt": "Switch off the ceiling lamp.",
@@ -2852,7 +3033,7 @@
     "color": "red",
     "move_cost_mod": -1,
     "coverage": 10,
-    "required_str": -1,
+    "required_str": 10,
     "crafting_pseudo_item": "fake_adv_butchery",
     "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT", "FLAT_SURF", "PLACE_ITEM", "TRANSPARENT", "BUTCHER_EQ" ],
     "deconstruct": {
@@ -2951,9 +3132,10 @@
     "color": "light_cyan",
     "looks_like": "t_vat",
     "move_cost_mod": -1,
-    "required_str": 6,
+    "required_str": -1,
     "coverage": 75,
-    "flags": [ "TRANSPARENT", "SEALED", "PLACE_ITEM", "WALL", "EASY_DECONSTRUCT" ],
+    "max_volume": "1000 L",
+    "flags": [ "TRANSPARENT", "SEALED", "PLACE_ITEM", "EASY_DECONSTRUCT" ],
     "deconstruct": { "items": [ { "item": "cloning_vat", "count": 1 } ] },
     "examine_action": "cloning_vat_examine",
     "bash": {
@@ -2961,8 +3143,8 @@
       "str_max": 80,
       "sound": "ker-rash!",
       "sound_fail": "plunk.",
-      "sound_vol": 16,
-      "sound_fail_vol": 12,
+      "sound_vol": "100 dB",
+      "sound_fail_vol": "80 dB",
       "items": [ { "item": "glass_shard", "count": [ 3, 6 ] }, { "item": "scrap", "count": [ 0, 2 ] } ],
       "//": "reduction and destroy_threshold are lower for plain glass",
       "ranged": { "reduction": [ 1, 6 ], "reduction_laser": [ 0, 5 ], "destroy_threshold": 6, "block_unaimed_chance": "75%" }
@@ -2977,17 +3159,18 @@
     "color": "light_cyan",
     "looks_like": "t_vat",
     "move_cost_mod": -1,
-    "required_str": 6,
+    "required_str": -1,
     "coverage": 75,
-    "flags": [ "TRANSPARENT", "SEALED", "PLACE_ITEM", "WALL" ],
+    "max_volume": "1000 L",
+    "flags": [ "TRANSPARENT", "SEALED", "PLACE_ITEM" ],
     "examine_action": "cloning_vat_examine",
     "bash": {
       "str_min": 6,
       "str_max": 80,
       "sound": "ker-rash!",
       "sound_fail": "plunk.",
-      "sound_vol": 16,
-      "sound_fail_vol": 12,
+      "sound_vol": "100 dB",
+      "sound_fail_vol": "80 dB",
       "items": [ { "item": "glass_shard", "count": [ 3, 6 ] }, { "item": "scrap", "count": [ 0, 2 ] } ],
       "//": "reduction and destroy_threshold are lower for plain glass",
       "ranged": { "reduction": [ 1, 6 ], "reduction_laser": [ 0, 5 ], "destroy_threshold": 6, "block_unaimed_chance": "75%" }
@@ -3003,5 +3186,85 @@
         }
       }
     ]
+  },
+  {
+    "type": "furniture",
+    "id": "f_gridanalytical_set",
+    "looks_like": "analytical_set_basic",
+    "name": "grid basic analysis kit",
+    "symbol": "=",
+    "description": "A basic laboratory analysis kit connected to an electrical grid, drawing power instead of batteries.  Its spectrophotometer, pH meter, and other instruments work just as well as the portable version.",
+    "color": "blue",
+    "move_cost_mod": -1,
+    "coverage": 10,
+    "required_str": 1,
+    "crafting_pseudo_item": [ "fake_gridanalytical_set" ],
+    "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
+    "deconstruct": {
+      "items": [
+        { "item": "solder_wire", "charges": 20 },
+        { "item": "analytical_set_basic", "count": 1 },
+        { "item": "cable", "charges": 5 },
+        { "item": "power_supply", "count": 1 }
+      ]
+    },
+    "bash": {
+      "str_min": 12,
+      "str_max": 40,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "items": [
+        { "item": "solder_wire", "charges": [ 10, 20 ] },
+        { "item": "scrap", "count": [ 1, 4 ] },
+        { "item": "steel_chunk", "count": [ 0, 1 ] },
+        { "item": "sheet_metal_small", "count": [ 2, 5 ] },
+        { "item": "cable", "charges": [ 1, 3 ] }
+      ]
+    }
+  },
+  {
+    "type": "furniture",
+    "id": "f_gridmicrocentrifuge",
+    "looks_like": "f_centrifuge",
+    "name": "grid microcentrifuge",
+    "symbol": "=",
+    "description": "A microcentrifuge connected to an electrical grid, drawing power instead of batteries.  Bench-sized but still very fast.",
+    "color": "blue",
+    "move_cost_mod": -1,
+    "coverage": 10,
+    "required_str": 1,
+    "crafting_pseudo_item": [ "fake_gridmicrocentrifuge" ],
+    "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
+    "deconstruct": { "items": [ { "item": "microcentrifuge", "count": 1 } ] },
+    "bash": {
+      "str_min": 8,
+      "str_max": 30,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "items": [ { "item": "microcentrifuge", "count": 1 } ]
+    }
+  },
+  {
+    "type": "furniture",
+    "id": "f_griddna_editor",
+    "looks_like": "f_centrifuge",
+    "name": "grid genome workstation",
+    "symbol": "=",
+    "description": "A genome workstation connected to an electrical grid, drawing power instead of batteries.  Can scan genetic samples and produce DNA samples for cloning.",
+    "color": "blue",
+    "move_cost_mod": -1,
+    "coverage": 10,
+    "required_str": 1,
+    "crafting_pseudo_item": [ "fake_griddna_editor" ],
+    "examine_action": "use_furn_fake_item",
+    "flags": [ "TRANSPARENT", "MOUNTABLE", "EASY_DECONSTRUCT" ],
+    "deconstruct": { "items": [ { "item": "dna_editor", "count": 1 } ] },
+    "bash": {
+      "str_min": 8,
+      "str_max": 30,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "items": [ { "item": "dna_editor", "count": 1 } ]
+    }
   }
 ]

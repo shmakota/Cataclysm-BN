@@ -1,14 +1,14 @@
 #include "activity_speed_adapters.h"
 
-#include <utility>
-
 #include "construction.h"
-#include "mapdata.h"
+#include "map/mapdata.h"
 #include "recipe.h"
 #include "requirements.h"
 #include "units_mass.h"
 #include "units_volume.h"
-#include "veh_type.h"
+#include "vehicle/veh_type.h"
+
+#include <utility>
 
 workbench_info_wrapper::workbench_info_wrapper( furn_workbench_info f_info )
     : multiplier( f_info.multiplier ), allowed_mass( f_info.allowed_mass ),
@@ -46,7 +46,7 @@ void workbench_info_wrapper::adjust_multiplier( const metric &metrics )
 }
 
 activity_reqs_adapter::activity_reqs_adapter( const recipe &rec,
-        const metric &metrics ) : metrics( metrics )
+        const metric &metrics ) : metrics( metrics ), target( &rec )
 {
     for( auto &qual : rec.simple_requirements().get_qualities() ) {
         qualities.emplace_back( qual.front().type, qual.front().level );
@@ -59,6 +59,7 @@ activity_reqs_adapter::activity_reqs_adapter( const recipe &rec,
 }
 
 activity_reqs_adapter::activity_reqs_adapter( const construction &con )
+    : target( &con )
 {
     for( auto &qual : con.requirements->get_qualities() ) {
         qualities.emplace_back( qual.front().type, qual.front().level );

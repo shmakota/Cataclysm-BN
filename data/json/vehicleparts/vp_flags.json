@@ -176,10 +176,22 @@
     "requires_flag": "TURRET"
   },
   {
+    "id": "LASER_DESIGNATOR",
+    "type": "json_flag",
+    "context": [ "vehicle_part" ],
+    "requires_flag": "TURRET"
+  },
+  {
     "id": "WHEEL",
     "type": "json_flag",
     "context": [ "vehicle_part" ],
     "info": "If the center of balance of your vehicle is between all the wheels, the vehicle will be able to move, provided it has an active engine or motor with enough power to move the vehicle."
+  },
+  {
+    "id": "TRAP_PROOF",
+    "type": "json_flag",
+    "context": [ "vehicle_part" ],
+    "info": "This wheel <info>hovers</info> and will <good>not set off traps</good> such as deep pits or landmines."
   },
   {
     "id": "FLAT_SURF",
@@ -284,5 +296,11 @@
     "id": "SHOCK_RESISTANT",
     "context": [ "vehicle_part" ],
     "type": "json_flag"
+  },
+  {
+    "id": "POWER_DRAW_LINKED_PORTAL",
+    "context": [ "vehicle_part" ],
+    "type": "json_flag",
+    "info": "This part can siphon power from a linked dimensional portal into the vehicle's battery system.  Must be linked by examining a compatible portal while the vehicle is nearby."
   }
 ]

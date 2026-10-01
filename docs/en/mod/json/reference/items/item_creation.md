@@ -27,10 +27,11 @@
 "description": "Socks. Put 'em on your feet.", // Description of the item
 "ascii_picture": "ascii_socks", // Id of the asci_art used for this item
 "phase": "solid",                            // (Optional, default = "solid") What phase it is
+"spill_field": "fd_water",                   // (Optional) For liquids dropped onto ordinary ground, create this field before any drop_action runs.
 "weight": "350 g",                           // Weight, weight in grams, mg and kg can be used - "50 mg", "5 g" or "5 kg". For stackable items (ammo, comestibles) this is the weight per charge.
 "volume": "250 ml",                          // Volume, volume in ml and L can be used - "50 ml" or "2 L". For stackable items (ammo, comestibles) this is the volume of stack_size charges.
-"integral_volume": 0,                        // Volume added to base item when item is integrated into another (eg. a gunmod integrated to a gun). Volume in ml and L can be used - "50 ml" or "2 L".
-"integral_weight": 0,                        // Weight added to base item when item is integrated into another (eg. a gunmod integrated to a gun)
+"integral_volume": 0,                        // Volume added to base item when item is integrated into another (eg. a gunmod integrated to a gun). Volume in ml and L can be used - "50 ml" or "2 L". Can be negative to reduce parent volume. Clamped at 1% of parent base volume.
+"integral_weight": 0,                        // Weight added to base item when item is integrated into another (eg. a gunmod integrated to a gun). Can be negative to reduce parent weight. Clamped at 1% of parent base weight.
 "rigid": false,                              // For non-rigid items volume (and for worn items encumbrance) increases proportional to contents
 "insulation": 1,                             // (Optional, default = 1) If container or vehicle part, how much insulation should it provide to the contents
 "price": 100,                                // Used when bartering with NPCs. For stackable items (ammo, comestibles) this is the price for stack_size charges. Can use string "cent" "USD" or "kUSD".
@@ -66,6 +67,13 @@
   "damage": 10,                              // Damage the explosion deals to player at epicenter. Damage is halved above 50% radius.
   "radius": 8,                               // Radius of the explosion. 0 means only the epicenter is affected.
   "fire": true,                              // Should the explosion leave fire
+  "fragment_effect": [ {                     // Effects data of "shrapnel"
+      "effect": "onfire",                    // Effect to apply (note that onfire has special hardcoded behaviour to check the target is flamable)
+      "odds": 2,                             // One in x chance to apply this effect
+      "min_turns": 4,                        // Min turn duration for effect
+      "max_turns": 8                         // Max turn duration for effect
+    }
+  ],
   "fragment": {                              // Projectile data of "shrapnel". This projectile will hit every target in its range and field of view exactly once.
     "damage": {                              // Damage data of the shrapnel projectile.  Uses damage_instance syntax (see below)
       "damage_type": "acid",                 // Type of damage dealt.
@@ -77,6 +85,25 @@
 },
 "repair_difficulty": 2                       // Overrites recipe difficulty being used for repair difficulty
 ```
+
+`spill_field` is intended for liquids. If a liquid item with a `spill_field` is dropped onto
+ordinary ground, the game marks the liquid dirty when appropriate, creates the specified field,
+and then still runs any `drop_action` the item defines. The liquid item is consumed: its charges
+and item state are not stored in the field, and the puddle cannot be collected as liquid again.
+Tiles with the `LIQUIDCONT` flag do not convert liquids to spill fields.
+
+Spill visuals are volume-based rather than charge-count-based. The current implementation treats
+each liter of liquid as one unit of visible spill intensity, with a minimum of one unit for any
+non-zero spill. When additional liquid is poured into an existing connected spill of the same
+field type, the spill deepens existing tiles first by raising field intensity, then expands
+outward into adjacent passable tiles. The visible footprint is capped, so very large spills stop
+growing visually while still consuming the poured liquid.
+
+In practice, `spill_field` is usually many-to-one. Multiple related liquids can intentionally map
+to the same visible field to avoid JSON bloat and unnecessary field type proliferation. For
+example, `tea`, `coca_tea`, and `sweet_tea` can all spill as `fd_tea`, producing the same visible
+`puddle of tea` field. A separate field type is only needed when the puddle has different effects
+or appearance. See [Field Types](../map/field_type.md) for field properties.
 
 #### damage_instance
 
@@ -109,7 +136,11 @@
 "drop": "nail",             // (Optional) Defines an object that drops at the projectile location at a 100% chance.
 "drop_active": false        // (Optional) Whether the object starts active. Default is true.
 "drop_count": 1,            // (Optional) Number of items to drop. For tools, this sets their charges. 
-                            // If omitted, the drop amount defaults to the 'count' defined in its itype.
+                             // If omitted, the drop amount defaults to the 'count' defined in its itype.
+"shot": {                   // (Optional) Shot-pattern data for pellet-style ammo.
+  "count": 12,             // Number of projectile attacks spawned by one round.
+  "half_angle": 3          // Half-angle in degrees used for the pellet spread preview and pattern.
+},
 "effects" : ["COOKOFF", "SHOT"]
 ```
 
@@ -126,6 +157,7 @@
 "reliability" : 8,               // How reliable this this magazine on a range of 0 to 10? (see GAME_BALANCE.md)
 "reload_time" : 100,             // How long it takes to load each unit of ammo into the magazine
 "linkage" : "ammolink"           // If set one linkage (of given type) is dropped for each unit of ammo consumed (set for disintegrating ammo belts)
+"reloads_like": "light_minus_battery_cell" // If set, anything that takes that itype as a magazine will also take this itype
 ```
 
 ### Armor
@@ -147,8 +179,10 @@ Armor can be defined like this:
 "coverage" : 80,      // What percentage of body part
 "material_thickness" : 1,  // Thickness of material, in millimeter units (approximately).  Generally ranges between 1 - 5, more unusual armor types go up to 10 or more
 "power_armor" : false, // If this is a power armor item (those are special).
-"valid_mods" : ["steel_padded"] // List of valid clothing mods. Note that if the clothing mod doesn't have "restricted" listed, this isn't needed.
-"resistance": { "cut": 0, "bullet": 1000 } // If set, overrides usual resistance calculation. Values are for undamaged item, thickness affects scaling with damage - 1 thickness means no reduction from damage, 2 means it's halved on first damage, 10 means each level of damage decreases armor by 10%
+"valid_mods" : ["steel_padded"], // List of valid clothing mods. Note that if the clothing mod doesn't have "restricted" listed, this isn't needed.
+"resistance": { "cut": 0, "bullet": 1000 }, // If set, overrides usual resistance calculation. Values are for undamaged item, thickness affects scaling with damage - 1 thickness means no reduction from damage, 2 means it's halved on first damage, 10 means each level of damage decreases armor by 10%
+"hearing_protection": 0,    // How much does this armor dampen sound hear by the wearer, in dB spl. 0 - 191. This will make all sounds harder to hear for the wearer, including deafening sounds. At a hearing_ability multiplier of one, heard sounds of 120dB+ can deafen the player, with guaranteed temporary deafness at 140dB+. Use this instead of the "DEAF" or "PARTIAL_DEAF" flags. ~40 dB spl total protection will protect against most gunfire, 80 will protect against almost any sound. Cumulative with other items with this quality.
+"adv_hearing_protection": 0 // How much does this armor dampen deafening sounds heard by the wearer, in dB spl. 0 - 191. This will reduce the damaging volume of deafening sounds by its given amount without dampening other sounds.  Cumulative with other items with this quality.
 ```
 
 Alternately, every item (book, tool, gun, even food) can be used as armor if it has armor_data:
@@ -512,11 +546,15 @@ Guns can be defined like this:
 "ammo_to_fire" 1,          // Amount of ammo used per shot, separate from any UPS cost that may be given to the weapon.
 // The legacy item flags `FIRE_20`, `FIRE_50`, and `FIRE_100` are still permitted and will override `ammo_to_fire` if present.
 "reload": 450,             // Amount of time to reload, 100 = 1 second = 1 "turn". Default 100.
+"reload_noise_volume": 6   // [DEPRECIATED] How loud is reloading the gun, in tile distance. This is depreciated, use reload_noise_volume_dB instead. This value will be converted to an appropiate dB volume if provided.
+"reload_noise_volume_dB": 40, // How loud is reloading the gun, in dB spl @1 meter reference. Default 40dB. Normal conversation is ~60dB, deafening sounds are 120dB+
 "built_in_mods": ["m203"], // An array of mods that will be integrated in the weapon using the IRREMOVABLE tag.
 "default_mods": ["m203"]   // An array of mods that will be added to a weapon on spawn.
 "barrel_volume": "30 mL",  // Amount of volume lost when the barrel is sawn. Approximately 250 ml per IRL inch is a decent approximation.
 "barrel_length": "30 mL",  // Depreciated alias of barrel_volume, which should be used instead for clarity.
 "valid_mod_locations": [ [ "accessories", 4 ], [ "grip", 1 ] ],  // The valid locations for gunmods and the mount of slots for that location.
+"loudness_modifier": 4,    // Optional field increasing or decreasing base ammo loudness, measured in dB spl.
+"speed": 100               // Optional field increasing or decreasing base ammo speed in meters per second. Speed of sound is taken at 343 meters per second.
 ```
 
 Alternately, every item (book, tool, armor, even food) can be used as gun if it has gun_data:
@@ -586,7 +624,9 @@ Gun mods can be defined like this:
 "mode_modifier": [ [ "AUTO", "auto", 5 ] ],       // Optional. Array of [mode_id, mode_name, burst_size, [...flags]?] arrays. Adds firing modes to the weapon. Optional flags array can include "MELEE", "REACH_ATTACK", etc.
 "damage_modifier": -1,         // Optional field increasing or decreasing base gun damage
 "dispersion_modifier": 15,     // Optional field increasing or decreasing base gun dispersion
-"loudness_modifier": 4,        // Optional field increasing or decreasing base guns loudness
+"loudness_modifier": 4,        // Optional field increasing or decreasing base ammo loudness, measured in dB spl.
+"speed": 100,                  // Optional field increasing or decreasing base ammo speed in meters per second. Speed of sound is taken at 343 meters per second.
+"speed": 100,                  // Optional field increasing or decreasing base ammo speed in meters per second. Speed of sound is taken at 343 meters per second.
 "range_modifier": 2,           // Optional field increasing or decreasing base gun range
 "recoil_modifier": -100,       // Optional field increasing or decreasing base gun recoil
 "ups_charges_modifier": 200,   // Optional field increasing or decreasing base gun UPS consumption (per shot) by adding given value
@@ -595,6 +635,8 @@ Gun mods can be defined like this:
 "ammo_to_fire_multiplier": 2.5, // Optional field increasing or decreasing main ammo consumed per shot by multiplying by given value
 "reload_modifier": -10,        // Optional field increasing or decreasing base gun reload time in percent
 "min_str_required_mod": 14,    // Optional field increasing or decreasing minimum strength required to use gun
+"weight_multiplier": 0.75,     // Optional field increasing or decreasing the weight of the parent gun by multiplying. 1.0 means no change, 0.75 means 25% lighter.
+"volume_multiplier": 0.67,     // Optional field increasing or decreasing the volume of the parent gun by multiplying. 1.0 means no change, 0.67 means ~33% reduction. Replaces the deprecated COLLAPSIBLE_STOCK flag.
 ```
 
 Alternately, every item (book, tool, armor, even food) can be used as a gunmod if it has
@@ -841,6 +883,18 @@ machines.
 The contents of use_action fields can either be a string indicating a built-in function to call when
 the item is activated (defined in iuse.cpp), or one of several special definitions that invoke a
 more structured function.
+
+All object defined use actions support the following two types.
+
+```jsonc
+"use_action": {
+  "menu_text": "xyz", // What string is shown in the activate menu
+  // Unique key for the iuse, defaults to the `type`
+  // Note: This should only be used on repeated type definitions
+  // WARN: This does not work on `repair_item` iuse actors -> they have their own special `item_action_type`
+  "internal_name": "test"
+}
+```
 
 ```json
 "use_action": {
@@ -1099,7 +1153,7 @@ more structured function.
 },
 "use_action": {
     "type": "sew_advanced",  // Modify clothing
-    "materials": [           // materials to deal with.
+    "materials": [           // materials to deal with. Power armor can be targeted when its material matches.
         "cotton",
         "leather"
     ],
@@ -1115,7 +1169,7 @@ more structured function.
     "charges_to_start": 50, // Static cost per item crafted
     "charges_per_minute": 1, // Cost per minute of craft time
     "time_mult": 1, //Multiplier for craft time, 2 is twice as long, 0.5 is half as long, 0 is instant
-    "recipes": [ "water_clean" ], //Any specific item itype in this list can be crafted
+    "recipes": [ "water_clean" ], //Any recipie ident (crafted item + its suffix, e.g water_clean_using_water_purifier) in this list can be crafted
     "subcategories": [ "CSC_FOOD_MEAT", "CSC_FOOD_VEGGI", "CSC_FOOD_PASTA" ], //Any item in these subcategories can be crafted
     "temporary_tools": [ "hotplate", "tongs", "toolset", "pot" ] //Temporary items spawned when crafting to allow for innate qualities
 },
@@ -1124,8 +1178,16 @@ more structured function.
     "spell_id": "magus_escape", // The ID of the spell to be casted
     "no_fail": true,            // Whether you can fail the cast
     "level": 10,                // The level its cast at
-    "need_worn": true,           // if you need to wear it to cast the spell
+    "need_worn": true,          // if you need to wear it to cast the spell
     "need_wielding": true       // if you need to wield it to cast the spell
+},
+"use_action": {
+    "type": "paint_stuff",      // Paints terrain or vehicles using ammo
+    "charge_cost": 0            // Number of charges to use
+},
+"use_action": {
+    "type": "paint_stuff_cfg",  // Configures how it paints using paint stuff
+    "color_swap": true          // Allow the color to be swapped to any other named color
 }
 ```
 

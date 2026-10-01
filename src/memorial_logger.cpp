@@ -1,12 +1,5 @@
 #include "memorial_logger.h"
 
-#include <istream>
-#include <list>
-#include <map>
-#include <memory>
-#include <tuple>
-#include <utility>
-
 #include "addiction.h"
 #include "avatar.h"
 #include "bionics.h"
@@ -26,15 +19,15 @@
 #include "item_contents.h"
 #include "itype.h"
 #include "kill_tracker.h"
-#include "magic.h"
+#include "magic/magic.h"
 #include "martialarts.h"
 #include "messages.h"
 #include "monstergenerator.h"
 #include "mtype.h"
 #include "mutation.h"
-#include "omdata.h"
 #include "output.h"
-#include "overmapbuffer.h"
+#include "overmap/omdata.h"
+#include "overmap/overmapbuffer.h"
 #include "pldata.h"
 #include "profession.h"
 #include "skill.h"
@@ -43,6 +36,13 @@
 #include "translations.h"
 #include "type_id.h"
 #include "units.h"
+
+#include <istream>
+#include <list>
+#include <map>
+#include <memory>
+#include <tuple>
+#include <utility>
 
 static const efftype_id effect_datura( "datura" );
 static const efftype_id effect_drunk( "drunk" );
@@ -101,7 +101,8 @@ void memorial_logger::add( const std::string &male_msg,
         return;
     }
 
-    const oter_id &cur_ter = ACTIVE_OVERMAP_BUFFER.ter( g->u.global_omt_location() );
+    const oter_id &cur_ter = get_overmapbuffer( get_avatar().get_dimension() ).ter(
+                                 g->u.abs_omt_pos() );
     const std::string &location = cur_ter->get_name();
 
     std::string log_message = "| " + to_string( calendar::turn ) + " | " + location + " | " + msg;
@@ -170,7 +171,8 @@ void memorial_logger::write( std::ostream &file, const std::string &epitaph ) co
 
     // TODO: fix point types
     const std::string locdesc =
-        ACTIVE_OVERMAP_BUFFER.get_description_at( tripoint_abs_sm( u.global_sm_location() ) );
+        get_overmapbuffer( get_avatar().get_dimension() ).get_description_at( tripoint_abs_sm(
+                    u.abs_sm_pos() ) );
     //~ First parameter is a pronoun ("He"/"She"), second parameter is a description
     //~ that designates the location relative to its surroundings.
     const std::string kill_place = string_format( _( "%1$s was killed in a %2$s." ),

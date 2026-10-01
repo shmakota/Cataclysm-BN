@@ -1,3 +1,27 @@
+#include "advanced_inv_area.h"
+
+#include "advanced_inv_listitem.h"
+#include "avatar.h"
+#include "enums.h"
+#include "game.h"
+#include "game_constants.h"
+#include "int_id.h"
+#include "inventory.h"
+#include "item.h"
+#include "item_contents.h"
+#include "map/field.h"
+#include "map/field_type.h"
+#include "map/map.h"
+#include "map/mapdata.h"
+#include "translations.h"
+#include "trap.h"
+#include "type_id.h"
+#include "uistate.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -8,29 +32,6 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
-
-#include "advanced_inv_area.h"
-#include "advanced_inv_listitem.h"
-#include "avatar.h"
-#include "enums.h"
-#include "field.h"
-#include "field_type.h"
-#include "game.h"
-#include "game_constants.h"
-#include "int_id.h"
-#include "inventory.h"
-#include "item.h"
-#include "item_contents.h"
-#include "map.h"
-#include "mapdata.h"
-#include "translations.h"
-#include "trap.h"
-#include "type_id.h"
-#include "uistate.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vpart_position.h"
 
 int advanced_inv_area::get_item_count() const
 {
@@ -47,7 +48,7 @@ int advanced_inv_area::get_item_count() const
     }
 }
 
-advanced_inv_area::advanced_inv_area( aim_location id, point h, tripoint off,
+advanced_inv_area::advanced_inv_area( aim_location id, point h, tripoint_rel_ms off,
                                       const std::string &name, const std::string &shortname,
                                       std::string minimapname, std::string actionname,
                                       aim_location relative_location ) :
@@ -62,7 +63,7 @@ advanced_inv_area::advanced_inv_area( aim_location id, point h, tripoint off,
 
 void advanced_inv_area::init()
 {
-    pos = g->u.pos() + off;
+    pos = g->u.bub_pos() + off;
     veh = nullptr;
     vstor = -1;
     // must update in main function
@@ -84,7 +85,7 @@ void advanced_inv_area::init()
             // offset for dragged vehicles is not statically initialized, so get it
             off = g->u.grab_point;
             // Reset position because offset changed
-            pos = g->u.pos() + off;
+            pos = g->u.bub_pos() + off;
             if( const std::optional<vpart_reference> vp = here.veh_at( pos ).part_with_feature( "CARGO",
                     false ) ) {
                 veh = &vp->vehicle();
@@ -119,7 +120,7 @@ void advanced_inv_area::init()
             break;
         case AIM_ABOVE:
         case AIM_BELOW:
-            if( !g->m.has_zlevels() || !g->m.valid_move( g->u.pos(), pos ) ) {
+            if( !g->m.valid_move( g->u.bub_pos(), pos ) ) {
                 canputitemsloc = false;
                 break;
             }
@@ -376,31 +377,31 @@ bool advanced_inv_area::is_container_valid( const item *it ) const
     return false;
 }
 
-static tripoint aim_vector( aim_location id )
+static tripoint_rel_ms aim_vector( aim_location id )
 {
     switch( id ) {
         case AIM_SOUTHWEST:
-            return tripoint_south_west;
+            return tripoint_rel_ms::south_west();
         case AIM_SOUTH:
-            return tripoint_south;
+            return tripoint_rel_ms::south();
         case AIM_SOUTHEAST:
-            return tripoint_south_east;
+            return tripoint_rel_ms::south_east();
         case AIM_WEST:
-            return tripoint_west;
+            return tripoint_rel_ms::west();
         case AIM_EAST:
-            return tripoint_east;
+            return tripoint_rel_ms::east();
         case AIM_NORTHWEST:
-            return tripoint_north_west;
+            return tripoint_rel_ms::north_west();
         case AIM_NORTH:
-            return tripoint_north;
+            return tripoint_rel_ms::north();
         case AIM_NORTHEAST:
-            return tripoint_north_east;
+            return tripoint_rel_ms::north_east();
         case AIM_ABOVE:
-            return tripoint_above;
+            return tripoint_rel_ms::above();
         case AIM_BELOW:
-            return tripoint_below;
+            return tripoint_rel_ms::below();
         default:
-            return tripoint_zero;
+            return tripoint_rel_ms::zero();
     }
 }
 void advanced_inv_area::set_container_position()
@@ -412,7 +413,7 @@ void advanced_inv_area::set_container_position()
         off = aim_vector( static_cast<aim_location>( uistate.adv_inv_container_location ) );
     }
     // update the absolute position
-    pos = g->u.pos() + off;
+    pos = g->u.bub_pos() + off;
     // update vehicle information
     if( const std::optional<vpart_reference> vp = get_map().veh_at( pos ).part_with_feature( "CARGO",
             false ) ) {

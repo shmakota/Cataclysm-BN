@@ -23,7 +23,10 @@
     "entries": [
       {
         "distribution": [
-          { "distribution": [ { "item": "sunglasses", "prob": 80 }, { "item": "fancy_sunglasses", "prob": 20 } ], "prob": 25 },
+          {
+            "distribution": [ { "item": "sunglasses", "prob": 60 }, { "item": "aviators", "prob": 20 }, { "item": "fancy_sunglasses", "prob": 20 } ],
+            "prob": 25
+          },
           {
             "collection": [
               {
@@ -72,7 +75,8 @@
       { "item": "boots_winter", "prob": 50 },
       { "item": "boots_hiking", "prob": 50 },
       { "item": "boots_steel", "prob": 25 },
-      { "item": "fishing_waders", "prob": 25 }
+      { "item": "fishing_waders", "prob": 25 },
+      { "item": "nature_ghillie", "prob": 15 }
     ]
   },
   {
@@ -110,6 +114,26 @@
     ]
   },
   {
+    "id": "clothing_military_bioop",
+    "type": "item_group",
+    "subtype": "collection",
+    "//": "Used by bio-operators, replaces the standard blouse and pants with tactical version.",
+    "items": [
+      { "group": "clothing_soldier_shirt" },
+      { "item": "jacket_tacticool" },
+      { "item": "pants_tacticool" },
+      { "item": "webbing_belt" },
+      { "distribution": [ { "item": "socks", "prob": 95 }, { "item": "socks_wool", "prob": 5 } ] },
+      { "item": "boots_combat" },
+      {
+        "distribution": [
+          { "collection": [ { "item": "sports_bra" }, { "item": "boy_shorts" } ] },
+          { "distribution": [ { "item": "briefs" }, { "item": "boxer_briefs" }, { "item": "boxer_shorts" } ] }
+        ]
+      }
+    ]
+  },
+  {
     "id": "clothing_military_distribution",
     "type": "item_group",
     "subtype": "distribution",
@@ -120,6 +144,7 @@
       { "item": "hood_rain", "prob": 5 },
       { "item": "beret", "prob": 3 },
       { "item": "beret_wool", "prob": 2 },
+      { "item": "hat_boonie", "prob": 5 },
       { "item": "jacket_army", "prob": 5 },
       { "item": "winter_jacket_army", "prob": 5 },
       { "item": "coat_rain", "prob": 3 },
@@ -179,6 +204,10 @@
         ],
         "prob": 90
       },
+      {
+        "distribution": [ { "item": "nature_ghillie", "prob": 50 }, { "item": "urban_ghillie", "prob": 50 } ],
+        "prob": 5
+      },
       { "item": "molle_pack", "prob": 85 },
       { "group": "clothing_tactical_leg", "prob": 15 },
       {
@@ -186,6 +215,7 @@
           { "group": "clothing_glasses", "prob": 60 },
           { "item": "glasses_bal", "prob": 30 },
           { "item": "goggles_nv", "prob": 5 },
+          { "item": "goggles_nv_enhanced", "prob": 1 },
           { "item": "goggles_ir", "prob": 5 }
         ],
         "prob": 20
@@ -211,6 +241,10 @@
         "prob": 80
       },
       {
+        "distribution": [ { "item": "nature_ghillie", "prob": 50 }, { "item": "urban_ghillie", "prob": 50 } ],
+        "prob": 5
+      },
+      {
         "distribution": [
           { "item": "modularvestceramic", "prob": 50 },
           { "item": "modularvest", "prob": 25 },
@@ -228,9 +262,128 @@
           { "group": "clothing_glasses", "prob": 60 },
           { "item": "glasses_bal", "prob": 30 },
           { "item": "goggles_nv", "prob": 5 },
+          { "item": "goggles_nv_enhanced", "prob": 1 },
           { "item": "goggles_ir", "prob": 5 }
         ],
         "prob": 20
+      },
+      { "group": "clothing_watch", "prob": 5 }
+    ]
+  },
+  {
+    "id": "clothing_soldier_set_elite",
+    "type": "item_group",
+    "subtype": "collection",
+    "//": "Standard (non-winter) set of clothes and combat gear worn by elite soldiers and paramilitary forces.",
+    "items": [
+      { "distribution": [ { "group": "clothing_military", "prob": 80 }, { "group": "clothing_military_bioop", "prob": 20 } ] },
+      { "item": "elbow_pads", "prob": 10 },
+      { "item": "knee_pads", "prob": 85 },
+      {
+        "distribution": [
+          { "item": "beret", "prob": 25 },
+          { "collection": [ { "item": "helmet_army" }, { "item": "mask_bal", "prob": 25 } ], "prob": 50 },
+          { "collection": [ { "item": "tac_helmet" }, { "item": "mask_bal", "prob": 25 } ], "prob": 15 },
+          { "item": "tac_fullhelmet", "prob": 10 }
+        ],
+        "prob": 80
+      },
+      { "item": "gloves_tactical", "prob": 60 },
+      {
+        "distribution": [
+          { "item": "modularvestceramic", "prob": 25 },
+          { "item": "modularvest", "prob": 10 },
+          { "item": "modularveststeel", "prob": 5 },
+          { "item": "modularvesthard", "prob": 5 },
+          { "item": "modularvestsuper", "prob": 5 },
+          { "item": "dragonskin", "prob": 15 },
+          { "item": "dragonskinempty", "prob": 5 },
+          { "item": "exosuit_military", "prob": 5 }
+        ],
+        "prob": 90
+      },
+      {
+        "distribution": [ { "item": "nature_ghillie", "prob": 50 }, { "item": "urban_ghillie", "prob": 50 } ],
+        "prob": 10
+      },
+      { "distribution": [ { "item": "molle_pack", "prob": 75 }, { "item": "rucksack", "prob": 25 } ], "prob": 85 },
+      { "group": "clothing_tactical_leg", "prob": 15 },
+      {
+        "distribution": [
+          { "group": "clothing_glasses", "prob": 50 },
+          { "item": "glasses_bal", "prob": 25 },
+          { "item": "mil_scouter", "prob": 10 },
+          { "item": "goggles_nv", "prob": 5 },
+          { "item": "goggles_nv_enhanced", "prob": 5 },
+          { "item": "goggles_ir", "prob": 5 }
+        ],
+        "prob": 30
+      },
+      { "group": "clothing_watch", "prob": 5 }
+    ]
+  },
+  {
+    "id": "clothing_soldier_winter_set_elite",
+    "type": "item_group",
+    "subtype": "collection",
+    "//": "Winter set of clothes and combat gear worn by elite soldiers and paramilitary forces.",
+    "items": [
+      {
+        "distribution": [ { "group": "clothing_military_winter", "prob": 80 }, { "group": "clothing_military_bioop", "prob": 20 } ]
+      },
+      { "item": "elbow_pads", "prob": 10 },
+      { "item": "knee_pads", "prob": 85 },
+      {
+        "distribution": [
+          { "item": "beret_wool", "prob": 25 },
+          {
+            "collection": [ { "item": "helmet_army" }, { "item": "helmet_liner" }, { "item": "mask_bal", "prob": 25 } ],
+            "prob": 50
+          },
+          {
+            "collection": [ { "item": "tac_helmet" }, { "item": "helmet_liner" }, { "item": "mask_bal", "prob": 25 } ],
+            "prob": 15
+          },
+          { "collection": [ { "item": "tac_fullhelmet" }, { "item": "helmet_liner" } ], "prob": 10 }
+        ],
+        "prob": 80
+      },
+      {
+        "collection": [
+          { "distribution": [ { "item": "gloves_liner", "prob": 75 }, { "item": "gloves_liner_wool", "prob": 25 } ], "prob": 60 },
+          { "item": "winter_gloves_army" }
+        ],
+        "prob": 80
+      },
+      {
+        "distribution": [ { "item": "nature_ghillie", "prob": 50 }, { "item": "urban_ghillie", "prob": 50 } ],
+        "prob": 10
+      },
+      {
+        "distribution": [
+          { "item": "modularvestceramic", "prob": 25 },
+          { "item": "modularvest", "prob": 10 },
+          { "item": "modularveststeel", "prob": 5 },
+          { "item": "modularvesthard", "prob": 5 },
+          { "item": "modularvestsuper", "prob": 5 },
+          { "item": "dragonskin", "prob": 15 },
+          { "item": "dragonskinempty", "prob": 5 },
+          { "item": "exosuit_military", "prob": 5 }
+        ],
+        "prob": 90
+      },
+      { "distribution": [ { "item": "molle_pack", "prob": 75 }, { "item": "rucksack", "prob": 25 } ], "prob": 85 },
+      { "group": "clothing_tactical_leg", "prob": 15 },
+      {
+        "distribution": [
+          { "group": "clothing_glasses", "prob": 50 },
+          { "item": "glasses_bal", "prob": 25 },
+          { "item": "mil_scouter", "prob": 10 },
+          { "item": "goggles_nv", "prob": 5 },
+          { "item": "goggles_nv_enhanced", "prob": 5 },
+          { "item": "goggles_ir", "prob": 5 }
+        ],
+        "prob": 30
       },
       { "group": "clothing_watch", "prob": 5 }
     ]
@@ -255,8 +408,9 @@
           { "distribution": [ { "item": "briefs" }, { "item": "boxer_briefs" }, { "item": "boxer_shorts" } ] }
         ]
       },
-      { "distribution": [ { "item": "fancy_sunglasses", "prob": 95 }, { "item": "glasses_bal", "prob": 5 } ] },
+      { "distribution": [ { "item": "aviators", "prob": 95 }, { "item": "glasses_bal", "prob": 5 } ] },
       { "group": "clothing_watch", "prob": 85 },
+      { "item": "army_powered_earmuffs", "prob": 25 },
       { "item": "goggles_ir", "prob": 10 }
     ]
   },
@@ -280,6 +434,7 @@
         ]
       },
       { "group": "clothing_watch", "prob": 85 },
+      { "item": "army_powered_earmuffs", "prob": 20 },
       { "item": "goggles_ir", "prob": 10, "charges": [ 0, 100 ] }
     ]
   },
@@ -344,6 +499,7 @@
               { "item": "longshirt", "prob": 80 },
               { "item": "polo_shirt", "prob": 50 },
               { "item": "tshirt", "prob": 80 },
+              { "item": "alohashirt", "prob": 10 },
               { "item": "linuxtshirt", "prob": 10 },
               { "item": "tshirt_tour", "prob": 10 }
             ]
@@ -459,6 +615,7 @@
       [ "gloves_rubber", 15 ],
       [ "gloves_medical", 10 ],
       [ "boots_rubber", 15 ],
+      [ "shoe_covers_noslip", 15 ],
       [ "fishing_waders", 5 ],
       [ "knee_pads", 5 ]
     ]
@@ -546,7 +703,10 @@
       { "group": "clothing_work_gloves", "prob": 75 },
       { "group": "clothing_work_hat", "prob": 60 },
       { "group": "clothing_work_mask", "prob": 40 },
-      { "item": "ear_plugs", "prob": 15 },
+      {
+        "distribution": [ { "item": "ear_plugs", "prob": 50 }, { "item": "attached_ear_plugs_off", "prob": 50 } ],
+        "prob": 15
+      },
       { "item": "tool_belt", "prob": 25 },
       {
         "distribution": [
@@ -637,7 +797,8 @@
       { "item": "aspirin", "prob": 30 },
       { "item": "water_clean", "prob": 30 },
       { "item": "sports_drink", "prob": 30 },
-      { "item": "1st_aid", "prob": 20 }
+      { "item": "1st_aid", "prob": 16 },
+      { "item": "1st_aid_deluxe", "prob": 4 }
     ]
   },
   {
@@ -1101,7 +1262,7 @@
     "type": "item_group",
     "id": "shirts_summer_unisex",
     "subtype": "distribution",
-    "entries": [ { "item": "tshirt", "prob": 5 }, { "item": "tank_top", "prob": 5 } ]
+    "entries": [ { "item": "tshirt", "prob": 5 }, { "item": "tank_top", "prob": 5 }, { "item": "alohashirt", "prob": 5 } ]
   },
   {
     "type": "item_group",
@@ -1237,6 +1398,7 @@
       [ "veil_wedding", 1 ],
       [ "dress_wedding", 1 ],
       [ "tshirt", 80 ],
+      [ "alohashirt", 10 ],
       [ "longshirt", 70 ],
       [ "polo_shirt", 65 ],
       [ "dress_shirt", 60 ],
@@ -1343,6 +1505,7 @@
       [ "thigh_high_boots", 20 ],
       [ "boots", 70 ],
       [ "flip_flops", 35 ],
+      [ "crocs", 35 ],
       [ "lowtops", 45 ],
       [ "dress_shoes", 50 ],
       [ "dance_shoes", 5 ],
@@ -1390,6 +1553,7 @@
     "id": "shirts",
     "items": [
       [ "tshirt", 80 ],
+      [ "alohashirt", 20 ],
       [ "longshirt", 80 ],
       [ "polo_shirt", 65 ],
       [ "dress_shirt", 60 ],
@@ -1606,6 +1770,7 @@
       [ "thigh_high_boots", 40 ],
       [ "boots", 100 ],
       [ "flip_flops", 50 ],
+      [ "crocs", 50 ],
       [ "lowtops", 100 ],
       [ "dress_shoes", 50 ],
       [ "dance_shoes", 20 ],
@@ -1720,6 +1885,7 @@
       { "item": "skirt", "prob": 75 },
       { "item": "skirt_leather", "prob": 5 },
       { "item": "tshirt", "prob": 70 },
+      { "item": "alohashirt", "prob": 15 },
       { "item": "longshirt", "prob": 80 },
       { "item": "polo_shirt", "prob": 65 },
       { "item": "dress_shirt", "prob": 60 },
@@ -1880,6 +2046,7 @@
       [ "goggles_swim", 90 ],
       [ "wetsuit_hood", 30 ],
       [ "fancy_sunglasses", 1 ],
+      [ "aviators", 1 ],
       [ "rebreather", 1 ],
       [ "fitover_sunglasses", 5 ],
       [ "sunglasses", 10 ]
@@ -1898,7 +2065,7 @@
   {
     "type": "item_group",
     "id": "swimmer_shoes",
-    "items": [ [ "flip_flops", 80 ], [ "swim_fins", 20 ] ]
+    "items": [ [ "flip_flops", 40 ], [ "crocs", 40 ], [ "swim_fins", 20 ] ]
   },
   {
     "type": "item_group",
@@ -1977,7 +2144,9 @@
       { "item": "adv_UPS_off", "prob": 20, "charges": [ 0, 2000 ] },
       { "group": "used_UPS", "prob": 5 },
       { "item": "goggles_nv", "prob": 20, "charges": [ 0, 150 ] },
+      { "item": "goggles_nv_enhanced", "prob": 5, "charges": [ 0, 150 ] },
       { "item": "goggles_ir", "prob": 20, "charges": [ 0, 150 ] },
+      { "item": "army_powered_earmuffs", "prob": 20 },
       [ "solarpack", 5 ],
       [ "optical_cloak", 3 ],
       [ "holo_cloak", 2 ]
@@ -1988,15 +2157,56 @@
     "id": "pwr_armor",
     "subtype": "distribution",
     "entries": [
-      { "collection": [ { "item": "power_armor_basic" }, { "item": "power_armor_helmet_basic", "prob": 75 } ], "prob": 40 },
+      {
+        "collection": [
+          { "item": "power_armor_exo_2" },
+          { "item": "power_armor_plating_2" },
+          { "item": "power_armor_helmet_basic", "prob": 75 }
+        ],
+        "prob": 40
+      },
       { "item": "power_armor_helmet_basic", "prob": 10 },
       {
-        "collection": [ { "item": "power_armor_light" }, { "item": "power_armor_helmet_light", "prob": 75 } ],
+        "collection": [
+          { "item": "power_armor_exo_2" },
+          { "item": "power_armor_plating_3" },
+          { "item": "power_armor_helmet_light", "prob": 75 }
+        ],
         "prob": 20
       },
       { "item": "power_armor_helmet_light", "prob": 5 },
       {
-        "collection": [ { "item": "power_armor_heavy" }, { "item": "power_armor_helmet_heavy", "prob": 75 } ],
+        "collection": [ { "item": "power_armor_exo_1" }, { "item": "power_armor_plating_1", "prob": 75 } ],
+        "prob": 20
+      },
+      { "item": "power_armor_helmet_heavy", "prob": 5 }
+    ]
+  },
+  {
+    "type": "item_group",
+    "id": "pwr_armor_basic",
+    "subtype": "distribution",
+    "entries": [
+      {
+        "collection": [
+          { "item": "power_armor_exo_1" },
+          { "item": "power_armor_plating_2" },
+          { "item": "power_armor_helmet_basic", "prob": 75 }
+        ],
+        "prob": 40
+      },
+      { "item": "power_armor_helmet_basic", "prob": 10 },
+      {
+        "collection": [
+          { "item": "power_armor_exo_1" },
+          { "item": "power_armor_plating_3" },
+          { "item": "power_armor_helmet_light", "prob": 75 }
+        ],
+        "prob": 20
+      },
+      { "item": "power_armor_helmet_light", "prob": 5 },
+      {
+        "collection": [ { "item": "power_armor_exo_1" }, { "item": "power_armor_plating_1", "prob": 75 } ],
         "prob": 20
       },
       { "item": "power_armor_helmet_heavy", "prob": 5 }
@@ -2039,6 +2249,7 @@
       [ "waterproof_gunmod", 8 ],
       [ "grapnel", 3 ],
       [ "glasses_bal", 30 ],
+      { "item": "army_powered_earmuffs", "prob": 20 },
       [ "sheath", 10 ],
       [ "bootsheath", 8 ],
       [ "holster", 15 ],
@@ -2172,7 +2383,9 @@
       [ "apron_leather", 2 ],
       [ "tool_belt", 5 ],
       [ "bootsheath", 8 ],
-      [ "sheath", 5 ]
+      [ "sheath", 5 ],
+      [ "chestrig", 5 ],
+      [ "belt_magazine", 5 ]
     ]
   },
   {
@@ -2358,6 +2571,7 @@
       [ "jacket_leather", 12 ],
       [ "jacket_leather_mod", 12 ],
       [ "cuirass_scrap", 12 ],
+      [ "armor_trench", 4 ],
       [ "armor_lamellar", 6 ],
       [ "chainmail_vest", 2 ],
       [ "cuirass_lightplate", 2 ],
@@ -2479,6 +2693,7 @@
       [ "chainmail_hood", 1 ],
       [ "helmet_kabuto", 1 ],
       [ "helmet_scrap", 12 ],
+      [ "helm_trench", 4 ],
       [ "survivor_goggles", 10 ],
       [ "carbon_helmet", 1 ]
     ]
@@ -2488,7 +2703,7 @@
     "id": "survivorzed_extra",
     "items": [
       [ "mask_lsurvivor", 10 ],
-      [ "mask_survivor", 8 ],
+      [ "mask_survivor", 10 ],
       [ "mask_halfsurvivor", 4 ],
       [ "mask_hsurvivor", 6 ],
       [ "mask_sasurvivor", 1 ],
@@ -2509,12 +2724,12 @@
       [ "mask_fsurvivor", 2 ],
       [ "glasses_bal", 18 ],
       [ "goggles_nv", 2 ],
+      [ "goggles_nv_enhanced", 1 ],
       [ "goggles_ir", 1 ],
       [ "tacvest", 22 ],
       [ "legrig", 22 ],
       [ "dump_pouch", 6 ],
       [ "mask_gas_xl", 4 ],
-      [ "mask_survivorxl", 2 ],
       [ "survivor_belt_notools", 2 ],
       [ "survivor_light", 24 ],
       [ "shield_wooden", 1 ],
@@ -2898,6 +3113,7 @@
       { "item": "sweatshirt", "prob": 50 },
       { "item": "tank_top", "prob": 30 },
       { "item": "tshirt", "prob": 80 },
+      { "item": "alohashirt", "prob": 15 },
       { "item": "tshirt_text", "prob": 50 },
       { "item": "tunic", "prob": 10 },
       { "item": "waistcoat", "prob": 10 },
@@ -3079,7 +3295,8 @@
           { "item": "quiver_large", "prob": 15 },
           { "item": "solarpack", "prob": 5 },
           { "item": "ammo_satchel", "prob": 10 },
-          { "item": "chestrig", "prob": 20 },
+          { "item": "chestrig", "prob": 10 },
+          { "item": "belt_magazine", "prob": 10 },
           { "item": "dive_bag", "prob": 50 },
           { "item": "petpack", "prob": 50 }
         ],
@@ -3306,6 +3523,7 @@
       { "item": "bastsandals", "prob": 20 },
       { "item": "straw_sandals", "prob": 20 },
       { "item": "flip_flops", "prob": 40 },
+      { "item": "crocs", "prob": 40 },
       { "item": "leathersandals", "prob": 35 }
     ]
   },

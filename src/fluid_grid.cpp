@@ -1,37 +1,37 @@
 #include "fluid_grid.h"
 
+#include "calendar.h"
+#include "coordinates.h"
+#include "cuboid_rectangle.h"
+#include "debug.h"
+#include "game_constants.h"
+#include "item.h"
+#include "map/map.h"
+#include "map/mapbuffer.h"
+#include "map/mapdata.h"
+#include "map/submap.h"
+#include "memory_fast.h"
+#include "messages.h"
+#include "output.h"
+#include "overmap/overmap.h"
+#include "overmap/overmapbuffer.h"
+#include "overmap/overmapbuffer_registry.h"
+#include "point.h"
+#include "profile.h"
+#include "rng.h"
+#include "translations.h"
+#include "weather/weather.h"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <queue>
 #include <ranges>
-
-#include "calendar.h"
-#include "coordinate_conversions.h"
-#include "coordinates.h"
-#include "cuboid_rectangle.h"
-#include "debug.h"
-#include "game_constants.h"
-#include "item.h"
-#include "mapbuffer.h"
-#include "mapdata.h"
-#include "memory_fast.h"
-#include "map.h"
-#include "messages.h"
-#include "overmap.h"
-#include "overmapbuffer.h"
-#include "overmapbuffer_registry.h"
-#include "output.h"
-#include "point.h"
-#include "profile.h"
-#include "rng.h"
-#include "submap.h"
-#include "translations.h"
-#include "weather.h"
 
 namespace
 {
@@ -212,8 +212,7 @@ auto batches_for_inputs( const std::vector<fluid_grid_transform_io> &inputs,
 
     auto max_batches = std::numeric_limits<double>::max();
     std::ranges::for_each( inputs, [&]( const fluid_grid_transform_io & io ) {
-        const auto amount_ml = units::to_milliliter<int>( io.amount );
-        if( amount_ml <= 0 ) {
+        if( io.amount <= 0_ml ) {
             max_batches = 0.0;
             return;
         }
@@ -239,7 +238,7 @@ auto batches_for_inputs( const std::vector<fluid_grid_transform_io> &inputs,
 
 auto is_outdoors_at( const tripoint_abs_ms &p ) -> bool
 {
-    return get_map().is_outside( get_map().getlocal( p.raw() ) );
+    return get_map().is_outside( abs_to_bub( p ) );
 }
 
 auto rain_charges_for( double collector_area_m2, const weather_sum &weather ) -> int
@@ -288,7 +287,7 @@ auto collect_transformers( const std::set<tripoint_abs_omt> &grid,
         }
         std::ranges::for_each( std::views::iota( 0, SEEX ), [&]( int x ) {
             std::ranges::for_each( std::views::iota( 0, SEEY ), [&]( int y ) {
-                const auto pos = point( x, y );
+                const auto pos = point_sm_ms( x, y );
                 const auto &furn = sm->get_furn( pos ).obj();
                 if( !furn.fluid_grid ) {
                     return;
@@ -300,7 +299,7 @@ auto collect_transformers( const std::set<tripoint_abs_omt> &grid,
                 if( !furn.fluid_grid->transformer ) {
                     return;
                 }
-                const auto abs_pos = project_combine( sm_coord, point_sm_ms( pos ) );
+                const auto abs_pos = project_combine( sm_coord, pos );
                 transformers.push_back( transformer_instance{
                     .pos = abs_pos,
                     .config = &*furn.fluid_grid->transformer,
@@ -323,7 +322,7 @@ auto tank_capacity_at( mapbuffer &mb, const tripoint_abs_ms &p ) -> std::optiona
         return std::nullopt;
     }
 
-    const auto &furn = target_submap->get_furn( target_pos.raw() ).obj();
+    const auto &furn = target_submap->get_furn( target_pos ).obj();
     return tank_capacity_for_furn( furn );
 }
 
@@ -337,7 +336,7 @@ auto has_transformer_at( mapbuffer &mb, const tripoint_abs_ms &p ) -> bool
         return false;
     }
 
-    const auto &furn = target_submap->get_furn( target_pos.raw() ).obj();
+    const auto &furn = target_submap->get_furn( target_pos ).obj();
     if( !furn.fluid_grid ) {
         return false;
     }
@@ -596,7 +595,7 @@ auto submap_has_transformer( const tripoint_abs_sm &sm_coord, mapbuffer &mb ) ->
             if( found ) {
                 return;
             }
-            const auto pos = point( x, y );
+            const auto pos = point_sm_ms( x, y );
             const auto &furn = sm->get_furn( pos ).obj();
             if( !furn.fluid_grid ) {
                 return;
@@ -665,9 +664,10 @@ auto build_grid_members( const overmap &om, const tripoint_om_omt &p ) -> grid_m
     return result;
 }
 
-auto grid_members_for( const tripoint_abs_omt &p ) -> const grid_member_set & // *NOPAD*
+auto grid_members_for( overmapbuffer &omb, const tripoint_abs_omt &p ) -> const grid_member_set
+& // *NOPAD*
 {
-    const auto omc = fluid_omb().get_om_global( p );
+    const auto omc = omb.get_om_global( p );
     auto &cache = grid_members_cache()[omc.om->pos()];
     const auto iter = cache.find( omc.local );
     if( iter != cache.end() ) {
@@ -681,6 +681,18 @@ auto grid_members_for( const tripoint_abs_omt &p ) -> const grid_member_set & //
     } );
 
     return *members_ptr;
+}
+
+auto grid_at_for_omb( overmapbuffer &omb, const tripoint_abs_omt &p ) -> std::set<tripoint_abs_omt>
+{
+    const auto omc = omb.get_om_global( p );
+    const auto &grid_members = grid_members_for( omb, p );
+    auto result = std::set<tripoint_abs_omt> {};
+    std::ranges::for_each( grid_members, [&]( const tripoint_om_omt & member ) {
+        result.emplace( project_combine( omc.om->pos(), member ) );
+    } );
+
+    return result;
 }
 
 auto submap_tank_cache_at( const tripoint_abs_sm &sm_coord,
@@ -700,7 +712,7 @@ auto submap_tank_cache_at( const tripoint_abs_sm &sm_coord,
     auto entry = submap_tank_cache_entry{};
     std::ranges::for_each( std::views::iota( 0, SEEX ), [&]( int x ) {
         std::ranges::for_each( std::views::iota( 0, SEEY ), [&]( int y ) {
-            const auto pos = point( x, y );
+            const auto pos = point_sm_ms( x, y );
             const auto &furn = sm->get_furn( pos ).obj();
             const auto tank_capacity = tank_capacity_for_furn( furn );
             if( tank_capacity ) {
@@ -795,13 +807,13 @@ auto split_storage_state( const fluid_grid::liquid_storage_state &state,
         return { .lhs = lhs_state, .rhs = rhs_state };
     }
 
-    const auto total_capacity_ml = units::to_milliliter<int>( total_capacity );
-    const auto lhs_capacity_ml = units::to_milliliter<int>( lhs_capacity );
+    const auto total_capacity_ml = units::to_milliliter( total_capacity );
+    const auto lhs_capacity_ml = units::to_milliliter( lhs_capacity );
     const auto ratio = static_cast<double>( lhs_capacity_ml ) / total_capacity_ml;
 
     std::ranges::for_each( state.stored_by_type, [&]( const auto & entry ) {
-        const auto liquid_ml = units::to_milliliter<int>( entry.second );
-        const auto lhs_liquid_ml = static_cast<int>( std::round( liquid_ml * ratio ) );
+        const auto liquid_ml = units::to_milliliter( entry.second );
+        const auto lhs_liquid_ml = static_cast<decltype( liquid_ml )>( std::round( liquid_ml * ratio ) );
 
         lhs_state.stored_by_type[entry.first] = units::from_milliliter( lhs_liquid_ml );
         rhs_state.stored_by_type[entry.first] =
@@ -1097,7 +1109,7 @@ class fluid_grid_tracker
         explicit fluid_grid_tracker( mapbuffer &buffer ) : mb( buffer ) {}
 
         auto load( const map &m ) -> void {
-            const auto p_min = point_abs_sm( m.get_abs_sub().xy() );
+            const auto p_min = m.get_abs_sub();
             const auto p_max = p_min + point( m.getmapsize(), m.getmapsize() );
             bounds = half_open_rectangle<point_abs_sm>( p_min, p_max );
             rebuild_transformer_grids();
@@ -1149,7 +1161,7 @@ class fluid_grid_tracker
                 return;
             }
 
-            const auto &furn = target_submap->get_furn( target_pos.raw() ).obj();
+            const auto &furn = target_submap->get_furn( target_pos ).obj();
             const auto tank_capacity = tank_capacity_for_furn( furn );
             if( !tank_capacity ) {
                 return;
@@ -1174,7 +1186,7 @@ class fluid_grid_tracker
             enforce_tank_type_limit( state, tank_count );
             grid.set_state( state );
 
-            auto &items = target_submap->get_items( target_pos.raw() );
+            auto &items = target_submap->get_items( target_pos );
             items.clear();
 
             std::ranges::for_each( overflow.stored_by_type, [&]( const auto & entry ) {
@@ -1238,14 +1250,7 @@ auto storage_for( const overmap &om ) -> const std::map<tripoint_om_omt, liquid_
 
 auto grid_at( const tripoint_abs_omt &p ) -> std::set<tripoint_abs_omt>
 {
-    const auto omc = fluid_omb().get_om_global( p );
-    const auto &grid_members = grid_members_for( p );
-    auto result = std::set<tripoint_abs_omt> {};
-    std::ranges::for_each( grid_members, [&]( const tripoint_om_omt & member ) {
-        result.emplace( project_combine( omc.om->pos(), member ) );
-    } );
-
-    return result;
+    return grid_at_for_omb( fluid_omb(), p );
 }
 
 auto grid_connectivity_at( const tripoint_abs_omt &p ) -> std::vector<tripoint_rel_omt>
@@ -1305,28 +1310,33 @@ auto add_liquid_charges( const tripoint_abs_omt &p, const itype_id &liquid_type,
     return get_fluid_grid_tracker().storage_at( p ).add_charges( liquid_type, charges );
 }
 
-auto seed_liquid_charges_for_mapgen( const tripoint_abs_omt &p, const itype_id &liquid_type,
-                                     int charges ) -> int
+auto seed_liquid_charges_for_mapgen( const seed_liquid_mapgen_opts &options )
+-> int
 {
-    if( charges <= 0 ) {
+    if( options.charges <= 0 ) {
         return 0;
     }
-    if( !is_supported_liquid( liquid_type ) ) {
+    if( !is_supported_liquid( options.liquid_type ) ) {
+        return 0;
+    }
+    if( options.overmap_buffer == nullptr || options.map_buffer == nullptr ) {
+        debugmsg( "seed_liquid_charges_for_mapgen called without mapgen context" );
         return 0;
     }
 
-    const auto grid = grid_at( p );
+    const auto grid = grid_at_for_omb( *options.overmap_buffer, options.p );
     if( grid.empty() ) {
         return 0;
     }
 
     const auto anchor_abs = anchor_for_grid( grid );
-    auto &cur_omb = fluid_omb();
+    auto &cur_omb = *options.overmap_buffer;
     auto omc = cur_omb.get_om_global( anchor_abs );
     auto &storage = fluid_grid::storage_for( *omc.om );
     auto &state = storage[omc.local];
-    auto &mbuf = MAPBUFFER_REGISTRY.get( get_map().get_bound_dimension() );
-    const auto is_transient_mapgen = mbuf.lookup_submap( project_to<coords::sm>( p ) ) == nullptr;
+    auto &mbuf = *options.map_buffer;
+    const auto is_transient_mapgen =
+        mbuf.lookup_submap( project_to<coords::sm>( options.p ) ) == nullptr;
     const auto tank_count = is_transient_mapgen ? 1 : tank_count_for_grid( grid, mbuf );
     if( !is_transient_mapgen ) {
         state.capacity = calculate_capacity_for_grid( grid, mbuf );
@@ -1337,25 +1347,25 @@ auto seed_liquid_charges_for_mapgen( const tripoint_abs_omt &p, const itype_id &
 
     const auto allow_mixed = tank_count > 1;
     normalize_water_storage( state, allow_mixed );
-    if( liquid_type == itype_water ) {
+    if( options.liquid_type == itype_water ) {
         taint_clean_water( state, allow_mixed );
     }
 
-    auto added = charges;
+    auto added = options.charges;
     if( !is_transient_mapgen ) {
         const auto available_volume = state.capacity - state.stored_total();
         if( available_volume <= 0_ml ) {
             return 0;
         }
-        const auto max_charges = charges_from_volume( liquid_type, available_volume );
-        added = std::min( charges, max_charges );
+        const auto max_charges = charges_from_volume( options.liquid_type, available_volume );
+        added = std::min( options.charges, max_charges );
     }
     if( added <= 0 ) {
         return 0;
     }
 
-    const auto added_volume = volume_from_charges( liquid_type, added );
-    if( liquid_type == itype_water_clean ) {
+    const auto added_volume = volume_from_charges( options.liquid_type, added );
+    if( options.liquid_type == itype_water_clean ) {
         const auto dirty_iter = state.stored_by_type.find( itype_water );
         if( dirty_iter != state.stored_by_type.end() ) {
             dirty_iter->second += added_volume;
@@ -1435,7 +1445,7 @@ auto process_transformers_at( const tripoint_abs_omt &p, time_point to ) -> void
             if( !is_outdoors_at( inst.pos ) ) {
                 return;
             }
-            const auto weather = sum_conditions( last_run, to, inst.pos.raw() );
+            const auto weather = sum_conditions( last_run, to, inst.pos );
             if( weather.rain_amount <= 0 ) {
                 return;
             }
@@ -1561,7 +1571,7 @@ auto process_transformers_at( const tripoint_abs_omt &p, time_point to ) -> void
         std::ranges::for_each( request.recipe->inputs, [&]( const fluid_grid_transform_io & io ) {
             const auto amount_ml = units::to_milliliter<double>( io.amount );
             const auto volume_ml = amount_ml * adjusted_batches;
-            const auto volume_ml_floor = static_cast<int>( std::floor( volume_ml ) );
+            const auto volume_ml_floor = static_cast<std::int64_t>( std::floor( volume_ml ) );
             if( volume_ml_floor <= 0 ) {
                 return;
             }
@@ -1581,7 +1591,7 @@ auto process_transformers_at( const tripoint_abs_omt &p, time_point to ) -> void
         std::ranges::for_each( request.recipe->outputs, [&]( const fluid_grid_transform_io & io ) {
             const auto amount_ml = units::to_milliliter<double>( io.amount );
             const auto volume_ml = amount_ml * adjusted_batches;
-            const auto volume_ml_floor = static_cast<int>( std::floor( volume_ml ) );
+            const auto volume_ml_floor = static_cast<std::int64_t>( std::floor( volume_ml ) );
             if( volume_ml_floor <= 0 ) {
                 return;
             }
@@ -1606,7 +1616,7 @@ auto update( time_point to ) -> void
     get_fluid_grid_tracker().update( to );
 }
 
-auto bind_dimension( const std::string &dim_id ) -> void
+auto bind_dimension( const dimension_id &dim_id ) -> void
 {
     g_fluid_omb = &get_overmapbuffer( dim_id );
 }
@@ -1683,7 +1693,7 @@ auto on_tank_removed( const tripoint_abs_ms &p ) -> void
         return;
     }
 
-    auto &items = target_submap->get_items( target_pos.raw() );
+    auto &items = target_submap->get_items( target_pos );
     std::ranges::for_each( overflow.stored_by_type, [&]( const auto & entry ) {
         if( entry.second <= 0_ml ) {
             return;

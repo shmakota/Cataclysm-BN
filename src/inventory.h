@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "coordinates.h"
 #include "item.h"
 #include "units.h"
 #include "visitable.h"
@@ -134,15 +135,16 @@ class inventory : public temp_visitable<inventory>
          * the player's worn items / weapon
          */
         void restack( player &p );
-        void form_from_zone( map &m, std::unordered_set<tripoint> &zone_pts, const Character *pl = nullptr,
+        void form_from_zone( map &m, std::unordered_set<tripoint_abs_ms> &zone_pts,
+                             const Character *pl = nullptr,
                              bool assign_invlet = true );
-        void form_from_map( const tripoint &origin, int range, const Character *pl = nullptr,
+        void form_from_map( const tripoint_bub_ms &origin, int range, const Character *pl = nullptr,
                             bool assign_invlet = true,
                             bool clear_path = true );
-        void form_from_map( map &m, const tripoint &origin, int range, const Character *pl = nullptr,
+        void form_from_map( map &m, const tripoint_bub_ms &origin, int range, const Character *pl = nullptr,
                             bool assign_invlet = true,
                             bool clear_path = true );
-        void form_from_map( map &m, std::vector<tripoint> pts, const Character *pl,
+        void form_from_map( map &m, std::vector<tripoint_bub_ms> pts, const Character *pl,
                             bool assign_invlet = true );
         /**
          * Remove a specific item from the inventory. The item is compared
@@ -187,7 +189,12 @@ class inventory : public temp_visitable<inventory>
 
         void rust_iron_items();
 
+    private:
+        units::mass cached_weight;
+        bool cached_weight_dirty = true;
+    public:
         units::mass weight() const;
+        units::mass weight_cached();
         units::mass weight_without( const excluded_stacks &without ) const;
         units::volume volume() const;
         units::volume volume_without( const excluded_stacks &without ) const;
@@ -349,6 +356,7 @@ class location_inventory : public location_visitable<location_inventory>
         void rust_iron_items();
 
         units::mass weight() const;
+        units::mass weight_cached();
         units::mass weight_without( const excluded_stacks &without ) const;
         units::volume volume() const;
         units::volume volume_without( const excluded_stacks &without ) const;

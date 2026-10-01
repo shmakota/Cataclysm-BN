@@ -41,7 +41,7 @@
 #include "wcwidth.h"
 
 #if defined(__ANDROID__)
-#include <SDL_keyboard.h>
+#include <SDL3/SDL.h>
 #endif
 
 // Display data
@@ -1290,9 +1290,36 @@ void draw_subtab( const catacurses::window &w, int iOffsetX, const std::string &
 }
 
 void draw_tabs( const catacurses::window &w, const std::vector<std::string> &tab_texts,
-                size_t current_tab )
+                size_t current_tab, int max_tab_width )
 {
+    const int tab_step = 3;
+    if( max_tab_width == -1 ) {
+        max_tab_width = getmaxx( w );
+    }
+    int total_used_width = 0;
+    int current = 0;
+    for( size_t i = 0; i < tab_texts.size(); ++i ) {
+        const std::string &tab_text = tab_texts[i];
+        total_used_width += utf8_width( tab_text ) + tab_step;
+        if( i == current_tab ) {
+            current = total_used_width;
+        }
+    }
+    int start = 0;
+    calcStartPos( start, current, max_tab_width, total_used_width );
     int width = getmaxx( w );
+    current = 0;
+    int start_i = 0;
+    if( start != 0 ) {
+        for( size_t i = 0; i < tab_texts.size(); ++i ) {
+            const std::string &tab_text = tab_texts[i];
+            current += utf8_width( tab_text ) + tab_step;
+            if( current >= start ) {
+                start_i = i + 1;
+                break;
+            }
+        }
+    }
     for( int i = 0; i < width; i++ ) {
         mvwputch( w, point( i, 2 ), BORDER_COLOR, LINE_OXOX ); // -
     }
@@ -1300,21 +1327,23 @@ void draw_tabs( const catacurses::window &w, const std::vector<std::string> &tab
     mvwputch( w, point( 0, 2 ), BORDER_COLOR, LINE_OXXO ); // |^
     mvwputch( w, point( width - 1, 2 ), BORDER_COLOR, LINE_OOXX ); // ^|
 
-    const int tab_step = 3;
     int x = 2;
-    for( size_t i = 0; i < tab_texts.size(); ++i ) {
+    for( size_t i = start_i; i < tab_texts.size(); ++i ) {
         const std::string &tab_text = tab_texts[i];
-        draw_tab( w, x, tab_text, i == current_tab );
-        x += utf8_width( tab_text ) + tab_step;
+        int newx = x + utf8_width( tab_text ) + tab_step;
+        if( newx <= max_tab_width ) {
+            draw_tab( w, x, tab_text, i == current_tab );
+        }
+        x = newx;
     }
 }
 
 void draw_tabs( const catacurses::window &w, const std::vector<std::string> &tab_texts,
-                const std::string &current_tab )
+                const std::string &current_tab, int width )
 {
     auto it = std::ranges::find( tab_texts, current_tab );
     assert( it != tab_texts.end() );
-    draw_tabs( w, tab_texts, it - tab_texts.begin() );
+    draw_tabs( w, tab_texts, it - tab_texts.begin(), width );
 }
 
 /**
@@ -1654,13 +1683,15 @@ std::pair<std::string, nc_color> get_hp_bar( const int cur_hp, const int max_hp,
         return std::make_pair( "-----", c_light_gray );
     }
     const auto bar_style = get_option<std::string>( "HEALTH_STYLE" );
-    if( bar_style == "bar_ascii" || is_mon ) {
-        return get_bar( cur_hp, max_hp, 5, !is_mon );
+    const bool extra_resolution = !is_mon;
+    if( bar_style == "bar_ascii" ) {
+        return get_bar( cur_hp, max_hp, 5, extra_resolution );
     } else if( bar_style == "bar_alt" ) {
-        return get_bar_custom( fancy_bar_hor, cur_hp, max_hp, 5, !is_mon );
-    } else {
-        return get_bar_custom( fancy_bar_ver, cur_hp, max_hp, 5, !is_mon );
+        return get_bar_custom( fancy_bar_hor, cur_hp, max_hp, 5, extra_resolution );
+    } else if( bar_style == "bar" ) {
+        return get_bar_custom( fancy_bar_ver, cur_hp, max_hp, 5, extra_resolution );
     }
+    return get_bar_custom( fancy_bar_ver, cur_hp, max_hp, 5, extra_resolution );
 }
 
 std::pair<std::string, nc_color> get_stamina_bar( int cur_stam, int max_stam )

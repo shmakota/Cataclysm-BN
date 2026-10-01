@@ -1,24 +1,12 @@
 #include "mondeath.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdlib>
-#include <map>
-#include <memory>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "avatar.h"
 #include "bodypart.h"
 #include "calendar.h"
+#include "coordinates.h"
 #include "creature.h"
 #include "enums.h"
 #include "explosion_queue.h"
-#include "field_type.h"
 #include "fungal_effects.h"
 #include "game.h"
 #include "harvest.h"
@@ -31,7 +19,8 @@
 #include "kill_tracker.h"
 #include "line.h"
 #include "make_static.h"
-#include "map.h"
+#include "map/field_type.h"
+#include "map/map.h"
 #include "map_iterator.h"
 #include "mattack_actors.h"
 #include "mattack_common.h"
@@ -52,6 +41,18 @@
 #include "units.h"
 #include "value_ptr.h"
 #include "weighted_list.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdlib>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 static const efftype_id effect_ai_controlled( "ai_controlled" );
 static const efftype_id effect_amigara( "amigara" );
@@ -92,6 +93,8 @@ static const trait_flag_str_id trait_flag_PRED2( "PRED2" );
 static const trait_flag_str_id trait_flag_PRED3( "PRED3" );
 static const trait_flag_str_id trait_flag_PRED4( "PRED4" );
 
+static const enchantment_value_id ench_val_OVERKILL( "OVERKILL" );
+
 void mdeath::normal( monster &z )
 {
     if( z.no_corpse_quiet ) {
@@ -99,7 +102,7 @@ void mdeath::normal( monster &z )
     }
 
     if( z.type->in_species( ZOMBIE ) ) {
-        sfx::play_variant_sound( "mon_death", "zombie_death", sfx::get_heard_volume( z.pos() ) );
+        sfx::play_variant_sound( "mon_death", "zombie_death", sfx::get_heard_volume( z.bub_pos(), 75 ) );
     }
 
     if( g->u.sees( z ) ) {
@@ -108,7 +111,12 @@ void mdeath::normal( monster &z )
     }
 
     const int max_hp = std::max( z.get_hp_max(), 1 );
-    const float overflow_damage = std::max( -z.get_hp(), 0 );
+    float overflow_damage = -z.get_hp();
+    player *ch = dynamic_cast<player *>( z.get_killer() );
+    if( ch ) {
+        overflow_damage += ch->bonus_from_enchantments( overflow_damage, ench_val_OVERKILL );
+    }
+    overflow_damage = std::max( overflow_damage, 0.0f );
     const float corpse_damage = 2.5 * overflow_damage / max_hp;
     const bool pulverized = corpse_damage > 5 && overflow_damage > z.get_hp_max();
 
@@ -140,18 +148,19 @@ static void scatter_chunks( const itype_id &chunk_name, int chunk_amt, monster &
     map &here = get_map();
     for( int i = 0; i < chunk_amt; i += pile_size ) {
         bool drop_chunks = true;
-        tripoint tarp( z.pos() + point( rng( -distance, distance ), rng( -distance, distance ) ) );
-        const auto traj = line_to( z.pos(), tarp );
-        tripoint prev_point = z.pos();
+        tripoint_bub_ms tarp( z.bub_pos() + point_rel_ms( rng( -distance, distance ), rng( -distance,
+                              distance ) ) );
+        const auto traj = line_to( z.bub_pos(), tarp );
+        auto prev_point = z.bub_pos();
         for( size_t j = 0; j < traj.size(); j++ ) {
             tarp = traj[j];
 
             bool obstructed = false;
             if( here.obstructed_by_vehicle_rotation( prev_point, tarp ) ) {
                 if( one_in( 2 ) ) {
-                    tarp.x = prev_point.x;
+                    tarp.x() = prev_point.x();
                 } else {
-                    tarp.y = prev_point.y;
+                    tarp.y() = prev_point.y();
                 }
                 obstructed = true;
             }
@@ -209,12 +218,12 @@ void mdeath::splatter( monster &z )
     const field_type_id type_gib = z.gibType();
 
     if( gibbable ) {
-        const auto area = here.points_in_radius( z.pos(), 1 );
+        const auto area = here.points_in_radius( z.bub_pos(), 1 );
         int number_of_gibs = std::min( std::floor( corpse_damage ) - 1, 1 + max_hp / 5.0f );
 
         if( pulverized && z.type->size >= creature_size::medium ) {
             number_of_gibs += rng( 1, 6 );
-            sfx::play_variant_sound( "mon_death", "zombie_gibbed", sfx::get_heard_volume( z.pos() ) );
+            sfx::play_variant_sound( "mon_death", "zombie_gibbed", sfx::get_heard_volume( z.bub_pos(), 90 ) );
         }
 
         for( int i = 0; i < number_of_gibs; ++i ) {
@@ -257,7 +266,7 @@ void mdeath::splatter( monster &z )
         if( z.has_effect( effect_no_ammo ) ) {
             corpse->set_var( "no_ammo", "no_ammo" );
         }
-        here.add_item_or_charges( z.pos(), std::move( corpse ) );
+        here.add_item_or_charges( z.bub_pos(), std::move( corpse ) );
     }
 }
 
@@ -271,14 +280,23 @@ void mdeath::acid( monster &z )
             add_msg( m_warning, _( "The %s's body leaks acid." ), z.name() );
         }
     }
-    g->m.add_field( z.pos(), fd_acid, 3 );
+    g->m.add_field( z.bub_pos(), fd_acid, 3 );
 }
 
 void mdeath::boomer( monster &z )
 {
     std::string explode = string_format( _( "a %s explode!" ), z.name() );
-    sounds::sound( z.pos(), 24, sounds::sound_t::combat, explode, false, "explosion", "small" );
-    for( const tripoint &dest : g->m.points_in_radius( z.pos(), 1 ) ) { // *NOPAD*
+    sound_event se;
+    se.origin = z.bub_pos();
+    se.volume = 80;
+    se.category = sounds::sound_t::combat;
+    se.description = explode;
+    se.from_monster = true;
+    se.id = "explosion";
+    se.variant = "small";
+    se.monfaction = z.faction.id();
+    sounds::sound( se );
+    for( const tripoint_bub_ms &dest : g->m.points_in_radius( z.bub_pos(), 1 ) ) { // *NOPAD*
         g->m.bash( dest, 10 );
         if( monster *const target = g->critter_at<monster>( dest ) ) {
             target->stumble();
@@ -286,19 +304,28 @@ void mdeath::boomer( monster &z )
         }
     }
 
-    if( rl_dist( z.pos(), g->u.pos() ) == 1 ) {
+    if( rl_dist( z.bub_pos(), g->u.bub_pos() ) == 1 ) {
         g->u.add_env_effect( effect_boomered, body_part_eyes, 2, 24_turns );
     }
 
-    g->m.propagate_field( z.pos(), fd_bile, 15, 1 );
+    g->m.propagate_field( z.bub_pos(), fd_bile, 15, 1 );
 }
 
 void mdeath::boomer_glow( monster &z )
 {
     std::string explode = string_format( _( "a %s explode!" ), z.name() );
-    sounds::sound( z.pos(), 24, sounds::sound_t::combat, explode, false, "explosion", "small" );
+    sound_event se;
+    se.origin = z.bub_pos();
+    se.volume = 80;
+    se.category = sounds::sound_t::combat;
+    se.description = explode;
+    se.from_monster = true;
+    se.id = "explosion";
+    se.variant = "small";
+    se.monfaction = z.faction.id();
+    sounds::sound( se );
 
-    for( const tripoint &dest : g->m.points_in_radius( z.pos(), 1 ) ) { // *NOPAD*
+    for( const tripoint_bub_ms &dest : g->m.points_in_radius( z.bub_pos(), 1 ) ) { // *NOPAD*
         g->m.bash( dest, 10 );
         if( monster *const target = g->critter_at<monster>( dest ) ) {
             target->stumble();
@@ -316,7 +343,7 @@ void mdeath::boomer_glow( monster &z )
         }
     }
 
-    g->m.propagate_field( z.pos(), fd_bile, 30, 2 );
+    g->m.propagate_field( z.bub_pos(), fd_bile, 30, 2 );
 }
 
 void mdeath::kill_vines( monster &z )
@@ -331,10 +358,10 @@ void mdeath::kill_vines( monster &z )
     } );
 
     for( Creature *const vine : vines ) {
-        int dist = rl_dist( vine->pos(), z.pos() );
+        int dist = rl_dist( vine->bub_pos(), z.bub_pos() );
         bool closer = false;
         for( auto &j : hubs ) {
-            if( rl_dist( vine->pos(), j->pos() ) < dist ) {
+            if( rl_dist( vine->bub_pos(), j->bub_pos() ) < dist ) {
                 break;
             }
         }
@@ -347,8 +374,8 @@ void mdeath::kill_vines( monster &z )
 void mdeath::vine_cut( monster &z )
 {
     std::vector<monster *> vines;
-    for( const tripoint &tmp : g->m.points_in_radius( z.pos(), 1 ) ) {
-        if( tmp == z.pos() ) {
+    for( const tripoint_bub_ms &tmp : g->m.points_in_radius( z.bub_pos(), 1 ) ) {
+        if( tmp == z.bub_pos() ) {
             continue; // Skip ourselves
         }
         if( monster *const neighbor = g->critter_at<monster>( tmp ) ) {
@@ -360,8 +387,8 @@ void mdeath::vine_cut( monster &z )
 
     for( auto &vine : vines ) {
         bool found_neighbor = false;
-        for( const tripoint &dest : g->m.points_in_radius( vine->pos(), 1 ) ) {
-            if( dest != z.pos() ) {
+        for( const tripoint_bub_ms &dest : g->m.points_in_radius( vine->bub_pos(), 1 ) ) {
+            if( dest != z.bub_pos() ) {
                 // Not the dying vine
                 if( monster *const v = g->critter_at<monster>( dest ) ) {
                     if( v->type->id == mon_creeper_hub || v->type->id == mon_creeper_vine ) {
@@ -388,11 +415,21 @@ void mdeath::triffid_heart( monster &z )
 void mdeath::fungus( monster &z )
 {
     //~ the sound of a fungus dying
-    sounds::sound( z.pos(), 10, sounds::sound_t::combat, _( "Pouf!" ), false, "misc", "puff" );
+    sound_event se;
+    se.origin = z.bub_pos();
+    se.volume = 60;
+    se.category = sounds::sound_t::combat;
+    se.description = _( "Pouf!" );
+    se.from_monster = true;
+    se.id = "misc";
+    se.variant = "puff";
+    se.monfaction = z.faction.id();
+    sounds::sound( se );
 
     fungal_effects fe( *g, g->m );
-    for( const tripoint &sporep : g->m.points_in_radius( z.pos(), 1 ) ) { // *NOPAD*
-        if( g->m.impassable( sporep ) && !get_map().obstructed_by_vehicle_rotation( z.pos(), sporep ) ) {
+    for( const tripoint_bub_ms &sporep : g->m.points_in_radius( z.bub_pos(), 1 ) ) { // *NOPAD*
+        if( g->m.impassable( sporep ) &&
+            !get_map().obstructed_by_vehicle_rotation( z.bub_pos(), sporep ) ) {
             continue;
         }
         // z is dead, don't credit it with the kill
@@ -419,7 +456,7 @@ void mdeath::worm( monster &z )
     }
 
     int worms = 2;
-    while( worms > 0 && g->place_critter_around( mon_halfworm, z.pos(), 1 ) ) {
+    while( worms > 0 && g->place_critter_around( mon_halfworm, z.bub_pos(), 1 ) ) {
         worms--;
     }
 }
@@ -449,7 +486,7 @@ void mdeath::guilt( monster &z )
         g->u.has_trait_flag( trait_flag_PRED4 ) || g->u.has_trait( trait_KILLER ) ) {
         return;
     }
-    if( rl_dist( z.pos(), g->u.pos() ) > MAX_GUILT_DISTANCE ) {
+    if( rl_dist( z.bub_pos(), g->u.bub_pos() ) > MAX_GUILT_DISTANCE ) {
         // Too far away, we can deal with it.
         return;
     }
@@ -503,7 +540,7 @@ void mdeath::guilt( monster &z )
 void mdeath::blobsplit( monster &z )
 {
     int speed = z.get_speed() - rng( 30, 50 );
-    g->m.spawn_item( z.pos(), "slime_scrap", 1, 0, calendar::turn );
+    g->m.spawn_item( z.bub_pos(), "slime_scrap", 1, 0, calendar::turn );
     if( z.get_speed() <= 0 ) {
         if( g->u.sees( z ) ) {
             // TODO: Add vermin-tagged tiny versions of the splattered blob  :)
@@ -521,7 +558,7 @@ void mdeath::blobsplit( monster &z )
 
     const mtype_id &child = speed < 50 ? mon_blob_small : mon_blob;
     for( int s = 0; s < 2; s++ ) {
-        if( monster *const blob = g->place_critter_around( child, z.pos(), 1 ) ) {
+        if( monster *const blob = g->place_critter_around( child, z.bub_pos(), 1 ) ) {
             blob->make_ally( z );
             blob->set_speed_base( speed );
             blob->set_hp( speed );
@@ -577,12 +614,12 @@ void mdeath::amigara( monster &z )
         add_msg( _( "Your obsession with the fault fades away…" ) );
     }
 
-    g->m.spawn_artifact( z.pos() );
+    g->m.spawn_artifact( z.bub_pos() );
 }
 
 void mdeath::thing( monster &z )
 {
-    g->place_critter_at( mon_thing, z.pos() );
+    g->place_critter_at( mon_thing, z.bub_pos() );
 }
 
 void mdeath::explode( monster &z )
@@ -609,13 +646,13 @@ void mdeath::explode( monster &z )
             size = 150;
             break;
     }
-    explosion_handler::explosion( z.pos(), &z, size );
+    explosion_handler::explosion( z.bub_pos(), &z, size );
     explosion_handler::get_explosion_queue().execute();
 }
 
 void mdeath::focused_beam( monster &z )
 {
-    map_stack items = g->m.i_at( z.pos() );
+    map_stack items = g->m.i_at( z.bub_pos() );
     for( map_stack::iterator it = items.begin(); it != items.end(); ) {
         if( ( *it )->typeId() == itype_processor ) {
             it = items.erase( it );
@@ -632,12 +669,11 @@ void mdeath::focused_beam( monster &z )
 
         item &settings = *z.get_items()[0];
 
-        point p2( z.posx() + settings.get_var( "SL_SPOT_X", 0 ), z.posy() + settings.get_var( "SL_SPOT_Y",
-                  0 ) );
-        tripoint p( p2, z.posz() );
+        const auto p = z.bub_pos() + point_rel_ms( settings.get_var( "SL_SPOT_X", 0 ),
+                       settings.get_var( "SL_SPOT_Y", 0 ) );
 
-        std::vector <tripoint> traj = line_to( z.pos(), p, 0, 0 );
-        tripoint last_point = z.pos();
+        std::vector <tripoint_bub_ms> traj = line_to( z.bub_pos(), p, 0, 0 );
+        auto last_point = z.bub_pos();
         for( auto &elem : traj ) {
             if( !g->m.is_transparent( elem ) || get_map().obscured_by_vehicle_rotation( last_point, elem ) ) {
                 break;
@@ -650,7 +686,7 @@ void mdeath::focused_beam( monster &z )
     z.clear_items();
 
     // Roughly 20 damage
-    explosion_handler::explosion( z.pos(), &z, 150 );
+    explosion_handler::explosion( z.bub_pos(), &z, 150 );
     explosion_handler::get_explosion_queue().execute();
 }
 
@@ -672,11 +708,16 @@ void mdeath::broken( monster &z )
     const float corpse_damage = 2.5 * overflow_damage / max_hp;
     broken_mon->set_damage( static_cast<int>( std::floor( corpse_damage * itype::damage_scale ) ) );
     item &broken_mon_ref = *broken_mon;
-    g->m.add_item_or_charges( z.pos(), std::move( broken_mon ) );
+    g->m.add_item_or_charges( z.bub_pos(), std::move( broken_mon ) );
     //TODO!: push up these temporaries
     if( z.type->has_flag( MF_DROPS_AMMO ) ) {
+        auto processed_ammo_ids = std::set<itype_id> {};
         for( const std::pair<const itype_id, int> &ammo_entry : z.type->starting_ammo ) {
-            if( z.ammo[ammo_entry.first] > 0 ) {
+            for( const auto &slot_ammo_id : z.ammo_slot_items( ammo_entry.first ) ) {
+                if( processed_ammo_ids.contains( slot_ammo_id ) || z.ammo[slot_ammo_id] <= 0 ) {
+                    continue;
+                }
+                processed_ammo_ids.insert( slot_ammo_id );
                 bool spawned = false;
                 for( const std::pair<const std::string, mtype_special_attack> &attack : z.type->special_attacks ) {
                     if( attack.second->id == "gun" ) {
@@ -684,7 +725,7 @@ void mdeath::broken( monster &z )
                                                             ( attack.second.get() )->gun_type );
                         bool same_ammo = false;
                         for( const ammotype &at : gun.ammo_types() ) {
-                            if( at == item::spawn_temporary( ammo_entry.first )->ammo_type() ) {
+                            if( at == item::spawn_temporary( slot_ammo_id )->ammo_type() ) {
                                 same_ammo = true;
                                 break;
                             }
@@ -692,23 +733,23 @@ void mdeath::broken( monster &z )
                         const bool uses_mags = !gun.magazine_compatible().empty();
                         if( same_ammo && uses_mags ) {
                             std::vector<detached_ptr<item>> mags;
-                            int ammo_count = z.ammo[ammo_entry.first];
+                            int ammo_count = z.ammo[slot_ammo_id];
                             while( ammo_count > 0 ) {
                                 detached_ptr<item> mag = item::spawn( gun.type->magazine_default.find( item::spawn_temporary(
-                                        ammo_entry.first )->ammo_type() )->second );
-                                mag->ammo_set( ammo_entry.first,
+                                        slot_ammo_id )->ammo_type() )->second );
+                                mag->ammo_set( slot_ammo_id,
                                                std::min( ammo_count, mag->type->magazine->capacity ) );
                                 ammo_count -= mag->type->magazine->capacity;
                                 mags.push_back( std::move( mag ) );
                             }
-                            g->m.spawn_items( z.pos(), std::move( mags ) );
+                            g->m.spawn_items( z.bub_pos(), std::move( mags ) );
                             spawned = true;
                             break;
                         }
                     }
                 }
                 if( !spawned ) {
-                    g->m.spawn_item( z.pos(), ammo_entry.first, z.ammo[ammo_entry.first], 1,
+                    g->m.spawn_item( z.bub_pos(), slot_ammo_id, z.ammo[slot_ammo_id], 1,
                                      calendar::turn );
                 }
             }
@@ -716,9 +757,9 @@ void mdeath::broken( monster &z )
     }
 
     // TODO: make mdeath::splatter work for robots
-    if( ( broken_mon_ref.damage() >= broken_mon_ref.max_damage() ) && g->u.sees( z.pos() ) ) {
+    if( ( broken_mon_ref.damage() >= broken_mon_ref.max_damage() ) && g->u.sees( z.bub_pos() ) ) {
         add_msg( m_good, _( "The %s is destroyed!" ), z.name() );
-    } else if( g->u.sees( z.pos() ) ) {
+    } else if( g->u.sees( z.bub_pos() ) ) {
         add_msg( m_good, _( "The %s collapses!" ), z.name() );
     }
 }
@@ -731,7 +772,7 @@ void mdeath::ratking( monster &z )
     }
 
     for( int rats = 0; rats < 7; rats++ ) {
-        g->place_critter_around( mon_sewer_rat, z.pos(), 1 );
+        g->place_critter_around( mon_sewer_rat, z.bub_pos(), 1 );
     }
 }
 
@@ -746,21 +787,39 @@ void mdeath::darkman( monster &z )
 void mdeath::gas( monster &z )
 {
     std::string explode = string_format( _( "a %s explode!" ), z.name() );
-    sounds::sound( z.pos(), 24, sounds::sound_t::combat, explode, false, "explosion", "small" );
-    g->m.emit_field( z.pos(), emit_id( "emit_toxic_blast" ) );
+    sound_event se;
+    se.origin = z.bub_pos();
+    se.volume = 80;
+    se.category = sounds::sound_t::combat;
+    se.description = explode;
+    se.from_monster = true;
+    se.id = "explosion";
+    se.variant = "small";
+    se.monfaction = z.faction.id();
+    sounds::sound( se );
+    g->m.emit_field( z.bub_pos(), emit_id( "emit_toxic_blast" ) );
 }
 
 void mdeath::smokeburst( monster &z )
 {
     std::string explode = string_format( _( "a %s explode!" ), z.name() );
-    sounds::sound( z.pos(), 24, sounds::sound_t::combat, explode, false, "explosion", "small" );
-    g->m.emit_field( z.pos(), emit_id( "emit_smoke_blast" ) );
+    sound_event se;
+    se.origin = z.bub_pos();
+    se.volume = 80;
+    se.category = sounds::sound_t::combat;
+    se.description = explode;
+    se.from_monster = true;
+    se.id = "explosion";
+    se.variant = "small";
+    se.monfaction = z.faction.id();
+    sounds::sound( se );
+    g->m.emit_field( z.bub_pos(), emit_id( "emit_smoke_blast" ) );
 }
 
 void mdeath::fungalburst( monster &z )
 {
     // If the fungus died from anti-fungal poison, don't pouf
-    if( g->m.get_field_intensity( z.pos(), fd_fungicidal_gas ) ) {
+    if( g->m.get_field_intensity( z.bub_pos(), fd_fungicidal_gas ) ) {
         if( g->u.sees( z ) ) {
             add_msg( m_good, _( "The %s inflates and melts away." ), z.name() );
         }
@@ -768,8 +827,17 @@ void mdeath::fungalburst( monster &z )
     }
 
     std::string explode = string_format( _( "a %s explodes!" ), z.name() );
-    sounds::sound( z.pos(), 24, sounds::sound_t::combat, explode, false, "explosion", "small" );
-    g->m.emit_field( z.pos(), emit_id( "emit_fungal_blast" ) );
+    sound_event se;
+    se.origin = z.bub_pos();
+    se.volume = 90;
+    se.category = sounds::sound_t::combat;
+    se.description = explode;
+    se.from_monster = true;
+    se.id = "explosion";
+    se.variant = "small";
+    se.monfaction = z.faction.id();
+    sounds::sound( se );
+    g->m.emit_field( z.bub_pos(), emit_id( "emit_fungal_blast" ) );
 }
 
 void mdeath::jabberwock( monster &z )
@@ -878,13 +946,13 @@ void mdeath::detonate( monster &z )
         detached_ptr<item> bomb_item = item::spawn( bombs.first, calendar::start_of_cataclysm );
         bomb_item->charges = bombs.second;
         bomb_item->activate();
-        g->m.add_item_or_charges( z.pos(), std::move( bomb_item ) );
+        g->m.add_item_or_charges( z.bub_pos(), std::move( bomb_item ) );
     }
 }
 
 void mdeath::broken_ammo( monster &z )
 {
-    if( g->u.sees( z.pos() ) ) {
+    if( g->u.sees( z.bub_pos() ) ) {
         //~ %s is the possessive form of the monster's name
         add_msg( m_info, _( "The %s's interior compartment sizzles with destructive energy." ),
                  z.name() );
@@ -957,13 +1025,13 @@ void make_mon_corpse( monster &z, int damageLvl )
     for( detached_ptr<item> &it : z.remove_corpse_components() ) {
         corpse->add_component( std::move( it ) );
     }
-    get_map().add_item_or_charges( z.pos(), std::move( corpse ) );
+    get_map().add_item_or_charges( z.bub_pos(), std::move( corpse ) );
 }
 
 void mdeath::preg_roach( monster &z )
 {
     int num_roach = rng( 1, 3 );
-    while( num_roach > 0 && g->place_critter_around( mon_giant_cockroach_nymph, z.pos(), 1 ) ) {
+    while( num_roach > 0 && g->place_critter_around( mon_giant_cockroach_nymph, z.bub_pos(), 1 ) ) {
         num_roach--;
         if( g->u.sees( z ) ) {
             add_msg( m_warning, _( "A cockroach nymph crawls out of the pregnant giant cockroach corpse." ) );
@@ -975,10 +1043,19 @@ void mdeath::fireball( monster &z )
 {
     // If we died from being set on fire, 50% chance to explode.
     if( z.has_effect( effect_onfire ) && one_in( 2 ) ) {
-        g->m.propagate_field( z.pos(), fd_fire, 15, 3 );
+        g->m.propagate_field( z.bub_pos(), fd_fire, 15, 3 );
         std::string explode = string_format( _( "a %s explode!" ),
                                              z.name() );
-        sounds::sound( z.pos(), 24, sounds::sound_t::combat, explode, false, "explosion", "default" );
+        sound_event se;
+        se.origin = z.bub_pos();
+        se.volume = 140;
+        se.category = sounds::sound_t::combat;
+        se.description = explode;
+        se.from_monster = true;
+        se.id = "explosion";
+        se.variant = "default";
+        se.monfaction = z.faction.id();
+        sounds::sound( se );
         if( g->u.sees( z ) && g->u.has_trait( trait_PYROMANIA ) ) {
             add_msg( m_good, _( "I love the smell of burning zed in the morning." ) );
         }
@@ -990,16 +1067,25 @@ void mdeath::fireball( monster &z )
 void mdeath::conflagration( monster &z )
 {
     if( z.has_effect( effect_onfire ) ) {
-        for( const auto &dest : g->m.points_in_radius( z.pos(), 1 ) ) {
+        for( const auto &dest : g->m.points_in_radius( z.bub_pos(), 1 ) ) {
             g->m.propagate_field( dest, fd_fire, 18, 3 );
         }
         const std::string explode = string_format( _( "a %s explode!" ), z.name() );
-        sounds::sound( z.pos(), 24, sounds::sound_t::combat, explode, false, "explosion", "small" );
+        sound_event se;
+        se.origin = z.bub_pos();
+        se.volume = 110;
+        se.category = sounds::sound_t::combat;
+        se.description = explode;
+        se.from_monster = true;
+        se.id = "explosion";
+        se.variant = "small";
+        se.monfaction = z.faction.id();
+        sounds::sound( se );
         if( g->u.sees( z ) && g->u.has_trait( trait_PYROMANIA ) ) {
             add_msg( m_good, _( "Toasty!" ) );
         }
     } else if( one_in( 2 ) ) {
-        g->m.propagate_field( z.pos(), fd_fire, 1, 3 );
+        g->m.propagate_field( z.bub_pos(), fd_fire, 1, 3 );
         add_msg( m_bad, _( "The %s bursts into flames as it dies!" ), z.name() );
     } else {
         add_msg( m_good, _( "The flames sputter and die out." ) );

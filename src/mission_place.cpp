@@ -1,15 +1,13 @@
 #include "coordinates.h"
 #include "mission.h" // IWYU pragma: associated
-
-#include "coordinate_conversions.h"
-#include "overmap.h"
-#include "overmapbuffer.h"
+#include "overmap/overmap.h"
+#include "overmap/overmapbuffer.h"
 
 // Input position is in global overmap terrain coordinates!
 bool mission_place::near_town( const tripoint_abs_omt &pos_omt )
 {
     const tripoint_abs_sm pos_sm = project_to<coords::sm>( pos_omt );
-    const auto cref = ACTIVE_OVERMAP_BUFFER.closest_city( pos_sm );
+    const auto cref = get_primary_overmapbuffer().closest_city( pos_sm );
     if( !cref ) {
         return false; // no nearby city at all.
     }

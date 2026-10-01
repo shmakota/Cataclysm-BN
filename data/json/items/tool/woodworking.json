@@ -102,12 +102,7 @@
     "charges_per_use": 5,
     "use_action": { "target": "circsaw_on", "msg": "You turn on the circular saw.", "active": true, "type": "transform" },
     "flags": [ "NONCONDUCTIVE", "COMBAT_NPC_USE" ],
-    "magazines": [
-      [
-        "battery",
-        [ "medium_battery_cell", "medium_plus_battery_cell", "medium_atomic_battery_cell", "medium_disposable_cell" ]
-      ]
-    ],
+    "magazines": [ [ "battery", [ "medium_battery_cell" ] ] ],
     "magazine_well": "500 ml"
   },
   {
@@ -199,12 +194,7 @@
       "need_dry": true
     },
     "flags": [ "NONCONDUCTIVE", "POWERED", "COMBAT_NPC_USE" ],
-    "magazines": [
-      [
-        "battery",
-        [ "medium_battery_cell", "medium_plus_battery_cell", "medium_atomic_battery_cell", "medium_disposable_cell" ]
-      ]
-    ],
+    "magazines": [ [ "battery", [ "medium_battery_cell" ] ] ],
     "magazine_well": "500 ml"
   },
   {
@@ -322,7 +312,7 @@
       { "type": "COMPONENT_ID", "condition": "bone", "name": "bone tomahawk" }
     ],
     "description": "A lightweight one-handed combat hatchet typically made of stone or bone, originally used by the Algonquian people.  It makes for a half decent tool and weapon.",
-    "price_postapoc": 100,
+    "price_postapoc": "1 USD",
     "material": [ "wood", "stone" ],
     "techniques": [ "WBLOCK_1" ],
     "volume": "1500 ml",
@@ -344,8 +334,8 @@
     "color": "light_red",
     "name": { "str": "copper tomahawk" },
     "description": "A lightweight one-handed combat hatchet made using basic copper.  Slightly better than stone, though not as historically accurate.",
-    "price": 3000,
-    "price_postapoc": 600,
+    "price": "30 USD",
+    "price_postapoc": "6 USD",
     "material": [ "copper", "wood" ],
     "techniques": [ "WBLOCK_1" ],
     "volume": "1500 ml",

@@ -1,47 +1,47 @@
 #include "inventory.h"
 
+#include "avatar.h"
+#include "calendar.h"
+#include "character.h"
+#include "damage.h"
+#include "debug.h"
+#include "diary.h"
+#include "distribution_grid.h"
+#include "enchantments/enchantment.h"
+#include "enums.h"
+#include "flag.h"
+#include "flat_set.h"
+#include "game.h"
+#include "iexamine.h"
+#include "inventory_ui.h" // auto inventory blocking
+#include "locations.h"
+#include "map/map.h"
+#include "map/mapdata.h"
+#include "map_iterator.h"
+#include "material.h"
+#include "messages.h" //for rust message
+#include "npc.h"
+#include "options.h"
+#include "player.h"
+#include "point.h"
+#include "rng.h"
+#include "translations.h"
+#include "type_id.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+
 #include <algorithm>
 #include <climits>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <algorithm>
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <unordered_set>
-
-#include "avatar.h"
-#include "debug.h"
-#include "diary.h"
-#include "distribution_grid.h"
-#include "game.h"
-#include "iexamine.h"
-#include "locations.h"
-#include "magic_enchantment.h"
-#include "map.h"
-#include "map_iterator.h"
-#include "mapdata.h"
-#include "messages.h" //for rust message
-#include "npc.h"
-#include "options.h"
-#include "translations.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "veh_type.h"
-#include "vpart_position.h"
-#include "calendar.h"
-#include "character.h"
-#include "damage.h"
-#include "enums.h"
-#include "flag.h"
-#include "player.h"
-#include "rng.h"
-#include "material.h"
-#include "type_id.h"
-#include "flat_set.h"
-#include "point.h"
-#include "inventory_ui.h" // auto inventory blocking
 
 static const itype_id itype_aspirin( "aspirin" );
 static const itype_id itype_battery( "battery" );
@@ -177,6 +177,7 @@ void inventory::clear()
     items.clear();
     binned = false;
     items_type_cached = false;
+    cached_weight_dirty = true;
 }
 
 inventory &inventory::add_items( const inventory &rhs, bool keep_invlet, bool assign_invlet,
@@ -302,6 +303,7 @@ template<bool IsCached>
 item &inventory::add_item_internal( item &newit, bool keep_invlet, bool assign_invlet,
                                     bool should_stack )
 {
+    cached_weight_dirty = true;
     binned = false;
 
     itype_id type = newit.typeId();
@@ -442,37 +444,39 @@ static int count_charges_in_list( const itype *type, const map_stack &items )
     return 0;
 }
 
-void inventory::form_from_map( const tripoint &origin, int range, const Character *pl,
+void inventory::form_from_map( const tripoint_bub_ms &origin, int range, const Character *pl,
                                bool assign_invlet,
                                bool clear_path )
 {
     form_from_map( g->m, origin, range, pl, assign_invlet, clear_path );
 }
 
-void inventory::form_from_zone( map &m, std::unordered_set<tripoint> &zone_pts, const Character *pl,
+void inventory::form_from_zone( map &m, std::unordered_set<tripoint_abs_ms> &zone_pts,
+                                const Character *pl,
                                 bool assign_invlet )
 {
-    std::vector<tripoint> pts;
+    std::vector<tripoint_bub_ms> pts;
     pts.reserve( zone_pts.size() );
-    for( const tripoint &elem : zone_pts ) {
-        pts.push_back( m.getlocal( elem ) );
+    for( const auto &elem : zone_pts ) {
+        pts.push_back( abs_to_bub( elem ) );
     }
     form_from_map( m, pts, pl, assign_invlet );
 }
 
-void inventory::form_from_map( map &m, const tripoint &origin, int range, const Character *pl,
+void inventory::form_from_map( map &m, const tripoint_bub_ms &origin, int range,
+                               const Character *pl,
                                bool assign_invlet,
                                bool clear_path )
 {
     // populate a grid of spots that can be reached
-    std::vector<tripoint> reachable_pts = {};
+    std::vector<tripoint_bub_ms> reachable_pts = {};
     // If we need a clear path we care about the reachability of points
     if( clear_path ) {
         m.reachable_flood_steps( reachable_pts, origin, range, 1, 100 );
     } else {
         // Fill reachable points with points_in_radius
-        tripoint_range<tripoint> in_radius = m.points_in_radius( origin, range );
-        for( const tripoint &p : in_radius ) {
+        tripoint_range<tripoint_bub_ms> in_radius = m.points_in_radius( origin, range );
+        for( const tripoint_bub_ms &p : in_radius ) {
             reachable_pts.emplace_back( p );
         }
     }
@@ -480,16 +484,17 @@ void inventory::form_from_map( map &m, const tripoint &origin, int range, const 
 }
 
 //TODO!: check that not stacking the crafting inventory works ok
-void inventory::form_from_map( map &m, std::vector<tripoint> pts, const Character *pl,
+void inventory::form_from_map( map &m, std::vector<tripoint_bub_ms> pts, const Character *pl,
                                bool assign_invlet )
 {
     const time_point bday = calendar::start_of_cataclysm;
     std::unordered_map<const vehicle *, std::unordered_set<std::string>> checked_veh_tools;
     bool has_faucet = false;
     bool has_autodoc = false;
+    cached_weight_dirty = true;
     items.clear();
     build_items_type_cache();
-    for( const tripoint &p : pts ) {
+    for( const tripoint_bub_ms &p : pts ) {
         if( m.has_furn( p ) ) {
             const furn_t &f = m.furn( p ).obj();
             const std::vector<itype> tool_list = f.crafting_pseudo_item_types();
@@ -500,7 +505,7 @@ void inventory::form_from_map( map &m, std::vector<tripoint> pts, const Characte
                     const itype_id &ammo = furn_item.ammo_default();
                     if( furn_item.has_flag( flag_USES_GRID_POWER ) ) {
                         // TODO: The grid tracker should correspond to map!
-                        auto &grid = get_distribution_grid_tracker().grid_at( tripoint_abs_ms( m.getabs( p ) ) );
+                        auto &grid = get_distribution_grid_tracker().grid_at( bub_to_abs( p ) );
                         furn_item.charges = grid.get_resource();
                     } else {
                         furn_item.charges = ammo ? count_charges_in_list( &*ammo, m.i_at( p ) ) : 0;
@@ -655,6 +660,7 @@ std::vector<detached_ptr<item>> location_inventory::reduce_stack( const int posi
 
 item &inventory::remove_item( const item *it )
 {
+    cached_weight_dirty = true;
     auto tmp = remove_items_with( [&it]( const item & i ) {
         return &i == it;
     }, 1 );
@@ -669,28 +675,26 @@ item &inventory::remove_item( const item *it )
 
 item &inventory::remove_item( const int position )
 {
-    int pos = 0;
-    for( invstack::iterator iter = items.begin(); iter != items.end(); ++iter ) {
-        if( position == pos ) {
-            binned = false;
-            items_type_cached = false;
-            if( iter->size() > 1 ) {
-                std::vector<item *>::iterator stack_member = iter->begin();
-                char invlet = ( *stack_member )->invlet;
-                ++stack_member;
-                ( *stack_member )->invlet = invlet;
-            }
-            item &ret = *iter->front();
-            iter->erase( iter->begin() );
-            if( iter->empty() ) {
-                items.erase( iter );
-            }
-            return ret;
-        }
-        ++pos;
+    cached_weight_dirty = true;
+    if( position < 0 || static_cast<size_t>( position ) >= items.size() ) {
+        return null_item_reference();
     }
 
-    return null_item_reference();
+    const auto iter = std::ranges::next( std::ranges::begin( items ), position );
+    binned = false;
+    items_type_cached = false;
+    if( iter->size() > 1 ) {
+        std::vector<item *>::iterator stack_member = iter->begin();
+        char invlet = ( *stack_member )->invlet;
+        ++stack_member;
+        ( *stack_member )->invlet = invlet;
+    }
+    item &ret = *iter->front();
+    iter->erase( iter->begin() );
+    if( iter->empty() ) {
+        items.erase( iter );
+    }
+    return ret;
 }
 
 std::vector<detached_ptr<item>> location_inventory::remove_randomly_by_volume(
@@ -944,12 +948,26 @@ void inventory::rust_iron_items()
                                     elem_stack_iter->base_volume().value() ) / 250 ) ) ) ) &&
                 //                       ^season length   ^14/5*0.75/pi (from volume of sphere)
                 //Freshwater without oxygen rusts slower than air
-                g->m.water_from( g->u.pos() )->typeId() == itype_salt_water ) {
+                g->m.water_from( g->u.bub_pos() )->typeId() == itype_salt_water ) {
                 elem_stack_iter->inc_damage( DT_ACID ); // rusting never completely destroys an item
                 add_msg( m_bad, _( "Your %s is damaged by rust." ), elem_stack_iter->tname() );
             }
         }
     }
+}
+
+units::mass inventory::weight_cached()
+{
+    if( cached_weight_dirty ) {
+        cached_weight = 0_gram;
+        for( const auto &elem : items ) {
+            for( const auto &elem_stack_iter : elem ) {
+                cached_weight += elem_stack_iter->weight();
+            }
+        }
+        cached_weight_dirty = false;
+    }
+    return cached_weight;
 }
 
 units::mass inventory::weight() const
@@ -1063,7 +1081,12 @@ enchantment inventory::get_active_enchantment_cache( const Character &owner ) co
     enchantment temp_cache;
     for( const std::vector<item *> &elem : items ) {
         for( const item * const &check_item : elem ) {
-            for( const enchantment &ench : check_item->get_enchantments() ) {
+            for( const enchantment &ench : check_item->get_enchantments( true ) ) {
+                if( ench.is_active( owner, *check_item ) ) {
+                    temp_cache.force_add( ench );
+                }
+            }
+            for( const enchantment &ench : check_item->get_enchantments( false ) ) {
                 if( ench.is_active( owner, *check_item ) ) {
                     temp_cache.force_add( ench );
                 }
@@ -1135,7 +1158,7 @@ void inventory::assign_empty_invlet( item &it, const Character &p, const bool fo
                 // don't overwrite assigned keys
                 continue;
             }
-            if( std::ranges::find( binds, inv_char ) != binds.end() ) {
+            if( std::ranges::contains( binds, inv_char ) ) {
                 // don't auto-assign bound keys
                 continue;
             }
@@ -1457,6 +1480,11 @@ void location_inventory::rust_iron_items()
 units::mass location_inventory::weight() const
 {
     return inv.weight();
+}
+
+units::mass location_inventory::weight_cached()
+{
+    return inv.weight_cached();
 }
 
 units::mass location_inventory::weight_without( const excluded_stacks &without ) const
