@@ -3,6 +3,7 @@
 #include "action_time_scale.h"
 #include "anatomy.h"
 #include "avatar.h"
+#include "cached_options.h"
 #include "calendar.h"
 #include "catalua_hooks.h"
 #include "catalua_sol.h"
@@ -298,12 +299,14 @@ void Creature::process_turn()
     if( is_dead_state() ) {
         return;
     }
-    reset_bonuses();
-
     process_effects();
 
     // Call this in case any effects have changed our stats
-    reset_stats();
+    if( !g->u.in_skip_state ||
+        action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        reset_bonuses();
+        reset_stats();
+    }
 
     // add an appropriate number of moves
     if( !has_effect( effect_ridden ) ) {
