@@ -158,6 +158,22 @@ TEST_CASE("cardboard_box_stores_a_water_bottle_as_an_item", "[reload],[reload_op
     CHECK(box.contents.front().contents.front().typeId() == itype_id("water_clean"));
 }
 
+TEST_CASE(
+    "reload_respects_nested_container_storage_volume", "[reload],[reload_option],[container]") {
+    avatar who;
+    who.set_body();
+    const auto birthday = calendar::start_of_cataclysm;
+
+    auto& bowl = who.i_add(item::spawn("bowl_plastic", birthday));
+    auto& bag = who.i_add(item::spawn("bag_zipper_small", birthday));
+
+    const auto option = item_reload_option(&who, &bowl, &bowl, bag);
+    CHECK(bag.volume() < bowl.get_container_capacity());
+    CHECK(bag.volume_for_storage() > bowl.get_container_capacity());
+    CHECK(option.qty() == 0);
+    CHECK_FALSE(bowl.reload(who, bag, 1));
+}
+
 TEST_CASE("reload_empty_option_value_initialization", "[reload][reload_option]") {
     const auto option = item_reload_option();
 

@@ -7982,7 +7982,7 @@ bool item::is_reloadable_helper( const itype_id &ammo, bool now ) const
         if( sample.count_by_charges() ) {
             return sample.charges_per_volume( free_volume ) > 0;
         }
-        return free_volume >= sample.volume();
+        return free_volume >= sample.volume_for_storage();
     } else if( is_container() ) {
         if( ammo.is_empty() ) {
             return now ? !is_container_full() : true;
@@ -8001,7 +8001,7 @@ bool item::is_reloadable_helper( const itype_id &ammo, bool now ) const
         if( sample.count_by_charges() ) {
             return sample.charges_per_volume( free_volume ) > 0;
         }
-        return free_volume >= sample.volume();
+        return free_volume >= sample.volume_for_storage();
     } else if( magazine_integral() ) {
         if( !ammo.is_empty() ) {
             if( now && ammo_data() ) {
@@ -9311,7 +9311,7 @@ bool item::reload( Character &who, item &loc, int qty, bool store_container_as_i
         } else {
             const auto free_volume = std::max( get_container_capacity() - contents.item_size_modifier(),
                                                0_ml );
-            limit = free_volume >= ammo->volume() ? 1 : 0;
+            limit = free_volume >= ammo->volume_for_storage() ? 1 : 0;
         }
     } else {
         limit = ammo_capacity() - ammo_remaining();

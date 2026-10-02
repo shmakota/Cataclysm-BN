@@ -69,7 +69,7 @@ auto item_reload_option::qty(int val) -> void {
         } else {
             const auto free_volume = std::
                 max(target->get_container_capacity() - target->contents.item_size_modifier(), 0_ml);
-            remaining_capacity = free_volume >= ammo_obj.volume() ? 1 : 0;
+            remaining_capacity = free_volume >= ammo_obj.volume_for_storage() ? 1 : 0;
         }
     } else {
         remaining_capacity = target->ammo_capacity() - target->ammo_remaining();
