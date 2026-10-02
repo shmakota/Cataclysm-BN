@@ -120,6 +120,7 @@ auto query_menu(const player& who, item& base, std::vector<item_reload_option> o
                 }
                 // Worn ammunition containers are named by their contents; location is updated
                 // below.
+                if (option.ammo->is_container_empty()) { return option.ammo->display_name(); }
                 return option.ammo->contents.front().display_name();
             }
             return ammo_color(
