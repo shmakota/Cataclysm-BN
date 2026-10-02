@@ -11,6 +11,7 @@
 #include "player.h"
 
 #include <algorithm>
+#include <unordered_set>
 
 namespace {
 const auto ammo_plutonium = ammotype("plutonium");
@@ -110,6 +111,7 @@ auto discover_ammo(const Character& who, item& base, discovery_options options)
 
     const auto ammo_search_range = who.is_mounted() ? -1 : 1;
     for (item* target : targets) {
+        auto seen_sources = std::unordered_set<item*>();
         for (item* ammo : character_funcs::find_ammo_items_or_mags(
                  who, *target, options.include_empty_mags, ammo_search_range)) {
             // Don't try to unload frozen liquids.
@@ -132,6 +134,7 @@ auto discover_ammo(const Character& who, item& base, discovery_options options)
             }
 
             for (item* source : source_items) {
+                if (!seen_sources.insert(source).second) { continue; }
                 const auto id = source->typeId();
                 if (target->is_container() && !target->is_container_full()
                     && !target->is_reloadable_with(id)) {

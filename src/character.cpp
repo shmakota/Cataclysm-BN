@@ -12923,12 +12923,16 @@ int Character::item_reload_cost( const item &it, item &ammo, int qty ) const
     }
 
     //Save the quantity so we can change it for item_handling_cost and reset it after
-    int saved_quantity = ammo.charges;
-    ammo.charges = qty;
+    const auto saved_quantity = ammo.charges;
+    if( ammo.count_by_charges() ) {
+        ammo.charges = qty;
+    }
     // No base cost for handling ammo - that's already included in obtain cost
     // We have the ammo in our hands right now
-    int mv = item_handling_cost( ammo, true, 0 );
-    ammo.charges = saved_quantity;
+    auto mv = item_handling_cost( ammo, true, 0 );
+    if( ammo.count_by_charges() ) {
+        ammo.charges = saved_quantity;
+    }
 
     if( ammo.has_flag( flag_MAG_BULKY ) ) {
         mv *= 1.5; // bulky magazines take longer to insert
