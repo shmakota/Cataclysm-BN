@@ -26,7 +26,9 @@ item_reload_option::item_reload_option(
     : who(who),
       target(target),
       ammo(&ammo),
-      store_container_as_item(store_container_as_item),
+      store_container_as_item(
+          store_container_as_item
+          || (target->is_container() && !target->is_watertight_container() && ammo.is_container())),
       parent(parent) {
     if (this->target->is_ammo_belt()) {
         const auto& linkage = this->target->type->magazine->linkage;
@@ -143,7 +145,14 @@ auto discover_ammo(const Character& who, item& base, discovery_options options)
 
             for (item* source : source_items) {
                 if (!seen_sources.insert(source).second) { continue; }
-                const auto id = source->typeId();
+                const auto store_container_as_item =
+                    source->is_container() && target->is_container()
+                    && target->can_contain(*source);
+                const auto* reloadable_source =
+                    source->is_ammo_container() && !store_container_as_item
+                        ? &source->contents.front()
+                        : source;
+                const auto id = reloadable_source->typeId();
                 if (target->is_container() && !target->is_container_full()
                     && !target->is_reloadable_with(id)) {
                     continue;
@@ -152,7 +161,7 @@ auto discover_ammo(const Character& who, item& base, discovery_options options)
                 if (can_reload_with) {
                     // Skip if the magazine is inside a gun/mod that can't fire its ammunition.
                     if (target->is_magazine() && target->parent_item()) {
-                        const auto ammo_type = source->ammo_type();
+                        const auto ammo_type = reloadable_source->ammo_type();
                         const auto& supported_ammo = target->parent_item()->ammo_types();
                         const auto gun_supports =
                             std::ranges::any_of(supported_ammo, [&](const ammotype& candidate) {
@@ -170,9 +179,6 @@ auto discover_ammo(const Character& who, item& base, discovery_options options)
                     || who.as_player()->can_reload(*target, id)
                     || (target->is_container() && can_reload_with)
                     || target->has_flag(flag_RELOAD_AND_SHOOT)) {
-                    const auto store_container_as_item =
-                        source->is_container() && target->is_container()
-                        && target->can_contain(*source);
                     result.options.emplace_back(
                         who.as_player(), target, &base, *source, store_container_as_item);
                 }
