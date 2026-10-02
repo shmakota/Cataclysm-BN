@@ -9290,7 +9290,13 @@ bool item::reload( Character &who, item &loc, int qty )
     // limit quantity of ammo loaded to remaining capacity
     int limit = 0;
     if( is_container() ) {
-        limit = get_remaining_capacity_for_liquid( *ammo, true );
+        if( ammo->count_by_charges() ) {
+            limit = get_remaining_capacity_for_liquid( *ammo, true );
+        } else {
+            const auto free_volume = std::max( get_container_capacity() - contents.item_size_modifier(),
+                                               0_ml );
+            limit = free_volume >= ammo->volume() ? 1 : 0;
+        }
     } else {
         limit = ammo_capacity() - ammo_remaining();
     }

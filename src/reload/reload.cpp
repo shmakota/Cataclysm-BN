@@ -58,7 +58,13 @@ auto item_reload_option::qty(int val) -> void {
     // This gets rounded up to 1 later.
     auto remaining_capacity = 0;
     if (target->is_container()) {
-        remaining_capacity = target->get_remaining_capacity_for_liquid(ammo_obj, true);
+        if (ammo_obj.count_by_charges()) {
+            remaining_capacity = target->get_remaining_capacity_for_liquid(ammo_obj, true);
+        } else {
+            const auto free_volume = std::
+                max(target->get_container_capacity() - target->contents.item_size_modifier(), 0_ml);
+            remaining_capacity = free_volume >= ammo_obj.volume() ? 1 : 0;
+        }
     } else {
         remaining_capacity = target->ammo_capacity() - target->ammo_remaining();
     }
@@ -127,6 +133,10 @@ auto discover_ammo(const Character& who, item& base, discovery_options options)
 
             for (item* source : source_items) {
                 const auto id = source->typeId();
+                if (target->is_container() && !target->is_container_full()
+                    && !target->is_reloadable_with(id)) {
+                    continue;
+                }
                 const auto can_reload_with = target->can_reload_with(id);
                 if (can_reload_with) {
                     // Skip if the magazine is inside a gun/mod that can't fire its ammunition.
