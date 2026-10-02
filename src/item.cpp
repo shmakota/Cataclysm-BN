@@ -5870,6 +5870,18 @@ units::volume item::volume( bool integral ) const
     return ret;
 }
 
+auto item::volume_for_storage() const -> units::volume
+{
+    const auto capacity = get_total_capacity();
+    if( capacity == 0_ml ) {
+        return volume();
+    }
+
+    // A nested container carries its capacity with it.  Counting only its exterior volume would
+    // let every nested container add the difference between its interior and exterior volume.
+    return std::max( { base_volume(), capacity, contents.item_size_modifier() } );
+}
+
 int item::lift_strength() const
 {
     const int mass = units::to_gram( weight() );

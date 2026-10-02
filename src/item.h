@@ -628,6 +628,9 @@ class item : public location_visitable<item>, public game_object<item>
          */
         units::volume volume( bool integral = false ) const;
 
+        /** Volume this item occupies when stored in another container. */
+        auto volume_for_storage() const -> units::volume;
+
         /**
          * Simplified, faster volume check for when processing time is important and exact volume is not.
          * NOTE: Result is rounded up to next nearest milliliter when working with stackable (@ref count_by_charges) items that have fractional volume per charge.
