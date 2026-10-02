@@ -47,8 +47,7 @@ auto item_reload_option::moves() const -> int {
 
 auto item_reload_option::qty(int val) -> void {
     const auto ammo_in_ammo_container = ammo->is_ammo_container();
-    const auto ammo_in_container = ammo->is_container();
-    auto& ammo_obj = (ammo_in_ammo_container || ammo_in_container) ? ammo->contents.front() : *ammo;
+    auto& ammo_obj = ammo_in_ammo_container ? ammo->contents.front() : *ammo;
 
     if (ammo_in_ammo_container && !ammo_obj.is_ammo()) {
         debugmsg("Invalid reload option: %s", ammo_obj.tname());
@@ -77,8 +76,7 @@ auto item_reload_option::qty(int val) -> void {
             remaining_capacity / PLUTONIUM_CHARGES + (remaining_capacity % PLUTONIUM_CHARGES != 0);
     }
 
-    const auto ammo_by_charges =
-        ammo_obj.count_by_charges() || ammo_in_container || ammo->is_comestible();
+    const auto ammo_by_charges = ammo_obj.count_by_charges() || ammo->is_comestible();
     const auto available_ammo =
         ammo->has_flag(flag_SPEEDLOADER) ? ammo->ammo_remaining()
         : magazine_like                  ? 1
@@ -113,35 +111,46 @@ auto discover_ammo(const Character& who, item& base, discovery_options options)
                 && ammo->contents_made_of(SOLID)) {
                 continue;
             }
-            const auto id =
-                (ammo->is_ammo_container() || ammo->is_container())
-                    ? ammo->contents.front().typeId()
-                    : ammo->typeId();
-            const auto can_reload_with = target->can_reload_with(id);
-            if (can_reload_with) {
-                // Skip if the magazine is inside a gun/mod that can't fire its ammunition.
-                if (target->is_magazine() && target->parent_item()) {
-                    const auto ammo_type =
-                        (ammo->is_ammo_container() || ammo->is_container())
-                            ? ammo->contents.front().ammo_type()
-                            : ammo->ammo_type();
-                    const auto& supported_ammo = target->parent_item()->ammo_types();
-                    const auto gun_supports =
-                        std::ranges::any_of(supported_ammo, [&](const ammotype& candidate) {
-                            return candidate == ammo_type;
-                        });
-                    if (!gun_supports) { continue; }
-                }
-                // Speedloaders require an empty target.
-                if (options.include_potential || !ammo->has_flag(flag_SPEEDLOADER)
-                    || target->ammo_remaining() < 1) {
-                    result.ammo_match_found = true;
-                }
+            auto source_items = std::vector<item*>{};
+            if (ammo->is_container() && !ammo->is_ammo_container() && !ammo->contents.empty()
+                && target->is_container() && !target->is_watertight_container()) {
+                source_items.push_back(ammo);
+                const auto& contents = ammo->contents.all_items_top();
+                source_items.insert(source_items.end(), contents.begin(), contents.end());
+            } else if (ammo->is_container() && !ammo->is_ammo_container() && !ammo->contents.empty()
+                       && !(ammo->is_watertight_container() && target->is_watertight_container()
+                            && ammo->contents_made_of(LIQUID))) {
+                source_items = ammo->contents.all_items_top();
+            } else {
+                source_items.push_back(ammo);
             }
-            if ((options.include_potential && can_reload_with)
-                || who.as_player()->can_reload(*target, id)
-                || target->has_flag(flag_RELOAD_AND_SHOOT)) {
-                result.options.emplace_back(who.as_player(), target, &base, *ammo);
+
+            for (item* source : source_items) {
+                const auto id = source->typeId();
+                const auto can_reload_with = target->can_reload_with(id);
+                if (can_reload_with) {
+                    // Skip if the magazine is inside a gun/mod that can't fire its ammunition.
+                    if (target->is_magazine() && target->parent_item()) {
+                        const auto ammo_type = source->ammo_type();
+                        const auto& supported_ammo = target->parent_item()->ammo_types();
+                        const auto gun_supports =
+                            std::ranges::any_of(supported_ammo, [&](const ammotype& candidate) {
+                                return candidate == ammo_type;
+                            });
+                        if (!gun_supports) { continue; }
+                    }
+                    // Speedloaders require an empty target.
+                    if (options.include_potential || !source->has_flag(flag_SPEEDLOADER)
+                        || target->ammo_remaining() < 1) {
+                        result.ammo_match_found = true;
+                    }
+                }
+                if ((options.include_potential && can_reload_with)
+                    || who.as_player()->can_reload(*target, id)
+                    || (target->is_container() && can_reload_with)
+                    || target->has_flag(flag_RELOAD_AND_SHOOT)) {
+                    result.options.emplace_back(who.as_player(), target, &base, *source);
+                }
             }
         }
     }

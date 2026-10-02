@@ -3366,6 +3366,9 @@ void item::container_info( std::vector<iteminfo> &info, const iteminfo_query *pa
 
     container_str += string_format( _( "can store <info>%s %s</info>." ),
                                     format_volume( c.contains ), volume_units_long() );
+    container_str += string_format( _( " It is currently storing <info>%s %s</info>." ),
+                                    format_volume( contents.item_size_modifier() ),
+                                    volume_units_long() );
 
     info.emplace_back( "CONTAINER", container_str );
 }
@@ -9273,7 +9276,9 @@ bool item::reload( Character &who, item &loc, int qty )
     }
 
     item *container = nullptr;
-    if( ammo->is_ammo_container() || ammo->is_container() ) {
+    if( ammo->is_ammo_container() || ( ammo->is_watertight_container() &&
+                                       is_watertight_container() &&
+                                       ammo->contents_made_of( LIQUID ) ) ) {
         container = ammo;
         ammo = &ammo->contents.front();
     }

@@ -114,6 +114,10 @@ auto query_menu(const player& who, item& base, std::vector<item_reload_option> o
             }
             if (option.ammo->is_container()
                 || (option.ammo->is_ammo_container() && who.is_worn(*option.ammo))) {
+                if (base.is_container() && !base.is_watertight_container()
+                    && option.ammo->is_container() && !option.ammo->contents_made_of(LIQUID)) {
+                    return option.ammo->display_name();
+                }
                 // Worn ammunition containers are named by their contents; location is updated
                 // below.
                 return option.ammo->contents.front().display_name();

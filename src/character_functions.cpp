@@ -890,7 +890,7 @@ void find_ammo_helper( T &src, const item &obj, bool empty, Output out, bool nes
                     out = node;
                 }
             } else if( ( node->is_container() && node->contents_made_of( SOLID ) ) ||
-                       ( !node->is_container() && !node->is_in_container() && node->made_of( SOLID ) ) ) {
+                       node->made_of( SOLID ) ) {
                 out = node;
             }
             return nested ? VisitResponse::NEXT : VisitResponse::SKIP;

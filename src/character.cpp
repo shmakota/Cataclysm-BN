@@ -12908,7 +12908,8 @@ int Character::item_reload_cost( const item &it, item &ammo, int qty ) const
 {
     if( ammo.is_ammo() ) {
         qty = std::max( std::min( ammo.charges, qty ), 1 );
-    } else if( ammo.is_ammo_container() || ammo.is_container() ) {
+    } else if( ammo.is_ammo_container() || ( ammo.is_watertight_container() &&
+               it.is_watertight_container() && ammo.contents_made_of( LIQUID ) ) ) {
         qty = clamp( qty, ammo.contents.front().charges, 1 );
     } else if( ammo.is_magazine() ) {
         qty = 1;
