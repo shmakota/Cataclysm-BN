@@ -44,6 +44,10 @@ TEST_CASE("revolver_reload_option", "[reload],[reload_option],[gun]") {
     CHECK(gun_speedloader_option.qty() == 1);
     gun_speedloader_option.qty(INT_MAX);
     CHECK(gun_speedloader_option.qty() == speedloader.ammo_capacity());
+
+    speedloader.ammo_set(itype_id("38_special"), 3);
+    gun_speedloader_option.qty(INT_MAX);
+    CHECK(gun_speedloader_option.qty() == 3);
 }
 
 TEST_CASE("magazine_reload_option", "[reload],[reload_option],[gun]") {
@@ -185,5 +189,17 @@ TEST_CASE("reload_quantity_respects_the_limiting_resource", "[reload][reload_opt
         CHECK(who.charges_of(itype_id("ammolink308")) == 3);
         CHECK(ammo.charges == 10);
         CHECK(belt.ammo_remaining() == 0);
+    }
+
+    SECTION("a full magazine has no remaining reload capacity") {
+        auto& magazine = who.i_add(item::spawn("glockmag", birthday, 0));
+        magazine.ammo_set(itype_id("9mm"), magazine.ammo_capacity());
+        auto& ammo = who.i_add(item::spawn("9mm", birthday, 3));
+
+        auto option = item_reload_option(&who, &magazine, &magazine, ammo);
+        option.qty(0);
+        CHECK(option.qty() == 0);
+        option.qty(INT_MAX);
+        CHECK(option.qty() == 0);
     }
 }
