@@ -9263,7 +9263,7 @@ void item::casings_handle( const std::function < detached_ptr<item>( detached_pt
     contents.casings_handle( func );
 }
 
-bool item::reload( Character &who, item &loc, int qty )
+bool item::reload( Character &who, item &loc, int qty, bool store_container_as_item )
 {
     if( qty <= 0 ) {
         debugmsg( "Tried to reload zero or less charges" );
@@ -9276,9 +9276,13 @@ bool item::reload( Character &who, item &loc, int qty )
     }
 
     item *container = nullptr;
-    if( ammo->is_ammo_container() || ( ammo->is_watertight_container() &&
-                                       is_watertight_container() &&
-                                       ammo->contents_made_of( LIQUID ) ) ) {
+    const auto preserve_container = store_container_as_item ||
+                                    ( is_container() && !is_watertight_container() &&
+                                      ammo->is_container() );
+    if( ( ammo->is_ammo_container() && !preserve_container ) ||
+        ( ammo->is_watertight_container() &&
+          is_watertight_container() &&
+          ammo->contents_made_of( LIQUID ) ) ) {
         container = ammo;
         ammo = &ammo->contents.front();
     }

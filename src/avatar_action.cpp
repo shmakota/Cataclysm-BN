@@ -1640,6 +1640,7 @@ void avatar_action::reload( item &loc, bool prompt, bool empty )
             u.activity->targets.emplace_back( opt.target );
         }
         u.activity->targets.emplace_back( opt.ammo );
+        u.activity->values.push_back( opt.store_container_as_item );
     }
 }
 
@@ -1734,6 +1735,7 @@ void avatar_action::reload_weapon( bool try_everything )
                                opt.qty() ) );
             u.activity->targets.emplace_back( turret.base() );
             u.activity->targets.emplace_back( opt.ammo );
+            u.activity->values.push_back( opt.store_container_as_item );
         }
         return;
     }

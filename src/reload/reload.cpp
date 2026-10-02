@@ -22,10 +22,11 @@ item_reload_option::item_reload_option(const item_reload_option&) = default;
 auto item_reload_option::operator=(const item_reload_option&) -> item_reload_option& = default;
 
 item_reload_option::item_reload_option(
-    const player* who, item* target, const item* parent, item& ammo)
+    const player* who, item* target, const item* parent, item& ammo, bool store_container_as_item)
     : who(who),
       target(target),
       ammo(&ammo),
+      store_container_as_item(store_container_as_item),
       parent(parent) {
     if (this->target->is_ammo_belt()) {
         const auto& linkage = this->target->type->magazine->linkage;
@@ -35,7 +36,8 @@ item_reload_option::item_reload_option(
 }
 
 auto item_reload_option::moves() const -> int {
-    auto mv = ammo->obtain_cost(*who, qty()) + who->item_reload_cost(*target, *ammo, qty());
+    auto mv = ammo->obtain_cost(*who, qty())
+            + who->item_reload_cost(*target, *ammo, qty(), store_container_as_item);
     if (parent != target) {
         if (parent->is_gun()) {
             mv += parent->get_reload_time();
@@ -47,7 +49,8 @@ auto item_reload_option::moves() const -> int {
 }
 
 auto item_reload_option::qty(int val) -> void {
-    const auto ammo_in_ammo_container = ammo->is_ammo_container();
+    const auto stores_container_as_item = store_container_as_item;
+    const auto ammo_in_ammo_container = ammo->is_ammo_container() && !stores_container_as_item;
     auto& ammo_obj = ammo_in_ammo_container ? ammo->contents.front() : *ammo;
 
     if (ammo_in_ammo_container && !ammo_obj.is_ammo()) {
@@ -125,6 +128,11 @@ auto discover_ammo(const Character& who, item& base, discovery_options options)
                 source_items.push_back(ammo);
                 const auto& contents = ammo->contents.all_items_top();
                 source_items.insert(source_items.end(), contents.begin(), contents.end());
+            } else if (ammo->is_watertight_container() && target->is_watertight_container()
+                       && ammo->contents_made_of(LIQUID)) {
+                source_items.push_back(ammo);
+                const auto& contents = ammo->contents.all_items_top();
+                source_items.insert(source_items.end(), contents.begin(), contents.end());
             } else if (ammo->is_container() && !ammo->is_ammo_container() && !ammo->contents.empty()
                        && !(ammo->is_watertight_container() && target->is_watertight_container()
                             && ammo->contents_made_of(LIQUID))) {
@@ -162,7 +170,11 @@ auto discover_ammo(const Character& who, item& base, discovery_options options)
                     || who.as_player()->can_reload(*target, id)
                     || (target->is_container() && can_reload_with)
                     || target->has_flag(flag_RELOAD_AND_SHOOT)) {
-                    result.options.emplace_back(who.as_player(), target, &base, *source);
+                    const auto store_container_as_item =
+                        source->is_container() && target->is_container()
+                        && target->can_contain(*source);
+                    result.options.emplace_back(
+                        who.as_player(), target, &base, *source, store_container_as_item);
                 }
             }
         }

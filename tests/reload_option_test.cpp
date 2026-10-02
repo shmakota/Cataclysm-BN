@@ -141,6 +141,23 @@ TEST_CASE("canteen_reload_option", "[reload],[reload_option],[liquid]") {
     CHECK(canteen_option.qty() == 2);
 }
 
+TEST_CASE("cardboard_box_stores_a_water_bottle_as_an_item", "[reload],[reload_option],[liquid]") {
+    avatar who;
+    who.set_body();
+    const auto birthday = calendar::start_of_cataclysm;
+
+    auto& box = who.i_add(item::spawn("box_large", birthday));
+    auto& bottle = who.i_add(item::spawn("bottle_plastic", birthday));
+    bottle.fill_with(item::spawn("water_clean", birthday, 2), 2);
+
+    const auto option = item_reload_option(&who, &box, &box, bottle);
+    CHECK(option.qty() == 1);
+    CHECK(box.reload(who, bottle, option.qty()));
+    REQUIRE(box.contents.num_item_stacks() == 1);
+    CHECK(box.contents.front().typeId() == itype_id("bottle_plastic"));
+    CHECK(box.contents.front().contents.front().typeId() == itype_id("water_clean"));
+}
+
 TEST_CASE("reload_empty_option_value_initialization", "[reload][reload_option]") {
     const auto option = item_reload_option();
 

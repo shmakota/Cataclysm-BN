@@ -583,7 +583,7 @@ class item : public location_visitable<item>, public game_object<item>
          * @param loc Location of ammo to be reloaded
          * @param qty caps reloading to this (or fewer) units
          */
-        bool reload( Character &who, item &loc, int qty );
+        bool reload( Character &who, item &loc, int qty, bool store_container_as_item = false );
 
         template<typename Archive>
         void io( Archive & );

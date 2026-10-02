@@ -888,6 +888,8 @@ void find_ammo_helper( T &src, const item &obj, bool empty, Output out, bool nes
             } else if( node->is_container() && node->contents_made_of( LIQUID ) ) {
                 if( is_empty_container && obj.is_watertight_container() ) {
                     out = node;
+                } else if( !obj.is_watertight_container() && node->made_of( SOLID ) ) {
+                    out = node;
                 }
             } else if( ( node->is_container() && node->contents_made_of( SOLID ) ) ||
                        node->made_of( SOLID ) ) {
