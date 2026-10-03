@@ -248,14 +248,15 @@
     "id": "fd_foamcrete",
     "type": "field_type",
     "intensity_levels": [
-      { "name": "foamcrete splatter", 
-        "transparent": false,
-        "impassable": true,"sym": "~", "color": "light_gray", "move_cost": 200 },
       {
-        "name": "thick foamcrete",
+        "name": "foamcrete splatter",
+        "transparent": false,
+        "impassable": true,
+        "sym": "~",
         "color": "light_gray",
         "move_cost": 200
-      }
+      },
+      { "name": "thick foamcrete", "color": "light_gray", "move_cost": 200 }
     ],
     "description_affix": "covered_in",
     "priority": 2,

@@ -2221,8 +2221,8 @@ void map::furn_set(
 }
 
 auto map::move_furn(
-    const tripoint_bub_ms& from, const tripoint_bub_ms& to,
-    const map_move_furn_options& options) -> bool {
+    const tripoint_bub_ms& from, const tripoint_bub_ms& to, const map_move_furn_options& options)
+    -> bool {
     if (from == to) { return true; }
 
     const auto moving_furn = furn(from);
@@ -2583,8 +2583,8 @@ auto map::features(const tripoint_bub_ms& p) -> std::string {
 }
 
 auto map::move_cost_internal(
-    const furn_t& furniture, const ter_t& terrain, const vehicle* veh,
-    const int vpart) const -> int {
+    const furn_t& furniture, const ter_t& terrain, const vehicle* veh, const int vpart) const
+    -> int {
     if (terrain.movecost == 0 || (furniture.id && furniture.movecost < 0)) { return 0; }
 
     if (veh != nullptr) {
@@ -4664,8 +4664,8 @@ struct can_open_while_mounted {
 };
 
 auto map::can_open_door_ter(
-    const const_interacting_entity& who, const ter_t&, const tripoint_bub_ms& p,
-    bool inside) const -> bool {
+    const const_interacting_entity& who, const ter_t&, const tripoint_bub_ms& p, bool inside) const
+    -> bool {
 
     if (has_flag(str_OPENCLOSE_INSIDE, p) && !inside) { return false; }
 
@@ -4676,8 +4676,8 @@ auto map::can_open_door_ter(
 
 
 auto map::open_door_ter(
-    const interacting_entity& who, const ter_t& ter, const tripoint_bub_ms& p,
-    const bool inside) -> bool {
+    const interacting_entity& who, const ter_t& ter, const tripoint_bub_ms& p, const bool inside)
+    -> bool {
     if (!can_open_door_ter(static_variant_cast<const_interacting_entity>(who), ter, p, inside)) {
         return false;
     }
@@ -4715,8 +4715,8 @@ auto map::open_door_ter(
 }
 
 auto map::can_open_door_furn(
-    const const_interacting_entity& who, const furn_t&, const tripoint_bub_ms& p,
-    bool inside) const -> bool {
+    const const_interacting_entity& who, const furn_t&, const tripoint_bub_ms& p, bool inside) const
+    -> bool {
 
     if (has_flag(str_OPENCLOSE_INSIDE, p) && !inside) { return false; }
 
@@ -4727,8 +4727,8 @@ auto map::can_open_door_furn(
 
 
 auto map::open_door_furn(
-    const interacting_entity& who, const furn_t& furn, const tripoint_bub_ms& p,
-    const bool inside) -> bool {
+    const interacting_entity& who, const furn_t& furn, const tripoint_bub_ms& p, const bool inside)
+    -> bool {
     if (!can_open_door_furn(static_variant_cast<const_interacting_entity>(who), furn, p, inside)) {
         return false;
     }
@@ -5035,8 +5035,8 @@ auto map::i_clear(const tripoint_bub_ms& p) -> std::vector<detached_ptr<item>> {
 }
 
 auto map::spawn_an_item(
-    const tripoint_bub_ms& p, detached_ptr<item>&& new_item, const int charges,
-    const int damlevel) -> detached_ptr<item> {
+    const tripoint_bub_ms& p, detached_ptr<item>&& new_item, const int charges, const int damlevel)
+    -> detached_ptr<item> {
     if (one_in(3) && new_item->has_flag(flag_VARSIZE)) { new_item->set_flag(flag_FIT); }
 
     if (charges && new_item->charges > 0) {
@@ -5411,8 +5411,8 @@ void map::update_lum(item& loc, bool add) {
 }
 
 static auto process_map_items(
-    item* item_ref, const tripoint_bub_ms& location, const temperature_flag flag,
-    int turns) -> bool {
+    item* item_ref, const tripoint_bub_ms& location, const temperature_flag flag, int turns)
+    -> bool {
     ZoneScopedN("process_map_items");
     return item_ref->attempt_detach([&location, &flag, &turns](detached_ptr<item>&& it) {
         return item::process(std::move(it), nullptr, location, false, turns, flag);
@@ -6053,8 +6053,8 @@ auto map::field_at(const tripoint_bub_ms& p) -> field& {
 }
 
 auto map::mod_field_age(
-    const tripoint_bub_ms& p, const field_type_id& type,
-    const time_duration& offset) -> time_duration {
+    const tripoint_bub_ms& p, const field_type_id& type, const time_duration& offset)
+    -> time_duration {
     return set_field_age(p, type, offset, true);
 }
 
@@ -6083,8 +6083,8 @@ auto map::set_field_age(
  * returns resulting intensity, or 0 for not present
  */
 auto map::set_field_intensity(
-    const tripoint_bub_ms& p, const field_type_id& type, const int new_intensity,
-    bool isoffset) -> int {
+    const tripoint_bub_ms& p, const field_type_id& type, const int new_intensity, bool isoffset)
+    -> int {
     return get_mapbuffer()
         .set_field_intensity(
             map_local_to_abs(*this, p),
@@ -6864,8 +6864,8 @@ auto map::sees(const tripoint_bub_ms& F, const tripoint_bub_ms& T, const int ran
  * class.
  **/
 auto map::sees(
-    const tripoint_bub_ms& F, const tripoint_bub_ms& T, const int range,
-    int& bresenham_slope) const -> bool {
+    const tripoint_bub_ms& F, const tripoint_bub_ms& T, const int range, int& bresenham_slope) const
+    -> bool {
     if ((range >= 0 && range < rl_dist(F, T)) || !inbounds(T) || !inbounds(F)) {
         bresenham_slope = 0;
         return false; // Out of range!
@@ -9271,8 +9271,8 @@ auto map::find_furnitures_with_flag_in_omt(const tripoint_bub_ms& p, const std::
 };
 
 auto map::find_furnitures_with_flag_in_radius(
-    const tripoint_bub_ms& center, size_t radius, const std::string& flag,
-    size_t radiusz) -> std::list<tripoint_bub_ms> {
+    const tripoint_bub_ms& center, size_t radius, const std::string& flag, size_t radiusz)
+    -> std::list<tripoint_bub_ms> {
     std::list<tripoint_bub_ms> furn_locs;
     for (const auto& furn_loc : points_in_radius(center, radius, radiusz)) {
         if (has_flag_furn(flag, furn_loc)) { furn_locs.push_back(furn_loc); }
@@ -9281,8 +9281,8 @@ auto map::find_furnitures_with_flag_in_radius(
 }
 
 auto map::find_furnitures_or_vparts_with_flag_in_radius(
-    const tripoint_bub_ms& center, size_t radius, const std::string& flag,
-    size_t radiusz) -> std::list<tripoint_bub_ms> {
+    const tripoint_bub_ms& center, size_t radius, const std::string& flag, size_t radiusz)
+    -> std::list<tripoint_bub_ms> {
     std::list<tripoint_bub_ms> locs;
     for (const auto& loc : points_in_radius(center, radius, radiusz)) {
         // workaround for ramp bridges
