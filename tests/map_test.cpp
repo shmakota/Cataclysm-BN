@@ -120,8 +120,8 @@ auto mapgen_item_count_in_radius(
 }
 
 auto count_field_tiles_in_radius(
-    map& here, const tripoint_bub_ms& center, const size_t radius, const field_type_id& field_id)
-    -> int {
+    map& here, const tripoint_bub_ms& center, const size_t radius,
+    const field_type_id& field_id) -> int {
     auto result = 0;
     for (const auto& pos : here.points_in_radius(center, radius)) {
         result += here.get_field(pos, field_id) != nullptr ? 1 : 0;
@@ -130,8 +130,8 @@ auto count_field_tiles_in_radius(
 }
 
 auto total_field_intensity_in_radius(
-    map& here, const tripoint_bub_ms& center, const size_t radius, const field_type_id& field_id)
-    -> int {
+    map& here, const tripoint_bub_ms& center, const size_t radius,
+    const field_type_id& field_id) -> int {
     auto result = 0;
     for (const auto& pos : here.points_in_radius(center, radius)) {
         if (const auto* field = here.get_field(pos, field_id)) {
@@ -650,6 +650,26 @@ TEST_CASE("repeated_liquid_spills_intensify_before_expanding", "[map][item][liqu
     auto center_items = here.i_at(center);
     CHECK(center_items.empty());
     CHECK(count_field_tiles_in_radius(here, center, 2, water_field) > 1);
+}
+
+TEST_CASE("field_intensity_can_make_a_tile_impassable", "[map][field][movement]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([]() { clear_all_state(); });
+
+    auto& here = get_map();
+    const auto pos = tripoint_bub_ms{60, 60, 0};
+    const auto foamcrete = field_type_id("fd_foamcrete");
+    here.ter_set(pos, ter_id("t_floor"));
+    here.furn_set(pos, furn_id("f_null"));
+    here.remove_field(pos, foamcrete);
+
+    REQUIRE(here.passable(pos));
+    REQUIRE(here.add_field(pos, foamcrete, 1));
+    CHECK(here.passable(pos));
+
+    CHECK(here.set_field_intensity(pos, foamcrete, 2) == 2);
+    CHECK_FALSE(here.passable(pos));
+    CHECK(here.move_cost(pos) == 0);
 }
 
 TEST_CASE(

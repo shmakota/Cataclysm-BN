@@ -249,7 +249,13 @@
     "type": "field_type",
     "intensity_levels": [
       { "name": "foamcrete splatter", "sym": "~", "color": "light_gray", "move_cost": 200 },
-      { "name": "thick foamcrete", "color": "light_gray", "transparent": false, "move_cost": 600 }
+      {
+        "name": "thick foamcrete",
+        "color": "light_gray",
+        "transparent": false,
+        "impassable": true,
+        "move_cost": 200
+      }
     ],
     "description_affix": "covered_in",
     "priority": 2,
@@ -257,7 +263,7 @@
     "display_field": true,
     "half_life": "12 hours",
     "looks_like": "t_wall_resin",
-    "tint": "#FFFFFF"
+    "tint": "#fff2a6"
   },
   {
     "id": "fd_fire",
