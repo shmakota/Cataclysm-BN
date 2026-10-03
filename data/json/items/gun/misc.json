@@ -33,7 +33,6 @@
     "material": "steel",
     "flags": [ "NEVER_JAMS", "MOUNTED_GUN", "NO_RELOAD", "NON_FOULING" ],
     "ammo_effects": [ "NO_PENETRATE_OBSTACLES", "JET", "BEANBAG", "NEVER_MISFIRES" ],
-    "ammo_effects_to_remove": [ "FLAME", "INCENDIARY", "STREAM" ],
     "ammo": [ "water", "acid", "lubricant", "glue" ],
     "weight": "24500 g",
     "volume": "12500 ml",
