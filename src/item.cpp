@@ -8931,7 +8931,7 @@ ret_val<bool> item::is_gunmod_compatible( const item &mod ) const
     }
     const islot_gunmod &g_mod = *mod.type->gunmod;
 
-    const auto already_has_tether = ranges::any_of( gunmods(), []( const auto *installed ) {
+    const auto already_has_tether = ranges::any_of( gunmods(), []( const auto * installed ) {
         return installed->has_flag( flag_id( "WEAPON_TETHER" ) );
     } );
     if( mod.has_flag( flag_id( "WEAPON_TETHER" ) ) && already_has_tether ) {

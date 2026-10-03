@@ -674,7 +674,7 @@ Custom tethers can inherit the bungee cord's flag and installation time:
   "type": "GUNMOD",
   "name": { "str": "custom weapon tether" },
   "description": "A reusable cord for securing a weapon.",
-  "material": [ "nylon" ],
+  "material": ["nylon"],
   "weight": "80 g"
 }
 ```
