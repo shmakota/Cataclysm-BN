@@ -160,6 +160,7 @@ TEST_CASE("super_soaker_uses_water_without_mount_restrictions", "[item][gun]") {
     item& squirt_gun = *item::spawn_temporary("super_soaker");
 
     CHECK(squirt_gun.ammo_types().count(ammotype("water")) == 1);
+    CHECK(squirt_gun.ammo_types().count(ammotype("gasoline")) == 0);
     CHECK(squirt_gun.ammo_default() == itype_id("water"));
     CHECK_FALSE(squirt_gun.has_flag(flag_MOUNTED_GUN));
 }
@@ -172,6 +173,24 @@ TEST_CASE("water_cannons_inherit_liquid_trail_effects_from_ammo", "[item][gun][f
 
     squirt_gun.ammo_set(itype_id("soapy_water"), 1);
     CHECK(squirt_gun.ammo_effects().contains(ammo_effect_str_id("STREAM_SOAPY_WATER")));
+}
+
+TEST_CASE("water_cannons_suppress_gasoline_ignition_but_flamethrowers_keep_it", "[item][gun]") {
+    auto& water_cannon = *item::spawn_temporary("watercannon");
+    CHECK(water_cannon.ammo_types().count(ammotype("gasoline")) == 0);
+    water_cannon.ammo_set(itype_id("gasoline"), 1);
+    CHECK_FALSE(water_cannon.ammo_effects().contains(ammo_effect_str_id("FLAME")));
+    CHECK_FALSE(water_cannon.ammo_effects().contains(ammo_effect_str_id("INCENDIARY")));
+    CHECK_FALSE(water_cannon.ammo_effects().contains(ammo_effect_str_id("STREAM")));
+
+    auto& super_soaker = *item::spawn_temporary("super_soaker");
+    CHECK(super_soaker.ammo_types().count(ammotype("gasoline")) == 0);
+
+    auto& flamethrower = *item::spawn_temporary("flamethrower");
+    flamethrower.ammo_set(itype_id("gasoline"), 1);
+    CHECK(flamethrower.ammo_effects().contains(ammo_effect_str_id("FLAME")));
+    CHECK(flamethrower.ammo_effects().contains(ammo_effect_str_id("INCENDIARY")));
+    CHECK(flamethrower.ammo_effects().contains(ammo_effect_str_id("STREAM")));
 }
 
 TEST_CASE("stacking_cash_cards", "[item]") {

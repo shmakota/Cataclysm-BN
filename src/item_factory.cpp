@@ -1986,6 +1986,7 @@ void Item_factory::load( islot_gun &slot, const JsonObject &jo, const std::strin
     assign( jo, "blackpowder_tolerance", slot.blackpowder_tolerance, strict, 0 );
     assign( jo, "min_cycle_recoil", slot.min_cycle_recoil, strict, 0 );
     assign( jo, "ammo_effects", slot.ammo_effects, strict );
+    assign( jo, "ammo_effects_to_remove", slot.ammo_effects_to_remove, strict );
     assign( jo, "ammo_to_fire", slot.ammo_to_fire, strict, 1 );
     assign( jo, "speed", slot.speed );
     assign( jo, "aimedcritbonus", slot.aimedcritbonus );

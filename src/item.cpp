@@ -8805,6 +8805,10 @@ std::set<ammo_effect_str_id> item::ammo_effects( bool with_ammo ) const
         res.insert( mod->type->gunmod->ammo_effects.begin(), mod->type->gunmod->ammo_effects.end() );
     }
 
+    std::erase_if( res, [this]( const auto &effect ) {
+        return type->gun->ammo_effects_to_remove.contains( effect );
+    } );
+
     return res;
 }
 

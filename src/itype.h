@@ -574,6 +574,8 @@ struct islot_gun : common_ranged_data {
      * Effects that are applied to the ammo when fired.
      */
     std::set<ammo_effect_str_id> ammo_effects;
+    /** Ammo effects removed when this gun fires ammunition. */
+    std::set<ammo_effect_str_id> ammo_effects_to_remove;
     /**
      * Location for gun mods.
      * Key is the location (untranslated!), value is the number of mods
