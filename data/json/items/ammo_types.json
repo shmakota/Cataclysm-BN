@@ -572,6 +572,12 @@
   },
   {
     "type": "ammunition_type",
+    "id": "foamcrete",
+    "name": "foamcrete slurry",
+    "default": "foamcrete_slurry"
+  },
+  {
+    "type": "ammunition_type",
     "id": "milk",
     "name": "milk",
     "default": "milk"
