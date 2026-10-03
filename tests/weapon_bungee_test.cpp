@@ -115,7 +115,7 @@ TEST_CASE("shoulder_strap_prevents_zombie_technicians_from_pulling_rifle", "[mon
     activity.targets.emplace_back(strap);
     activity.values = {0, 100, 0, 0};
     activity_handlers::gunmod_add_finish(&activity, &you);
-    REQUIRE(rifle.gunmod_find("shoulder_strap") == strap);
+    REQUIRE(rifle.gunmod_find(itype_id("shoulder_strap")) == strap);
     CHECK(rifle.get_free_mod_locations(gunmod_location("sling")) == sling_slots - 1);
 
     const auto bungee = item::spawn("bungee_cord");
