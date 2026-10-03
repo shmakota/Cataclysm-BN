@@ -22,7 +22,7 @@
     "id": "foamcrete_slurry",
     "type": "AMMO",
     "name": { "str_sp": "foamcrete slurry" },
-    "description": "A pressurized slurry that rapidly expands and hardens into foamcrete on impact.  It is intended for construction, not combat.",
+    "description": "A pressurized slurry that rapidly expands and hardens into foamcrete on impact, providing short-term construction support or cover.",
     "weight": "3 g",
     "volume": "250 ml",
     "price": "15 USD",
