@@ -9172,7 +9172,9 @@ void game::print_terrain_info( const tripoint_bub_ms &lp, const catacurses::wind
     std::string signage = m.get_signage( lp );
     if( !signage.empty() ) {
         std::string sign_string = u.has_trait( trait_ILLITERATE ) ? "???" : signage;
-        mvwprintz( w_look, point( column, ++line ), c_light_gray, _( "Sign: %s" ), sign_string );
+        auto col = c_light_gray;
+        print_colored_text( w_look, point( column, ++line ), col, col, string_format( _( "Sign: %s" ),
+                            sign_string ) );
     }
 
     if( lp.z() > -OVERMAP_DEPTH && !m.has_floor( lp ) ) {
