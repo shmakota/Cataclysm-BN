@@ -32,22 +32,5 @@
     "durability": 8,
     "loudness": 40,
     "magazines": [ [ "chemical_spray", [ "pressurized_tank_chem" ] ] ]
-  },
-  {
-    "id": "foamcrete_gun",
-    "copy-from": "chemical_thrower",
-    "type": "GUN",
-    "name": { "str": "foamcrete gun" },
-    "description": "A modified chemical thrower that sprays rapidly hardening foamcrete slurry.  It can coat an area with a slow-moving foamcrete field.",
-    "weight": "4588 g",
-    "volume": "4250 ml",
-    "price": "180 USD",
-    "price_postapoc": "20 USD",
-    "material": [ "steel", "plastic" ],
-    "ammo": "foamcrete",
-    "dispersion": 350,
-    "durability": 6,
-    "loudness": 40,
-    "magazines": [ [ "foamcrete", [ "pressurized_tank_foamcrete" ] ] ]
   }
 ]
