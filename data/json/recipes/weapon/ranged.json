@@ -799,21 +799,6 @@
   },
   {
     "type": "recipe",
-    "result": "foamcrete_gun",
-    "category": "CC_WEAPON",
-    "subcategory": "CSC_WEAPON_RANGED",
-    "skill_used": "mechanics",
-    "skills_required": [ "launcher", 2 ],
-    "difficulty": 6,
-    "time": "45 m",
-    "reversible": true,
-    "autolearn": true,
-    "qualities": [ { "id": "SAW_M_FINE", "level": 1 }, { "id": "SCREW_FINE", "level": 1 }, { "id": "HAMMER", "level": 2 } ],
-    "using": [ [ "welding_standard", 40 ] ],
-    "components": [ [ [ "chemical_thrower", 1 ] ], [ [ "steel_chunk", 2 ], [ "scrap", 6 ] ] ]
-  },
-  {
-    "type": "recipe",
     "result": "staff_sling",
     "category": "CC_WEAPON",
     "subcategory": "CSC_WEAPON_RANGED",
