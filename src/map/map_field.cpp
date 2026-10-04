@@ -597,6 +597,12 @@ auto map::creature_in_field(Creature& critter, const bool movement_only) -> void
                         || character->worn_with_flag(flag_NOSLIP, body_part_foot_r))) {
                     continue;
                 }
+                if (monster* const mon = critter.as_monster();
+                    mon != nullptr
+                    && (mon->digs() || mon->flies() || mon->digging() || veh_at(mon->bub_pos())
+                        || mon->has_flag(MF_NO_SLIP))) {
+                    continue;
+                }
             }
             bool effect_added = false;
             if (fe.is_environmental) {
