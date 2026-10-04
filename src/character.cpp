@@ -9,6 +9,7 @@
 #include "avatar_action.h"
 #include "bionics.h"
 #include "bodypart.h"
+#include "cached_options.h"
 #include "calendar.h"
 #include "cata_utility.h"
 #include "catacharset.h"
@@ -5199,6 +5200,39 @@ void Character::mod_int_bonus( int nint )
 {
     int_bonus += nint;
     int_cur = std::max( 0, int_max + int_bonus );
+}
+
+void Character::mod_str_bonus( int nstr, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_str_bonus( nstr );
+}
+void Character::mod_dex_bonus( int ndex, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_dex_bonus( ndex );
+}
+void Character::mod_per_bonus( int nper, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_per_bonus( nper );
+}
+void Character::mod_int_bonus( int nint, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_int_bonus( nint );
 }
 
 void Character::print_health() const

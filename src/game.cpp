@@ -16295,22 +16295,22 @@ void game::process_artifact( item &it, Character &who )
     for( const art_effect_passive &i : effects ) {
         switch( i ) {
             case AEP_STR_UP:
-                who.mod_str_bonus( +4 );
+                who.mod_str_bonus( +4, true );
                 break;
             case AEP_DEX_UP:
-                who.mod_dex_bonus( +4 );
+                who.mod_dex_bonus( +4, true );
                 break;
             case AEP_PER_UP:
-                who.mod_per_bonus( +4 );
+                who.mod_per_bonus( +4, true );
                 break;
             case AEP_INT_UP:
-                who.mod_int_bonus( +4 );
+                who.mod_int_bonus( +4, true );
                 break;
             case AEP_ALL_UP:
-                who.mod_str_bonus( +2 );
-                who.mod_dex_bonus( +2 );
-                who.mod_per_bonus( +2 );
-                who.mod_int_bonus( +2 );
+                who.mod_str_bonus( +2, true );
+                who.mod_dex_bonus( +2, true );
+                who.mod_per_bonus( +2, true );
+                who.mod_int_bonus( +2, true );
                 break;
             case AEP_SPEED_UP:
                 // Handled in player::current_speed()
@@ -16382,26 +16382,26 @@ void game::process_artifact( item &it, Character &who )
                 break;
 
             case AEP_STR_DOWN:
-                who.mod_str_bonus( -3 );
+                who.mod_str_bonus( -3, true );
                 break;
 
             case AEP_DEX_DOWN:
-                who.mod_dex_bonus( -3 );
+                who.mod_dex_bonus( -3, true );
                 break;
 
             case AEP_PER_DOWN:
-                who.mod_per_bonus( -3 );
+                who.mod_per_bonus( -3, true );
                 break;
 
             case AEP_INT_DOWN:
-                who.mod_int_bonus( -3 );
+                who.mod_int_bonus( -3, true );
                 break;
 
             case AEP_ALL_DOWN:
-                who.mod_str_bonus( -2 );
-                who.mod_dex_bonus( -2 );
-                who.mod_per_bonus( -2 );
-                who.mod_int_bonus( -2 );
+                who.mod_str_bonus( -2, true );
+                who.mod_dex_bonus( -2, true );
+                who.mod_per_bonus( -2, true );
+                who.mod_int_bonus( -2, true );
                 break;
 
             case AEP_SPEED_DOWN:
