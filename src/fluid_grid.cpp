@@ -1591,6 +1591,22 @@ auto process_transformers_at( const tripoint_abs_omt &p, time_point to ) -> void
                 return;
             }
             capped_batches = std::min( capped_batches, static_cast<double>( tick_count ) );
+            // A source cannot borrow space from another machine's planned consumption.
+            if( recipe.inputs.empty() ) {
+                for( const auto &output : recipe.outputs ) {
+                    const auto free_volume = std::max( 0_ml,
+                                                       calculate_liquid_capacity_for_grid( grid, mbuf, output.liquid ) -
+                                                       state.stored_for( output.liquid ) );
+                    if( output.amount > 0_ml ) {
+                        capped_batches = std::min( capped_batches,
+                                                   units::to_milliliter<double>( free_volume ) /
+                                                   units::to_milliliter<double>( output.amount ) );
+                    }
+                }
+            }
+            if( capped_batches <= 0.0 ) {
+                return;
+            }
             requests.push_back( transform_request{ .recipe = &recipe, .batches = capped_batches } );
         } );
     } );
@@ -1639,11 +1655,10 @@ auto process_transformers_at( const tripoint_abs_omt &p, time_point to ) -> void
 
     if( total_output_ml > 0.0 ) {
         const auto available_capacity = state.capacity - state.stored_total();
-        const auto max_output_ml = total_input_ml > 0.0
-                                   ? units::to_milliliter<double>( available_capacity ) + total_input_ml
-                                   : units::to_milliliter<double>( available_capacity );
-        if( total_output_ml > max_output_ml && max_output_ml > 0.0 ) {
-            scale = std::min( scale, max_output_ml / total_output_ml );
+        const auto net_output_ml = total_output_ml - total_input_ml;
+        if( net_output_ml > 0.0 ) {
+            scale = std::min( scale, std::max( 0.0,
+                                               units::to_milliliter<double>( available_capacity ) ) / net_output_ml );
         }
         std::ranges::for_each( total_outputs_ml, [&]( const auto & output ) {
             const auto input = total_inputs_ml.contains( output.first ) ?
@@ -1651,14 +1666,17 @@ auto process_transformers_at( const tripoint_abs_omt &p, time_point to ) -> void
             const auto held = units::to_milliliter<double>( state.stored_for( output.first ) );
             const auto liquid_capacity = units::to_milliliter<double>(
                                              calculate_liquid_capacity_for_grid( grid, mbuf, output.first ) );
-            const auto output_capacity = std::max( 0.0, liquid_capacity - held + input );
-            if( output.second > output_capacity ) {
-                scale = output_capacity > 0.0 ? std::min( scale, output_capacity / output.second ) : 0.0;
+            const auto net_output = output.second - input;
+            if( net_output > 0.0 ) {
+                scale = std::min( scale, std::max( 0.0, liquid_capacity - held ) / net_output );
             }
         } );
     }
 
     if( scale <= 0.0 ) {
+        std::ranges::for_each( processed_transformers, [&]( const tripoint_abs_ms & pos ) {
+            set_transformer_last_run_at( pos, to );
+        } );
         return;
     }
 
@@ -1669,11 +1687,11 @@ auto process_transformers_at( const tripoint_abs_omt &p, time_point to ) -> void
         const auto assigned_capacity = units::to_milliliter<double>(
                                            calculate_assigned_liquid_capacity_for_grid( grid, mbuf,
                                                    output.first ) );
-        const auto required_autofill = std::max( 0.0, output.second * scale + held - input -
-                                     assigned_capacity );
+        const auto required_autofill = std::max( 0.0, ( output.second - input ) * scale + held -
+                                       assigned_capacity );
         assign_autofill_tanks_for_grid( grid, mbuf, output.first,
                                         units::from_milliliter( static_cast<std::int64_t>( std::ceil(
-                                                    required_autofill ) ) ) );
+                                                required_autofill ) ) ) );
     } );
 
     std::ranges::for_each( requests, [&]( const transform_request & request ) {
