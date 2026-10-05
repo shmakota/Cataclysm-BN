@@ -665,7 +665,7 @@ TEST_CASE("field_intensity_can_make_a_tile_impassable", "[map][field][movement]"
 
     REQUIRE(here.passable(pos));
     REQUIRE(here.add_field(pos, foamcrete, 1));
-    CHECK(here.passable(pos));
+    CHECK_FALSE(here.passable(pos));
 
     CHECK(here.set_field_intensity(pos, foamcrete, 2) == 2);
     CHECK_FALSE(here.passable(pos));
