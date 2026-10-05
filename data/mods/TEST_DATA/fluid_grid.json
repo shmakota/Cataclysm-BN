@@ -4,6 +4,8 @@
     "id": "test_fluid_tank",
     "copy-from": "f_standing_tank_plumbed",
     "name": "test_fluid_tank",
+    "symbol": "O",
+    "color": "light_gray",
     "fluid_grid": { "role": "tank", "capacity": 40, "allowed_liquids": "universal", "autofill": true }
   },
   {
@@ -11,6 +13,8 @@
     "id": "test_fluid_pump",
     "copy-from": "f_electric_well_pump_on",
     "name": "test_fluid_pump",
+    "symbol": "&",
+    "color": "light_gray",
     "fluid_grid": {
       "role": "transformer",
       "allowed_liquids": [ "water" ],
@@ -22,6 +26,8 @@
     "id": "test_fluid_purifier",
     "copy-from": "f_water_purifier_on",
     "name": "test_fluid_purifier",
+    "symbol": "W",
+    "bgcolor": "blue",
     "fluid_grid": {
       "role": "transformer",
       "allowed_liquids": [ "water", "water_clean" ],
@@ -38,6 +44,8 @@
     "id": "test_fluid_tank_300l",
     "copy-from": "test_fluid_tank",
     "name": "300 L test fluid tank",
+    "symbol": "O",
+    "color": "light_gray",
     "fluid_grid": { "role": "tank", "capacity": 1200, "allowed_liquids": "universal", "autofill": true }
   }
 ]

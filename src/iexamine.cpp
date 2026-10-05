@@ -3794,9 +3794,8 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
             ASSIGN_LIQUID_BASE = 300,
         };
         uilist selectmenu;
-        std::ranges::for_each( liquid_types | std::views::enumerate,
-        [&]( const auto & indexed_type ) {
-            const auto [index, type] = indexed_type;
+        for( auto index = size_t{ 0 }; index < liquid_types.size(); ++index ) {
+            const auto &type = liquid_types[index];
             selectmenu.addentry( DISPENSE_LIQUID_BASE + static_cast<int>( index ), true,
                                  MENU_AUTOASSIGN, _( "Dispense or dump %s" ),
                                  item::nname( type ) );
@@ -3805,14 +3804,13 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                                      MENU_AUTOASSIGN, _( "Have a drink of %s" ),
                                      item::nname( type ) );
             }
-        } );
+        }
         if( is_universal_tank && !assigned_liquid ) {
-            std::ranges::for_each( assignable_liquid_types | std::views::enumerate,
-            [&]( const auto & indexed_type ) {
-                const auto [index, type] = indexed_type;
+            for( auto index = size_t{ 0 }; index < assignable_liquid_types.size(); ++index ) {
+                const auto &type = assignable_liquid_types[index];
                 selectmenu.addentry( ASSIGN_LIQUID_BASE + static_cast<int>( index ), true,
                                      MENU_AUTOASSIGN, _( "Set dispensing liquid to %s" ), item::nname( type ) );
-            } );
+            }
         } else if( is_universal_tank && assigned_liquid ) {
             selectmenu.addentry( UNASSIGN_TANK, true, MENU_AUTOASSIGN,
                                  _( "Unassign tank" ) );
@@ -4900,12 +4898,11 @@ auto iexamine::fluid_grid_fixture( player &p, const tripoint_bub_ms &examp ) -> 
         if( available_liquids.size() > 1 ) {
             uilist liquid_menu;
             liquid_menu.text = _( "Select a liquid" );
-            std::ranges::for_each( available_liquids | std::views::enumerate,
-            [&]( const auto & indexed_liquid ) {
-                const auto [index, type] = indexed_liquid;
+            for( auto index = size_t{ 0 }; index < available_liquids.size(); ++index ) {
+                const auto &type = available_liquids[index];
                 liquid_menu.addentry( static_cast<int>( index ), true, MENU_AUTOASSIGN,
                                       item::nname( type ) );
-            } );
+            }
             liquid_menu.query();
             if( liquid_menu.ret < 0 ) {
                 return;
@@ -4929,13 +4926,12 @@ auto iexamine::fluid_grid_fixture( player &p, const tripoint_bub_ms &examp ) -> 
             liquid_menu.addentry( UNASSIGN_FIXTURE, true, MENU_AUTOASSIGN,
                                   _( "Unassign fixture" ) );
         } else {
-            std::ranges::for_each( available_liquids | std::views::enumerate,
-            [&]( const auto & indexed_liquid ) {
-                const auto [index, type] = indexed_liquid;
+            for( auto index = size_t{ 0 }; index < available_liquids.size(); ++index ) {
+                const auto &type = available_liquids[index];
                 liquid_menu.addentry( ASSIGN_LIQUID_BASE + static_cast<int>( index ), true,
                                       MENU_AUTOASSIGN,
                                       _( "Assign fixture to %s" ), item::nname( type ) );
-            } );
+            }
         }
         liquid_menu.query();
         if( liquid_menu.ret >= ASSIGN_LIQUID_BASE &&
