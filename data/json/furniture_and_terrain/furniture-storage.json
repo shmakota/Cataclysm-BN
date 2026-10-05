@@ -1062,45 +1062,10 @@
     "id": "f_standing_tank_plumbed",
     "copy-from": "f_standing_tank",
     "name": "standing tank (plumbed)",
-    "description": "A large freestanding metal tank hooked into a fluid grid.",
+    "description": "A large freestanding metal tank hooked into a fluid grid. It accepts any liquid, and unassigned tanks can be assigned automatically when the grid needs more capacity for a liquid.",
     "symbol": "O",
     "color": "light_gray",
     "keg_capacity": 1200,
-    "fluid_grid": {
-      "role": "tank",
-      "allow_input": true,
-      "allow_output": true,
-      "allowed_liquids": "universal",
-      "disconnected_variant": "f_standing_tank",
-      "use_keg_capacity": true
-    }
-  },
-  {
-    "type": "furniture",
-    "id": "f_standing_tank_plumbed_limited",
-    "copy-from": "f_standing_tank",
-    "name": "standing tank (plumbed, limited)",
-    "description": "A large freestanding metal tank hooked into a fluid grid.",
-    "symbol": "O",
-    "color": "light_gray",
-    "keg_capacity": 1200,
-    "fluid_grid": {
-      "role": "tank",
-      "allow_input": true,
-      "allow_output": true,
-      "allowed_liquids": [ "water", "water_clean" ],
-      "disconnected_variant": "f_standing_tank",
-      "use_keg_capacity": true
-    }
-  },
-  {
-    "type": "furniture",
-    "id": "f_standing_tank_plumbed_autofill",
-    "copy-from": "f_standing_tank_plumbed",
-    "symbol": "O",
-    "color": "light_gray",
-    "name": "standing tank (plumbed, autofill)",
-    "description": "A large freestanding metal tank hooked into a fluid grid. It accepts one liquid type, chosen when first filled.",
     "fluid_grid": {
       "role": "tank",
       "allow_input": true,

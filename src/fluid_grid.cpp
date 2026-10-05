@@ -1779,7 +1779,8 @@ auto assign_tank_liquid( const tripoint_abs_ms &p, const itype_id &liquid_type )
         return false;
     }
     const auto &furn = sm->get_furn( local_pos ).obj();
-    if( !furn.fluid_grid || !furn.fluid_grid->universal_liquids ||
+    if( !furn.fluid_grid || furn.fluid_grid->role != fluid_grid_role::tank ||
+        !furn.fluid_grid->universal_liquids ||
         !furn.fluid_grid->allows_liquid( liquid_type ) ) {
         return true;
     }
@@ -1789,6 +1790,108 @@ auto assign_tank_liquid( const tripoint_abs_ms &p, const itype_id &liquid_type )
         return assigned == liquid_type.str();
     }
     vars.set( "fluid_grid_assigned_liquid", liquid_type.str() );
+    invalidate_submap_cache_at( sm_pos );
+    get_fluid_grid_tracker().invalidate_at( p );
+    return true;
+}
+
+auto set_tank_assigned_liquid( const tripoint_abs_ms &p, const itype_id &liquid_type ) -> bool
+{
+    auto &mbuf = MAPBUFFER_REGISTRY.get( get_map().get_bound_dimension() );
+    auto sm_pos = tripoint_abs_sm{};
+    auto local_pos = point_sm_ms{};
+    std::tie( sm_pos, local_pos ) = project_remain<coords::sm>( p );
+    auto *sm = mbuf.lookup_submap( sm_pos );
+    if( sm == nullptr ) {
+        return false;
+    }
+    const auto &furn = sm->get_furn( local_pos ).obj();
+    if( !furn.fluid_grid || furn.fluid_grid->role != fluid_grid_role::tank ||
+        !furn.fluid_grid->universal_liquids ||
+        !furn.fluid_grid->allows_liquid( liquid_type ) ||
+        !sm->get_furn_vars( local_pos ).get( "fluid_grid_assigned_liquid", "" ).empty() ||
+        liquid_charges_at( project_to<coords::omt>( p ), liquid_type ) <= 0 ) {
+        return false;
+    }
+    auto &vars = sm->get_furn_vars( local_pos );
+    vars.set( "fluid_grid_assigned_liquid", liquid_type.str() );
+    invalidate_submap_cache_at( sm_pos );
+    get_fluid_grid_tracker().invalidate_at( p );
+    return true;
+}
+
+auto unassign_tank_liquid( const tripoint_abs_ms &p ) -> bool
+{
+    auto &mbuf = MAPBUFFER_REGISTRY.get( get_map().get_bound_dimension() );
+    auto sm_pos = tripoint_abs_sm{};
+    auto local_pos = point_sm_ms{};
+    std::tie( sm_pos, local_pos ) = project_remain<coords::sm>( p );
+    auto *sm = mbuf.lookup_submap( sm_pos );
+    if( sm == nullptr ) {
+        return false;
+    }
+    const auto &furn = sm->get_furn( local_pos ).obj();
+    if( !furn.fluid_grid || furn.fluid_grid->role != fluid_grid_role::tank ||
+        !furn.fluid_grid->universal_liquids ) {
+        return false;
+    }
+    auto &vars = sm->get_furn_vars( local_pos );
+    const auto assigned = vars.get( "fluid_grid_assigned_liquid", "" );
+    if( assigned.empty() ) {
+        return false;
+    }
+    vars.erase( "fluid_grid_assigned_liquid" );
+    invalidate_submap_cache_at( sm_pos );
+    get_fluid_grid_tracker().invalidate_at( p );
+    return true;
+}
+
+auto set_fixture_assigned_liquid( const tripoint_abs_ms &p, const itype_id &liquid_type ) -> bool
+{
+    auto &mbuf = MAPBUFFER_REGISTRY.get( get_map().get_bound_dimension() );
+    auto sm_pos = tripoint_abs_sm{};
+    auto local_pos = point_sm_ms{};
+    std::tie( sm_pos, local_pos ) = project_remain<coords::sm>( p );
+    auto *sm = mbuf.lookup_submap( sm_pos );
+    if( sm == nullptr ) {
+        return false;
+    }
+    const auto &furn = sm->get_furn( local_pos ).obj();
+    if( !furn.fluid_grid || furn.fluid_grid->role != fluid_grid_role::fixture ||
+        furn.fluid_grid->universal_liquids || !furn.fluid_grid->allows_liquid( liquid_type ) ||
+        liquid_charges_at( project_to<coords::omt>( p ), liquid_type ) <= 0 ) {
+        return false;
+    }
+    auto &vars = sm->get_furn_vars( local_pos );
+    if( !vars.get( "fluid_grid_assigned_liquid", "" ).empty() ) {
+        return false;
+    }
+    vars.set( "fluid_grid_assigned_liquid", liquid_type.str() );
+    invalidate_submap_cache_at( sm_pos );
+    get_fluid_grid_tracker().invalidate_at( p );
+    return true;
+}
+
+auto unassign_fixture_liquid( const tripoint_abs_ms &p ) -> bool
+{
+    auto &mbuf = MAPBUFFER_REGISTRY.get( get_map().get_bound_dimension() );
+    auto sm_pos = tripoint_abs_sm{};
+    auto local_pos = point_sm_ms{};
+    std::tie( sm_pos, local_pos ) = project_remain<coords::sm>( p );
+    auto *sm = mbuf.lookup_submap( sm_pos );
+    if( sm == nullptr ) {
+        return false;
+    }
+    const auto &furn = sm->get_furn( local_pos ).obj();
+    if( !furn.fluid_grid || furn.fluid_grid->role != fluid_grid_role::fixture ||
+        furn.fluid_grid->universal_liquids ) {
+        return false;
+    }
+    auto &vars = sm->get_furn_vars( local_pos );
+    if( vars.get( "fluid_grid_assigned_liquid", "" ).empty() ) {
+        return false;
+    }
+    vars.erase( "fluid_grid_assigned_liquid" );
     invalidate_submap_cache_at( sm_pos );
     get_fluid_grid_tracker().invalidate_at( p );
     return true;
