@@ -3700,20 +3700,6 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
             fluid_grid::on_contents_changed( bub_to_abs( where ) );
         }
     };
-    const auto tank_contains_only_water = [&]( const tripoint_bub_ms & where ) -> bool {
-        auto items = here.i_at( where );
-        const auto has_non_water = std::ranges::any_of( items, [&]( const item * it )
-        {
-            return it != nullptr && it->made_of( LIQUID ) &&
-            it->typeId() != itype_water && it->typeId() != itype_water_clean;
-        } );
-        if( has_non_water )
-        {
-            add_msg( m_info, _( "The %s contains non-water liquids and cannot be connected." ), keg_name );
-            return false;
-        }
-        return true;
-    };
     const auto transfer_tank_liquid_to_grid = [&]( const tripoint_bub_ms & where ) {
         const auto pos_abs_omt = project_to<coords::omt>( bub_to_abs( where ) );
         auto items = here.i_at( where );
@@ -3728,12 +3714,14 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
     if( is_plumbed_tank ) {
         const auto pos_abs_ms = bub_to_abs( examp );
         const auto pos_abs_omt = project_to<coords::omt>( pos_abs_ms );
-        const auto clean_available = fluid_grid::liquid_charges_at( pos_abs_omt, itype_water_clean );
-        const auto dirty_available = fluid_grid::liquid_charges_at( pos_abs_omt, itype_water );
-        const auto available = clean_available > 0 ? clean_available : dirty_available;
-        const auto &liquid_type = clean_available > 0 ? itype_water_clean : itype_water;
+        const auto stats = fluid_grid::storage_stats_at( pos_abs_omt );
+        const auto liquid_types = stats.stored_by_type | std::views::filter( [&]( const auto & entry ) {
+            return entry.second > 0_ml && furn.fluid_grid->allowed_liquids.contains( entry.first );
+        } ) | std::views::keys | std::ranges::to<std::vector>();
+        auto liquid_type = itype_water;
+        auto available = 0;
 
-        if( available <= 0 ) {
+        if( liquid_types.empty() ) {
             add_msg( m_info, _( "It is empty." ) );
         }
 
@@ -3743,12 +3731,22 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
             FILL,
             EXAMINE,
             DISCONNECT_FROM_FLUID_GRID,
+            DISPENSE_LIQUID_BASE = 100,
+            DRINK_LIQUID_BASE = 200,
         };
         uilist selectmenu;
-        selectmenu.addentry( DISPENSE, available > 0, MENU_AUTOASSIGN,
-                             _( "Dispense or dump %s" ), item::nname( liquid_type ) );
-        selectmenu.addentry( HAVE_A_DRINK, available > 0, MENU_AUTOASSIGN,
-                             _( "Have a drink" ) );
+        std::ranges::for_each( liquid_types | std::views::enumerate,
+        [&]( const auto & indexed_type ) {
+            const auto [index, type] = indexed_type;
+            selectmenu.addentry( DISPENSE_LIQUID_BASE + static_cast<int>( index ), true,
+                                 MENU_AUTOASSIGN, _( "Dispense or dump %s" ),
+                                 item::nname( type ) );
+            if( type->comestible ) {
+                selectmenu.addentry( DRINK_LIQUID_BASE + static_cast<int>( index ), true,
+                                     MENU_AUTOASSIGN, _( "Have a drink of %s" ),
+                                     item::nname( type ) );
+            }
+        } );
         selectmenu.addentry( FILL, true, MENU_AUTOASSIGN, _( "Fill" ) );
         selectmenu.addentry( EXAMINE, true, MENU_AUTOASSIGN, _( "Examine" ) );
         if( can_disconnect_tank ) {
@@ -3757,6 +3755,19 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
         }
         selectmenu.text = _( "Select an action" );
         selectmenu.query();
+        auto selected_action = selectmenu.ret;
+        if( selectmenu.ret >= DISPENSE_LIQUID_BASE && selectmenu.ret < DRINK_LIQUID_BASE ) {
+            const auto index = static_cast<size_t>( selectmenu.ret - DISPENSE_LIQUID_BASE );
+            liquid_type = liquid_types[index];
+            available = fluid_grid::liquid_charges_at( pos_abs_omt, liquid_type );
+            selected_action = DISPENSE;
+        } else if( selectmenu.ret >= DRINK_LIQUID_BASE &&
+                   selectmenu.ret < DRINK_LIQUID_BASE + static_cast<int>( liquid_types.size() ) ) {
+            const auto index = static_cast<size_t>( selectmenu.ret - DRINK_LIQUID_BASE );
+            liquid_type = liquid_types[index];
+            available = fluid_grid::liquid_charges_at( pos_abs_omt, liquid_type );
+            selected_action = HAVE_A_DRINK;
+        }
 
         const auto use_grid_liquid = [&]( const auto & fn ) -> int {
             auto target_sm = tripoint_abs_sm{};
@@ -3786,7 +3797,7 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
             return before;
         };
 
-        switch( selectmenu.ret ) {
+        switch( selected_action ) {
             case DISPENSE: {
                 const auto used = use_grid_liquid( [&]( item & water_item ) {
                     liquid_handler::handle_liquid( water_item );
@@ -3838,10 +3849,10 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
 
             case FILL: {
                 auto drinks_inv = p.items_with( []( const item & it ) {
-                    return it.typeId() == itype_water || it.typeId() == itype_water_clean;
+                    return it.made_of( LIQUID );
                 } );
                 if( drinks_inv.empty() ) {
-                    add_msg( m_info, _( "You don't have any water to fill the %s with." ), keg_name );
+                    add_msg( m_info, _( "You don't have any liquids to fill the %s with." ), keg_name );
                     return;
                 }
                 auto drink_types = std::vector<itype_id> {};
@@ -3876,7 +3887,7 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                 }
                 const auto added = fluid_grid::add_liquid_charges( pos_abs_omt, drink_type, charges_held );
                 if( added <= 0 ) {
-                    add_msg( m_info, _( "The %s cannot hold any more water." ), keg_name );
+                    add_msg( m_info, _( "The %s cannot hold any more liquid." ), keg_name );
                     return;
                 }
                 p.use_charges( drink_type, added );
@@ -3958,9 +3969,6 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
             selectmenu.text = _( "Select an action" );
             selectmenu.query();
             if( selectmenu.ret == ADD_TO_FLUID_GRID ) {
-                if( !tank_contains_only_water( examp ) ) {
-                    return;
-                }
                 displace_items_except_one_liquid( examp );
                 if( !connected_variant ) {
                     return;
@@ -4145,9 +4153,6 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
             }
 
             case ADD_TO_FLUID_GRID: {
-                if( !tank_contains_only_water( examp ) ) {
-                    return;
-                }
                 displace_items_except_one_liquid( examp );
                 if( !connected_variant ) {
                     return;
@@ -4201,10 +4206,6 @@ detached_ptr<item> iexamine::pour_into_keg( const tripoint_bub_ms &pos,
     item &obj = *liquid;
 
     if( is_plumbed ) {
-        if( liquid->typeId() != itype_water && liquid->typeId() != itype_water_clean ) {
-            add_msg( _( "The %s only accepts water." ), keg_name );
-            return std::move( liquid );
-        }
         const auto pos_abs_omt = project_to<coords::omt>( bub_to_abs( pos ) );
         if( !confirm_fluid_grid_contamination( pos_abs_omt, liquid->typeId() ) ) {
             return std::move( liquid );
@@ -4740,16 +4741,34 @@ auto iexamine::fluid_grid_fixture( player &p, const tripoint_bub_ms &examp ) -> 
     const auto pos_abs_ms = bub_to_abs( examp );
     const auto pos_abs_omt = project_to<coords::omt>( pos_abs_ms );
 
-    const auto available_liquid = std::ranges::find_if( fluid_grid.allowed_liquids,
-    [&]( const itype_id & liquid ) {
-        return fluid_grid::liquid_charges_at( pos_abs_omt, liquid ) > 0;
-    } );
-    if( available_liquid == fluid_grid.allowed_liquids.end() ) {
+    const auto fluid_stats = fluid_grid::storage_stats_at( pos_abs_omt );
+    const auto available_liquids = fluid_stats.stored_by_type
+                                   | std::views::filter( [&]( const auto & entry ) {
+        return entry.second > 0_ml && fluid_grid.allowed_liquids.contains( entry.first );
+    } )
+                                   | std::views::keys
+                                   | std::ranges::to<std::vector>();
+    if( available_liquids.empty() ) {
         add_msg( m_info, _( "The %s is dry." ), fixture_name );
         return;
     }
 
-    const auto &liquid_type = *available_liquid;
+    auto liquid_type = available_liquids.front();
+    if( available_liquids.size() > 1 ) {
+        uilist liquid_menu;
+        liquid_menu.text = _( "Select a liquid" );
+        std::ranges::for_each( available_liquids | std::views::enumerate,
+        [&]( const auto & indexed_liquid ) {
+            const auto [index, type] = indexed_liquid;
+            liquid_menu.addentry( static_cast<int>( index ), true, MENU_AUTOASSIGN,
+                                  item::nname( type ) );
+        } );
+        liquid_menu.query();
+        if( liquid_menu.ret < 0 ) {
+            return;
+        }
+        liquid_type = available_liquids[static_cast<size_t>( liquid_menu.ret )];
+    }
     const auto available = fluid_grid::liquid_charges_at( pos_abs_omt, liquid_type );
     auto target_sm = tripoint_abs_sm{};
     auto target_pos = point_sm_ms{};
@@ -4763,15 +4782,15 @@ auto iexamine::fluid_grid_fixture( player &p, const tripoint_bub_ms &examp ) -> 
     auto &items = target_submap->get_items( target_pos );
     auto liquid_item = item::spawn( liquid_type, calendar::turn, available );
     auto iter = items.insert( items.end(), std::move( liquid_item ) );
-    item *water_item = *iter;
-    const auto before = water_item->charges;
-    liquid_handler::handle_liquid( *water_item );
+    item *liquid_item_ptr = *iter;
+    const auto before = liquid_item_ptr->charges;
+    liquid_handler::handle_liquid( *liquid_item_ptr );
     auto used = 0;
     const auto &item_ptrs = items.as_vector();
-    const auto still_here = std::ranges::find( item_ptrs, water_item ) != item_ptrs.end();
+    const auto still_here = std::ranges::find( item_ptrs, liquid_item_ptr ) != item_ptrs.end();
     if( still_here ) {
-        used = before - water_item->charges;
-        items.remove( water_item );
+        used = before - liquid_item_ptr->charges;
+        items.remove( liquid_item_ptr );
     } else {
         used = before;
     }

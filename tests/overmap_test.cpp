@@ -5,7 +5,10 @@
 #include "coordinates.h"
 #include "debug.h"
 #include "enums.h"
+#include "fluid_grid.h"
+#include "game.h"
 #include "game_constants.h"
+#include "map/map.h"
 #include "map_helpers.h"
 #include "numeric_interval.h"
 #include "overmap/omdata.h"
@@ -19,6 +22,7 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <sstream>
 #include <vector>
 
 TEST_CASE("city building selection preserves empty bins", "[overmap][city]") {
@@ -66,6 +70,48 @@ TEST_CASE("set_and_get_overmap_scents", "[overmap]") {
     test_overmap->set_scent({75, 85, 0}, test_scent);
     REQUIRE(test_overmap->scent_at({75, 85, 0}).creation_time == tp);
     REQUIRE(test_overmap->scent_at({75, 85, 0}).initial_strength == 90);
+}
+
+TEST_CASE("fluid grids preserve multiple liquid types", "[overmap][fluid_grid]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([] { clear_all_state(); });
+    clear_map();
+    auto& here = get_map();
+    const auto tank_pos = tripoint_bub_ms{g_half_mapsize_x, g_half_mapsize_y, 0};
+    const auto tank_abs_ms = map_local_to_abs(here, tank_pos);
+    const auto tank_abs_omt = project_to<coords::omt>(tank_abs_ms);
+    const auto grid_node_abs_omt = tank_abs_omt + tripoint_rel_omt{ 1, 0, 0 };
+    const auto gasoline = itype_id("gasoline");
+    const auto water = itype_id("water");
+    fluid_grid::load(here);
+    here.furn_set(tank_pos, furn_id("f_standing_tank_plumbed"));
+    fluid_grid::on_structure_changed(tank_abs_ms);
+    REQUIRE( fluid_grid::add_grid_connection( tank_abs_omt, grid_node_abs_omt ) );
+
+    REQUIRE( fluid_grid::storage_stats_at( grid_node_abs_omt ).capacity > 0_ml );
+    const auto gasoline_added = fluid_grid::add_liquid_charges( grid_node_abs_omt, gasoline, 500 );
+    const auto water_added = fluid_grid::add_liquid_charges( grid_node_abs_omt, water, 10 );
+
+    CHECK(gasoline_added == 500);
+    CHECK(water_added == 10);
+    CHECK( fluid_grid::liquid_charges_at( tank_abs_omt, gasoline ) == 500 );
+    CHECK( fluid_grid::liquid_charges_at( tank_abs_omt, water ) == 10 );
+
+    auto &owning_overmap = *get_overmapbuffer( here.get_bound_dimension() ).get_om_global(
+                               tank_abs_omt ).om;
+    const auto owning_omc = get_overmapbuffer( here.get_bound_dimension() ).get_om_global(
+                                tank_abs_omt );
+    fluid_grid::storage_for( owning_overmap )[owning_omc.local].capacity = 0_ml;
+    auto saved_data = std::ostringstream{};
+    owning_overmap.serialize( saved_data );
+    fluid_grid::clear();
+    auto loaded_data = std::istringstream{ saved_data.str() };
+    owning_overmap.unserialize( loaded_data, "multifluid grid save test" );
+    fluid_grid::load( here );
+
+    CHECK( fluid_grid::storage_stats_at( grid_node_abs_omt ).capacity > 0_ml );
+    CHECK( fluid_grid::liquid_charges_at( grid_node_abs_omt, gasoline ) == 500 );
+    CHECK( fluid_grid::liquid_charges_at( grid_node_abs_omt, water ) == 10 );
 }
 
 TEST_CASE("default_overmap_generation_always_succeeds", "[overmap][slow]") {
