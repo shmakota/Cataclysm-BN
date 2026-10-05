@@ -83,6 +83,16 @@ TEST_CASE("fluid grids preserve multiple liquid types", "[overmap][fluid_grid]")
     const auto grid_node_abs_omt = tank_abs_omt + tripoint_rel_omt{ 1, 0, 0 };
     const auto gasoline = itype_id("gasoline");
     const auto water = itype_id("water");
+    const auto &tank_liquids = furn_id( "f_standing_tank_plumbed" ).obj().fluid_grid;
+    REQUIRE( tank_liquids.has_value() );
+    CHECK( tank_liquids->universal_liquids );
+    CHECK( tank_liquids->allows_liquid( gasoline ) );
+    const auto &sink_liquids = furn_id( "f_sink" ).obj().fluid_grid;
+    REQUIRE( sink_liquids.has_value() );
+    CHECK( sink_liquids->allows_liquid( gasoline ) );
+    const auto &shower_liquids = furn_id( "f_shower" ).obj().fluid_grid;
+    REQUIRE( shower_liquids.has_value() );
+    CHECK_FALSE( shower_liquids->allows_liquid( gasoline ) );
     fluid_grid::load(here);
     here.furn_set(tank_pos, furn_id("f_standing_tank_plumbed"));
     fluid_grid::on_structure_changed(tank_abs_ms);

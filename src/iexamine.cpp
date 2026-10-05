@@ -3716,7 +3716,7 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
         const auto pos_abs_omt = project_to<coords::omt>( pos_abs_ms );
         const auto stats = fluid_grid::storage_stats_at( pos_abs_omt );
         const auto liquid_types = stats.stored_by_type | std::views::filter( [&]( const auto & entry ) {
-            return entry.second > 0_ml && furn.fluid_grid->allowed_liquids.contains( entry.first );
+            return entry.second > 0_ml && furn.fluid_grid->allows_liquid( entry.first );
         } ) | std::views::keys | std::ranges::to<std::vector>();
         auto liquid_type = itype_water;
         auto available = 0;
@@ -4744,7 +4744,7 @@ auto iexamine::fluid_grid_fixture( player &p, const tripoint_bub_ms &examp ) -> 
     const auto fluid_stats = fluid_grid::storage_stats_at( pos_abs_omt );
     const auto available_liquids = fluid_stats.stored_by_type
                                    | std::views::filter( [&]( const auto & entry ) {
-        return entry.second > 0_ml && fluid_grid.allowed_liquids.contains( entry.first );
+        return entry.second > 0_ml && fluid_grid.allows_liquid( entry.first );
     } )
                                    | std::views::keys
                                    | std::ranges::to<std::vector>();

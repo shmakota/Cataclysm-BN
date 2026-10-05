@@ -1070,6 +1070,7 @@
       "role": "tank",
       "allow_input": true,
       "allow_output": true,
+      "allowed_liquids": "universal",
       "disconnected_variant": "f_standing_tank",
       "use_keg_capacity": true
     }
