@@ -8,6 +8,7 @@
 #include "fluid_grid.h"
 #include "game.h"
 #include "game_constants.h"
+#include "item.h"
 #include "map/map.h"
 #include "map_helpers.h"
 #include "numeric_interval.h"
@@ -129,6 +130,12 @@ TEST_CASE("fluid grids preserve multiple liquid types", "[overmap][fluid_grid]")
     CHECK(fluid_grid::liquid_charges_at(tank_abs_omt, water) == 10);
     CHECK(fluid_grid::liquid_charges_at(tank_abs_omt, diesel) == 10);
     CHECK_FALSE(fluid_grid::set_tank_assigned_liquid(tank_abs_ms, water));
+    CHECK_FALSE(fluid_grid::unassign_tank_liquid(tank_abs_ms));
+    const auto spare_pos = tank_pos + point_north;
+    const auto spare_abs = map_local_to_abs(here, spare_pos);
+    here.furn_set(spare_pos, furn_id("f_standing_tank_plumbed"));
+    fluid_grid::on_structure_changed(spare_abs);
+    REQUIRE(fluid_grid::assign_tank_liquid(spare_abs, gasoline));
     CHECK(fluid_grid::unassign_tank_liquid(tank_abs_ms));
     CHECK(here.furn_vars(tank_pos)->get("fluid_grid_assigned_liquid", "").empty());
     CHECK(fluid_grid::set_tank_assigned_liquid(tank_abs_ms, water));
@@ -214,6 +221,80 @@ TEST_CASE("fluid grid pumps respect liquid capacity while purifying", "[overmap]
         fluid_grid::process_transformers_at(grid, calendar::turn + 70_minutes);
         CHECK(fluid_grid::storage_stats_at(grid).stored_for(water) == 5_liter);
     }
+}
+
+TEST_CASE("fluid tank removal respects assigned liquid storage", "[overmap][fluid_grid]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([] { clear_all_state(); });
+    clear_map();
+    auto& here = get_map();
+    const auto tank_pos = tripoint_bub_ms{g_half_mapsize_x, g_half_mapsize_y, 0};
+    const auto spare_pos = tank_pos + point_east;
+    const auto tank_abs = map_local_to_abs(here, tank_pos);
+    const auto spare_abs = map_local_to_abs(here, spare_pos);
+    const auto grid = project_to<coords::omt>(tank_abs);
+    const auto water = itype_id("water");
+    const auto clean = itype_id("water_clean");
+    fluid_grid::load(here);
+    here.furn_set(tank_pos, furn_id("test_fluid_tank"));
+    here.furn_set(spare_pos, furn_id("test_fluid_tank"));
+    fluid_grid::on_structure_changed(tank_abs);
+    fluid_grid::on_structure_changed(spare_abs);
+    REQUIRE(fluid_grid::assign_tank_liquid(tank_abs, water));
+    REQUIRE(fluid_grid::add_liquid_charges(grid, water, 40) == 40);
+
+    SECTION("Space assigned to another liquid cannot replace the tank") {
+        REQUIRE(fluid_grid::assign_tank_liquid(spare_abs, clean));
+        CHECK_FALSE(fluid_grid::unassign_tank_liquid(tank_abs));
+        CHECK(here.furn_vars(tank_pos)->get("fluid_grid_assigned_liquid", "") == "water");
+        CHECK(fluid_grid::liquid_charges_at(grid, water) == 40);
+    }
+    SECTION("Autofill storage takes over before unassigning") {
+        CHECK(fluid_grid::unassign_tank_liquid(tank_abs));
+        CHECK(here.furn_vars(tank_pos)->get("fluid_grid_assigned_liquid", "").empty());
+        CHECK(here.furn_vars(spare_pos)->get("fluid_grid_assigned_liquid", "") == "water");
+        CHECK(fluid_grid::liquid_charges_at(grid, water) == 40);
+    }
+    SECTION("Smashing spills only the destroyed tank's liquid") {
+        REQUIRE(fluid_grid::assign_tank_liquid(spare_abs, clean));
+        REQUIRE(fluid_grid::add_liquid_charges(grid, clean, 4) == 4);
+        here.destroy_furn(tank_pos, true);
+        CHECK(fluid_grid::liquid_charges_at(grid, water) == 0);
+        CHECK(fluid_grid::liquid_charges_at(grid, clean) == 4);
+        for (const auto* it : here.i_at(tank_pos)) {
+            CHECK(it->typeId() != water);
+            CHECK(it->typeId() != clean);
+        }
+        CHECK(here.get_field_intensity(tank_pos, field_type_id("fd_water")) > 0);
+    }
+}
+
+TEST_CASE(
+    "destroyed standing tank releases at most its 300 liter capacity", "[overmap][fluid_grid]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([] { clear_all_state(); });
+    clear_map();
+    auto& here = get_map();
+    const auto tank_pos = tripoint_bub_ms{g_half_mapsize_x, g_half_mapsize_y, 0};
+    const auto spare_pos = tank_pos + point_east;
+    const auto tank_abs = map_local_to_abs(here, tank_pos);
+    const auto grid = project_to<coords::omt>(tank_abs);
+    const auto water = itype_id("water");
+    fluid_grid::load(here);
+    for (const auto& pos : {tank_pos, spare_pos}) {
+        here.furn_set(pos, furn_id("test_fluid_tank_300l"));
+        const auto abs = map_local_to_abs(here, pos);
+        fluid_grid::on_structure_changed(abs);
+        REQUIRE(fluid_grid::assign_tank_liquid(abs, water));
+    }
+    REQUIRE(fluid_grid::add_liquid_charges(grid, water, 2400) == 2400);
+    fluid_grid::on_tank_removed(tank_abs);
+    auto spilled = 0_ml;
+    for (const auto* it : here.i_at(tank_pos)) {
+        if (it->typeId() == water) { spilled += it->volume(); }
+    }
+    CHECK(spilled == 300_liter);
+    CHECK(fluid_grid::storage_stats_at(grid).stored_for(water) == 300_liter);
 }
 
 TEST_CASE("default_overmap_generation_always_succeeds", "[overmap][slow]") {

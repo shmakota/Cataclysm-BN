@@ -3885,6 +3885,8 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                     p.i_add( item::spawn( rubber_hose, calendar::turn ) );
                     consume_fluid_grid_requirements( p, requirements );
                     add_msg( m_info, _( "You unassign the %s." ), keg_name );
+                } else {
+                    add_msg( m_info, _( "The rest of the fluid grid cannot hold this tank's liquid." ) );
                 }
                 return;
             }
@@ -4041,7 +4043,10 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
             }
 
             case DISCONNECT_FROM_FLUID_GRID:
-                fluid_grid::disconnect_tank( pos_abs_ms );
+                if( !fluid_grid::disconnect_tank( pos_abs_ms ) ) {
+                    add_msg( m_info, _( "The rest of the fluid grid cannot hold this tank's liquid." ) );
+                    return;
+                }
                 if( !disconnected_variant ) {
                     return;
                 }
@@ -4097,7 +4102,10 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                 add_msg( m_info, _( "You connect the %s to the fluid grid." ), keg_name );
                 return;
             } else if( selectmenu.ret == DISCONNECT_FROM_FLUID_GRID ) {
-                fluid_grid::disconnect_tank( bub_to_abs( examp ) );
+                if( !fluid_grid::disconnect_tank( bub_to_abs( examp ) ) ) {
+                    add_msg( m_info, _( "The rest of the fluid grid cannot hold this tank's liquid." ) );
+                    return;
+                }
                 if( !disconnected_variant ) {
                     return;
                 }
@@ -4282,7 +4290,10 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
             }
 
             case DISCONNECT_FROM_FLUID_GRID:
-                fluid_grid::disconnect_tank( bub_to_abs( examp ) );
+                if( !fluid_grid::disconnect_tank( bub_to_abs( examp ) ) ) {
+                    add_msg( m_info, _( "The rest of the fluid grid cannot hold this tank's liquid." ) );
+                    return;
+                }
                 if( !disconnected_variant ) {
                     return;
                 }

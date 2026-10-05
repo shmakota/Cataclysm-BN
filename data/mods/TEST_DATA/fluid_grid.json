@@ -32,5 +32,12 @@
         ]
       }
     }
+  },
+  {
+    "type": "furniture",
+    "id": "test_fluid_tank_300l",
+    "copy-from": "test_fluid_tank",
+    "name": "300 L test fluid tank",
+    "fluid_grid": { "role": "tank", "capacity": 1200, "allowed_liquids": "universal", "autofill": true }
   }
 ]

@@ -97,7 +97,7 @@ auto set_fixture_assigned_liquid( const tripoint_abs_ms &p, const itype_id &liqu
 auto unassign_fixture_liquid( const tripoint_abs_ms &p ) -> bool;
 auto on_structure_changed( const tripoint_abs_ms &p ) -> void;
 auto on_tank_removed( const tripoint_abs_ms &p ) -> void;
-auto disconnect_tank( const tripoint_abs_ms &p ) -> void;
+auto disconnect_tank( const tripoint_abs_ms &p ) -> bool;
 auto add_grid_connection( const tripoint_abs_omt &lhs,
                           const tripoint_abs_omt &rhs ) -> bool;
 auto remove_grid_connection( const tripoint_abs_omt &lhs,
