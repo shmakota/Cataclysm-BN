@@ -90,6 +90,7 @@ auto update( time_point to ) -> void;
 auto bind_dimension( const dimension_id &dim_id ) -> void;
 auto load( const map &m ) -> void;
 auto on_contents_changed( const tripoint_abs_ms &p ) -> void;
+auto assign_tank_liquid( const tripoint_abs_ms &p, const itype_id &liquid_type ) -> bool;
 auto on_structure_changed( const tripoint_abs_ms &p ) -> void;
 auto on_tank_removed( const tripoint_abs_ms &p ) -> void;
 auto disconnect_tank( const tripoint_abs_ms &p ) -> void;

@@ -646,6 +646,7 @@ struct fluid_grid_data {
     bool allow_output = false;
     std::set<itype_id> allowed_liquids;
     bool universal_liquids = false;
+    bool autofill = false;
     std::optional<units::volume> capacity;
     bool use_keg_capacity = false;
     std::optional<furn_str_id> connected_variant;

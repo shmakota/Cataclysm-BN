@@ -78,15 +78,23 @@ TEST_CASE("fluid grids preserve multiple liquid types", "[overmap][fluid_grid]")
     clear_map();
     auto& here = get_map();
     const auto tank_pos = tripoint_bub_ms{g_half_mapsize_x, g_half_mapsize_y, 0};
+    const auto water_tank_pos = tank_pos + point_south;
+    const auto autofill_tank_pos = tank_pos + point_east;
     const auto tank_abs_ms = map_local_to_abs(here, tank_pos);
+    const auto water_tank_abs_ms = map_local_to_abs(here, water_tank_pos);
+    const auto autofill_tank_abs_ms = map_local_to_abs(here, autofill_tank_pos);
     const auto tank_abs_omt = project_to<coords::omt>(tank_abs_ms);
     const auto grid_node_abs_omt = tank_abs_omt + tripoint_rel_omt{ 1, 0, 0 };
     const auto gasoline = itype_id("gasoline");
     const auto water = itype_id("water");
+    const auto diesel = itype_id("diesel");
     const auto &tank_liquids = furn_id( "f_standing_tank_plumbed" ).obj().fluid_grid;
     REQUIRE( tank_liquids.has_value() );
     CHECK( tank_liquids->universal_liquids );
     CHECK( tank_liquids->allows_liquid( gasoline ) );
+    const auto &autofill_tank = furn_id( "f_standing_tank_plumbed_autofill" ).obj().fluid_grid;
+    REQUIRE( autofill_tank.has_value() );
+    CHECK( autofill_tank->autofill );
     const auto &sink_liquids = furn_id( "f_sink" ).obj().fluid_grid;
     REQUIRE( sink_liquids.has_value() );
     CHECK( sink_liquids->allows_liquid( gasoline ) );
@@ -95,17 +103,28 @@ TEST_CASE("fluid grids preserve multiple liquid types", "[overmap][fluid_grid]")
     CHECK_FALSE( shower_liquids->allows_liquid( gasoline ) );
     fluid_grid::load(here);
     here.furn_set(tank_pos, furn_id("f_standing_tank_plumbed"));
+    here.furn_set(water_tank_pos, furn_id("f_standing_tank_plumbed"));
+    here.furn_set(autofill_tank_pos, furn_id("f_standing_tank_plumbed_autofill"));
     fluid_grid::on_structure_changed(tank_abs_ms);
+    fluid_grid::on_structure_changed(water_tank_abs_ms);
+    fluid_grid::on_structure_changed(autofill_tank_abs_ms);
     REQUIRE( fluid_grid::add_grid_connection( tank_abs_omt, grid_node_abs_omt ) );
 
     REQUIRE( fluid_grid::storage_stats_at( grid_node_abs_omt ).capacity > 0_ml );
+    REQUIRE( fluid_grid::assign_tank_liquid( tank_abs_ms, gasoline ) );
+    REQUIRE( fluid_grid::assign_tank_liquid( water_tank_abs_ms, water ) );
+    CHECK( fluid_grid::add_liquid_charges( grid_node_abs_omt, diesel, 10 ) == 10 );
+    CHECK( fluid_grid::assign_tank_liquid( autofill_tank_abs_ms, diesel ) );
+    CHECK_FALSE( fluid_grid::assign_tank_liquid( autofill_tank_abs_ms, gasoline ) );
     const auto gasoline_added = fluid_grid::add_liquid_charges( grid_node_abs_omt, gasoline, 500 );
     const auto water_added = fluid_grid::add_liquid_charges( grid_node_abs_omt, water, 10 );
 
     CHECK(gasoline_added == 500);
     CHECK(water_added == 10);
+    CHECK_FALSE( fluid_grid::assign_tank_liquid( tank_abs_ms, water ) );
     CHECK( fluid_grid::liquid_charges_at( tank_abs_omt, gasoline ) == 500 );
     CHECK( fluid_grid::liquid_charges_at( tank_abs_omt, water ) == 10 );
+    CHECK( fluid_grid::liquid_charges_at( tank_abs_omt, diesel ) == 10 );
 
     auto &owning_overmap = *get_overmapbuffer( here.get_bound_dimension() ).get_om_global(
                                tank_abs_omt ).om;
@@ -122,6 +141,7 @@ TEST_CASE("fluid grids preserve multiple liquid types", "[overmap][fluid_grid]")
     CHECK( fluid_grid::storage_stats_at( grid_node_abs_omt ).capacity > 0_ml );
     CHECK( fluid_grid::liquid_charges_at( grid_node_abs_omt, gasoline ) == 500 );
     CHECK( fluid_grid::liquid_charges_at( grid_node_abs_omt, water ) == 10 );
+    CHECK( fluid_grid::liquid_charges_at( grid_node_abs_omt, diesel ) == 10 );
 }
 
 TEST_CASE("default_overmap_generation_always_succeeds", "[overmap][slow]") {

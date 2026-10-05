@@ -3703,12 +3703,23 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
     const auto transfer_tank_liquid_to_grid = [&]( const tripoint_bub_ms & where ) {
         const auto pos_abs_omt = project_to<coords::omt>( bub_to_abs( where ) );
         auto items = here.i_at( where );
+        auto transferred = std::vector<item *> {};
         std::ranges::for_each( items, [&]( item * it ) {
             if( it != nullptr && it->made_of( LIQUID ) ) {
-                fluid_grid::add_liquid_charges( pos_abs_omt, it->typeId(), it->charges );
+                const auto pos_abs_ms = bub_to_abs( where );
+                if( fluid_grid::assign_tank_liquid( pos_abs_ms, it->typeId() ) ) {
+                    const auto added = fluid_grid::add_liquid_charges( pos_abs_omt, it->typeId(),
+                                        it->charges );
+                    it->charges -= added;
+                    if( it->charges <= 0 ) {
+                        transferred.push_back( it );
+                    }
+                }
             }
         } );
-        here.i_clear( where );
+        std::ranges::for_each( transferred, [&]( item * it ) {
+            here.i_rem( where, it );
+        } );
     };
 
     if( is_plumbed_tank ) {
@@ -3885,6 +3896,10 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                 if( !confirm_fluid_grid_contamination( pos_abs_omt, drink_type ) ) {
                     return;
                 }
+                if( !fluid_grid::assign_tank_liquid( pos_abs_ms, drink_type ) ) {
+                    add_msg( m_info, _( "This tank is assigned to a different liquid." ) );
+                    return;
+                }
                 const auto added = fluid_grid::add_liquid_charges( pos_abs_omt, drink_type, charges_held );
                 if( added <= 0 ) {
                     add_msg( m_info, _( "The %s cannot hold any more liquid." ), keg_name );
@@ -3902,27 +3917,18 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                          format_volume( fluid_stats.stored ),
                          format_volume( fluid_stats.capacity ),
                          volume_units_abbr() );
-                const auto stored_count = std::ranges::count_if( fluid_stats.stored_by_type,
-                []( const auto & entry ) {
+                auto stored_liquids = fluid_stats.stored_by_type |
+                                      std::views::filter( []( const auto & entry ) {
                     return entry.second > 0_ml;
                 } );
-                auto fluid_type = std::string{};
-                if( stored_count == 0 ) {
-                    fluid_type = _( "empty" );
-                } else if( stored_count == 1 ) {
-                    const auto iter = std::ranges::find_if( fluid_stats.stored_by_type,
-                    []( const auto & entry ) {
-                        return entry.second > 0_ml;
-                    } );
-                    if( iter != fluid_stats.stored_by_type.end() ) {
-                        fluid_type = item::nname( iter->first );
-                    } else {
-                        fluid_type = _( "empty" );
-                    }
+                if( std::ranges::empty( stored_liquids ) ) {
+                    add_msg( m_info, _( "No liquid is stored." ) );
                 } else {
-                    fluid_type = _( "mixed fluids" );
+                    std::ranges::for_each( stored_liquids, []( const auto & entry ) {
+                        add_msg( m_info, _( "%1$s: %2$s %3$s." ), item::nname( entry.first ),
+                                 format_volume( entry.second ), volume_units_abbr() );
+                    } );
                 }
-                add_msg( m_info, _( "Fluid type: %s." ), fluid_type );
                 return;
             }
 
@@ -4206,8 +4212,13 @@ detached_ptr<item> iexamine::pour_into_keg( const tripoint_bub_ms &pos,
     item &obj = *liquid;
 
     if( is_plumbed ) {
-        const auto pos_abs_omt = project_to<coords::omt>( bub_to_abs( pos ) );
+        const auto pos_abs_ms = bub_to_abs( pos );
+        const auto pos_abs_omt = project_to<coords::omt>( pos_abs_ms );
         if( !confirm_fluid_grid_contamination( pos_abs_omt, liquid->typeId() ) ) {
+            return std::move( liquid );
+        }
+        if( !fluid_grid::assign_tank_liquid( pos_abs_ms, liquid->typeId() ) ) {
+            add_msg( m_info, _( "This tank is assigned to a different liquid." ) );
             return std::move( liquid );
         }
         const auto added = fluid_grid::add_liquid_charges( pos_abs_omt, liquid->typeId(),

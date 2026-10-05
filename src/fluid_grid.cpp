@@ -47,6 +47,8 @@ using grid_member_cache_store = std::map<point_abs_om, grid_member_map>;
 struct submap_tank_cache_entry {
     units::volume capacity = 0_ml;
     int tank_count = 0;
+    std::map<itype_id, units::volume> capacity_by_liquid;
+    units::volume autofill_capacity = 0_ml;
 };
 using submap_tank_cache_store = std::map<tripoint_abs_sm, submap_tank_cache_entry>;
 using transformer_cache_store = std::map<tripoint_abs_sm, bool>;
@@ -675,6 +677,26 @@ auto submap_tank_cache_at( const tripoint_abs_sm &sm_coord,
             if( tank_capacity ) {
                 entry.capacity += *tank_capacity;
                 ++entry.tank_count;
+                const auto &config = *furn.fluid_grid;
+                if( config.universal_liquids ) {
+                    const auto assigned = sm->get_furn_vars( pos ).get(
+                                              "fluid_grid_assigned_liquid", "" );
+                    if( assigned.empty() ) {
+                        if( config.autofill ) {
+                            entry.autofill_capacity += *tank_capacity;
+                        }
+                    } else {
+                        const auto assigned_type = itype_id( assigned );
+                        if( assigned_type.is_valid() ) {
+                            entry.capacity_by_liquid[assigned_type] += *tank_capacity;
+                        }
+                    }
+                } else {
+                    std::ranges::for_each( config.allowed_liquids,
+                    [&]( const itype_id & liquid ) {
+                        entry.capacity_by_liquid[liquid] += *tank_capacity;
+                    } );
+                }
             }
         } );
     } );
@@ -725,6 +747,93 @@ auto calculate_capacity_for_grid( const std::set<tripoint_abs_omt> &grid,
     } );
 
     return total;
+}
+
+auto calculate_liquid_capacity_for_grid( const std::set<tripoint_abs_omt> &grid,
+        mapbuffer &mb, const itype_id &liquid_type ) -> units::volume
+{
+    auto submap_positions = std::set<tripoint_abs_sm> {};
+    std::ranges::for_each( grid, [&]( const tripoint_abs_omt & omp ) {
+        const auto base = project_to<coords::sm>( omp );
+        submap_positions.emplace( base + point_zero );
+        submap_positions.emplace( base + point_east );
+        submap_positions.emplace( base + point_south );
+        submap_positions.emplace( base + point_south_east );
+    } );
+
+    auto total = 0_ml;
+    std::ranges::for_each( submap_positions, [&]( const tripoint_abs_sm & sm_coord ) {
+        const auto entry = submap_tank_cache_at( sm_coord, mb );
+        const auto iter = entry.capacity_by_liquid.find( liquid_type );
+        if( iter != entry.capacity_by_liquid.end() ) {
+            total += iter->second;
+        }
+        total += entry.autofill_capacity;
+    } );
+    return total;
+}
+
+auto calculate_assigned_liquid_capacity_for_grid( const std::set<tripoint_abs_omt> &grid,
+        mapbuffer &mb, const itype_id &liquid_type ) -> units::volume
+{
+    auto submap_positions = std::set<tripoint_abs_sm> {};
+    std::ranges::for_each( grid, [&]( const tripoint_abs_omt & omp ) {
+        const auto base = project_to<coords::sm>( omp );
+        submap_positions.emplace( base + point_zero );
+        submap_positions.emplace( base + point_east );
+        submap_positions.emplace( base + point_south );
+        submap_positions.emplace( base + point_south_east );
+    } );
+    auto total = 0_ml;
+    std::ranges::for_each( submap_positions, [&]( const tripoint_abs_sm & sm_coord ) {
+        const auto entry = submap_tank_cache_at( sm_coord, mb );
+        const auto iter = entry.capacity_by_liquid.find( liquid_type );
+        if( iter != entry.capacity_by_liquid.end() ) {
+            total += iter->second;
+        }
+    } );
+    return total;
+}
+
+auto assign_autofill_tanks_for_grid( const std::set<tripoint_abs_omt> &grid, mapbuffer &mb,
+                                     const itype_id &liquid_type,
+                                     units::volume needed ) -> void
+{
+    auto submap_positions = std::set<tripoint_abs_sm> {};
+    std::ranges::for_each( grid, [&]( const tripoint_abs_omt & omp ) {
+        const auto base = project_to<coords::sm>( omp );
+        submap_positions.emplace( base + point_zero );
+        submap_positions.emplace( base + point_east );
+        submap_positions.emplace( base + point_south );
+        submap_positions.emplace( base + point_south_east );
+    } );
+    std::ranges::for_each( submap_positions, [&]( const tripoint_abs_sm & sm_coord ) {
+        if( needed <= 0_ml ) {
+            return;
+        }
+        auto *sm = mb.lookup_submap( sm_coord );
+        if( sm == nullptr ) {
+            return;
+        }
+        std::ranges::for_each( std::views::iota( 0, SEEX ), [&]( int x ) {
+            std::ranges::for_each( std::views::iota( 0, SEEY ), [&]( int y ) {
+                if( needed <= 0_ml ) {
+                    return;
+                }
+                const auto pos = point_sm_ms( x, y );
+                const auto &furn = sm->get_furn( pos ).obj();
+                const auto capacity = tank_capacity_for_furn( furn );
+                if( !capacity || !furn.fluid_grid || !furn.fluid_grid->universal_liquids ||
+                    !furn.fluid_grid->autofill ||
+                    !sm->get_furn_vars( pos ).get( "fluid_grid_assigned_liquid", "" ).empty() ) {
+                    return;
+                }
+                sm->get_furn_vars( pos ).set( "fluid_grid_assigned_liquid", liquid_type.str() );
+                invalidate_submap_cache_at( sm_coord );
+                needed -= *capacity;
+            } );
+        } );
+    } );
 }
 
 struct split_storage_result {
@@ -891,17 +1000,34 @@ class fluid_storage_grid
             normalize_water_storage( state, allow_mixed );
 
             const auto available_volume = state.capacity - state.stored_total();
-            if( available_volume <= 0_ml ) {
+            auto capacity_type = liquid_type;
+            auto type_stored = state.stored_for( liquid_type );
+            if( ( liquid_type == itype_water || liquid_type == itype_water_clean ) && !allow_mixed ) {
+                capacity_type = itype_water;
+                type_stored = state.stored_for( itype_water ) + state.stored_for( itype_water_clean );
+            }
+            auto liquid_capacity = calculate_liquid_capacity( capacity_type );
+            if( ( liquid_type == itype_water || liquid_type == itype_water_clean ) && !allow_mixed ) {
+                liquid_capacity = calculate_liquid_capacity( itype_water ) +
+                                  calculate_liquid_capacity( itype_water_clean ) -
+                                  calculate_autofill_capacity();
+            }
+            const auto type_available_volume = liquid_capacity - type_stored;
+            if( available_volume <= 0_ml || type_available_volume <= 0_ml ) {
                 return 0;
             }
 
-            const auto max_charges = charges_from_volume( liquid_type, available_volume );
+            const auto max_charges = charges_from_volume( liquid_type,
+                                     std::min( available_volume, type_available_volume ) );
             const auto added = std::min( charges, max_charges );
             if( added <= 0 ) {
                 return 0;
             }
 
             const auto added_volume = volume_from_charges( liquid_type, added );
+            const auto assigned_capacity = liquid_capacity - calculate_autofill_capacity();
+            assign_autofill_tanks( capacity_type,
+                                   std::max( added_volume + type_stored - assigned_capacity, 0_ml ) );
             add_liquid_to_storage( state, liquid_type, added_volume, allow_mixed );
             cached_stats.reset();
             sync_storage();
@@ -951,6 +1077,62 @@ class fluid_storage_grid
                 total += submap_tank_cache_at( sm_coord, mb ).capacity;
             } );
             return total;
+        }
+
+        auto calculate_liquid_capacity( const itype_id &liquid_type ) const -> units::volume {
+            auto total = 0_ml;
+            std::ranges::for_each( submap_coords, [&]( const tripoint_abs_sm & sm_coord ) {
+                const auto entry = submap_tank_cache_at( sm_coord, mb );
+                const auto iter = entry.capacity_by_liquid.find( liquid_type );
+                if( iter != entry.capacity_by_liquid.end() ) {
+                    total += iter->second;
+                }
+                total += entry.autofill_capacity;
+            } );
+            return total;
+        }
+
+        auto calculate_autofill_capacity() const -> units::volume {
+            auto total = 0_ml;
+            std::ranges::for_each( submap_coords, [&]( const tripoint_abs_sm & sm_coord ) {
+                total += submap_tank_cache_at( sm_coord, mb ).autofill_capacity;
+            } );
+            return total;
+        }
+
+        auto assign_autofill_tanks( const itype_id &liquid_type, units::volume needed ) -> void {
+            auto assigned_capacity = 0_ml;
+            std::ranges::for_each( submap_coords, [&]( const tripoint_abs_sm & sm_coord ) {
+                if( needed <= 0_ml ) {
+                    return;
+                }
+                auto *sm = mb.lookup_submap( sm_coord );
+                if( sm == nullptr ) {
+                    return;
+                }
+                std::ranges::for_each( std::views::iota( 0, SEEX ), [&]( int x ) {
+                    std::ranges::for_each( std::views::iota( 0, SEEY ), [&]( int y ) {
+                        if( needed <= 0_ml ) {
+                            return;
+                        }
+                        const auto pos = point_sm_ms( x, y );
+                        const auto &furn = sm->get_furn( pos ).obj();
+                        const auto capacity = tank_capacity_for_furn( furn );
+                        if( !capacity || !furn.fluid_grid || !furn.fluid_grid->universal_liquids ||
+                            !furn.fluid_grid->autofill ||
+                            !sm->get_furn_vars( pos ).get( "fluid_grid_assigned_liquid", "" ).empty() ) {
+                            return;
+                        }
+                        sm->get_furn_vars( pos ).set( "fluid_grid_assigned_liquid", liquid_type.str() );
+                        invalidate_submap_cache_at( sm_coord );
+                        assigned_capacity += *capacity;
+                        needed -= *capacity;
+                    } );
+                } );
+            } );
+            if( assigned_capacity > 0_ml ) {
+                cached_stats.reset();
+            }
         }
 
         auto sync_storage() -> void {
@@ -1463,11 +1645,36 @@ auto process_transformers_at( const tripoint_abs_omt &p, time_point to ) -> void
         if( total_output_ml > max_output_ml && max_output_ml > 0.0 ) {
             scale = std::min( scale, max_output_ml / total_output_ml );
         }
+        std::ranges::for_each( total_outputs_ml, [&]( const auto & output ) {
+            const auto input = total_inputs_ml.contains( output.first ) ?
+                               total_inputs_ml[output.first] : 0.0;
+            const auto held = units::to_milliliter<double>( state.stored_for( output.first ) );
+            const auto liquid_capacity = units::to_milliliter<double>(
+                                             calculate_liquid_capacity_for_grid( grid, mbuf, output.first ) );
+            const auto output_capacity = std::max( 0.0, liquid_capacity - held + input );
+            if( output.second > output_capacity ) {
+                scale = output_capacity > 0.0 ? std::min( scale, output_capacity / output.second ) : 0.0;
+            }
+        } );
     }
 
     if( scale <= 0.0 ) {
         return;
     }
+
+    std::ranges::for_each( total_outputs_ml, [&]( const auto & output ) {
+        const auto input = total_inputs_ml.contains( output.first ) ?
+                           total_inputs_ml[output.first] : 0.0;
+        const auto held = units::to_milliliter<double>( state.stored_for( output.first ) );
+        const auto assigned_capacity = units::to_milliliter<double>(
+                                           calculate_assigned_liquid_capacity_for_grid( grid, mbuf,
+                                                   output.first ) );
+        const auto required_autofill = std::max( 0.0, output.second * scale + held - input -
+                                     assigned_capacity );
+        assign_autofill_tanks_for_grid( grid, mbuf, output.first,
+                                        units::from_milliliter( static_cast<std::int64_t>( std::ceil(
+                                                    required_autofill ) ) ) );
+    } );
 
     std::ranges::for_each( requests, [&]( const transform_request & request ) {
         const auto scaled_batches = request.batches * scale;
@@ -1559,6 +1766,32 @@ auto load( const map &m ) -> void
 auto on_contents_changed( const tripoint_abs_ms &p ) -> void
 {
     get_fluid_grid_tracker().invalidate_at( p );
+}
+
+auto assign_tank_liquid( const tripoint_abs_ms &p, const itype_id &liquid_type ) -> bool
+{
+    auto &mbuf = MAPBUFFER_REGISTRY.get( get_map().get_bound_dimension() );
+    auto sm_pos = tripoint_abs_sm{};
+    auto local_pos = point_sm_ms{};
+    std::tie( sm_pos, local_pos ) = project_remain<coords::sm>( p );
+    auto *sm = mbuf.lookup_submap( sm_pos );
+    if( sm == nullptr ) {
+        return false;
+    }
+    const auto &furn = sm->get_furn( local_pos ).obj();
+    if( !furn.fluid_grid || !furn.fluid_grid->universal_liquids ||
+        !furn.fluid_grid->allows_liquid( liquid_type ) ) {
+        return true;
+    }
+    auto &vars = sm->get_furn_vars( local_pos );
+    const auto assigned = vars.get( "fluid_grid_assigned_liquid", "" );
+    if( !assigned.empty() ) {
+        return assigned == liquid_type.str();
+    }
+    vars.set( "fluid_grid_assigned_liquid", liquid_type.str() );
+    invalidate_submap_cache_at( sm_pos );
+    get_fluid_grid_tracker().invalidate_at( p );
+    return true;
 }
 
 auto on_structure_changed( const tripoint_abs_ms &p ) -> void
