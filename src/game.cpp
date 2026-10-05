@@ -9155,7 +9155,7 @@ void game::print_terrain_info( const tripoint_bub_ms &lp, const catacurses::wind
         }
         if( furniture.fluid_grid && furniture.fluid_grid->role == fluid_grid_role::tank &&
             furniture.fluid_grid->allow_output ) {
-            auto dispensable_liquids = std::vector<std::string>{};
+            auto dispensable_liquids = std::vector<std::string> {};
             if( furniture.fluid_grid->universal_liquids ) {
                 const auto *vars = m.furn_vars( lp );
                 const auto assigned_liquid = vars == nullptr ? std::string{} :
@@ -9165,7 +9165,7 @@ void game::print_terrain_info( const tripoint_bub_ms &lp, const catacurses::wind
                 }
             } else {
                 dispensable_liquids = furniture.fluid_grid->allowed_liquids |
-                                      std::views::transform( []( const itype_id & liquid ) {
+                std::views::transform( []( const itype_id & liquid ) {
                     return item::nname( liquid );
                 } ) | std::ranges::to<std::vector>();
             }

@@ -653,8 +653,8 @@ struct fluid_grid_data {
     std::optional<furn_str_id> disconnected_variant;
     std::optional<fluid_grid_transformer_config> transformer;
 
-    auto allows_liquid( const itype_id &liquid ) const -> bool {
-        return universal_liquids || allowed_liquids.contains( liquid );
+    auto allows_liquid(const itype_id& liquid) const -> bool {
+        return universal_liquids || allowed_liquids.contains(liquid);
     }
 };
 

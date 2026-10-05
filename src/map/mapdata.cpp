@@ -1620,7 +1620,8 @@ void furn_t::check() const {
             debugmsg("furn %s has fluid grid but no allowed_liquids set", id.c_str());
         }
         if (fluid_grid_data.autofill && !fluid_grid_data.universal_liquids) {
-            debugmsg("furn %s has fluid grid autofill enabled without universal liquids", id.c_str());
+            debugmsg("furn %s has fluid grid autofill enabled without universal liquids",
+                     id.c_str());
         }
         const auto invalid_liquid =
             std::ranges::find_if(fluid_grid_data.allowed_liquids, [](const itype_id& liquid) {

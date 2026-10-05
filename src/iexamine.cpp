@@ -3734,7 +3734,7 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                 const auto pos_abs_ms = bub_to_abs( where );
                 if( fluid_grid::assign_tank_liquid( pos_abs_ms, it->typeId() ) ) {
                     const auto added = fluid_grid::add_liquid_charges( pos_abs_omt, it->typeId(),
-                                        it->charges );
+                                       it->charges );
                     it->charges -= added;
                     if( it->charges <= 0 ) {
                         transferred.push_back( it );
@@ -3762,14 +3762,15 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                 }
             }
         }
-        const auto can_dispense_liquid = [&]( const itype_id &liquid ) {
+        const auto can_dispense_liquid = [&]( const itype_id & liquid ) {
             return furn.fluid_grid->allows_liquid( liquid ) &&
                    ( !is_universal_tank || ( assigned_liquid && liquid == *assigned_liquid ) );
         };
         const auto liquid_types = stats.stored_by_type | std::views::filter( [&]( const auto & entry ) {
             return entry.second > 0_ml && can_dispense_liquid( entry.first );
         } ) | std::views::keys | std::ranges::to<std::vector>();
-        const auto assignable_liquid_types = stats.stored_by_type | std::views::filter( [&]( const auto & entry ) {
+        const auto assignable_liquid_types = stats.stored_by_type | std::views::filter( [&](
+        const auto & entry ) {
             return entry.second > 0_ml && furn.fluid_grid->allows_liquid( entry.first );
         } ) | std::views::keys | std::ranges::to<std::vector>();
         auto liquid_type = itype_water;
@@ -4010,7 +4011,7 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                          volume_units_abbr() );
                 add_msg( m_info, _( "This tank can dispense:" ) );
                 auto dispensable_liquids = fluid_stats.stored_by_type |
-                                           std::views::filter( [&]( const auto & entry ) {
+                std::views::filter( [&]( const auto & entry ) {
                     return entry.second > 0_ml && can_dispense_liquid( entry.first );
                 } );
                 if( std::ranges::empty( dispensable_liquids ) ) {
@@ -4025,7 +4026,7 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                 }
                 add_msg( m_info, _( "Liquids stored in the fluid grid:" ) );
                 auto grid_liquids = fluid_stats.stored_by_type |
-                                    std::views::filter( []( const auto & entry ) {
+                std::views::filter( []( const auto & entry ) {
                     return entry.second > 0_ml;
                 } );
                 if( std::ranges::empty( grid_liquids ) ) {
@@ -4862,11 +4863,11 @@ auto iexamine::fluid_grid_fixture( player &p, const tripoint_bub_ms &examp ) -> 
 
     const auto fluid_stats = fluid_grid::storage_stats_at( pos_abs_omt );
     const auto available_liquids = fluid_stats.stored_by_type
-                                   | std::views::filter( [&]( const auto & entry ) {
+    | std::views::filter( [&]( const auto & entry ) {
         return entry.second > 0_ml && fluid_grid.allows_liquid( entry.first );
     } )
-                                   | std::views::keys
-                                   | std::ranges::to<std::vector>();
+    | std::views::keys
+    | std::ranges::to<std::vector>();
     auto assigned_liquid = std::optional<itype_id> {};
     if( !fluid_grid.universal_liquids ) {
         const auto *vars = here.furn_vars( examp );
