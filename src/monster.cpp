@@ -3423,6 +3423,12 @@ void monster::process_turn()
         local_attack_data.cooldown = std::max( 0, local_attack_data.cooldown -
                                                action_time_scale::calendar_turns_this_tick() );
     }
+    // A player-held monster must be released after any separation, including teleportation.
+    const auto &you = get_avatar();
+    if( has_effect( effect_grabbed ) &&
+        ( bub_pos().z() != you.bub_pos().z() || square_dist( bub_pos(), you.bub_pos() ) > 1 ) ) {
+        remove_effect( effect_grabbed );
+    }
     // Persist grabs as long as there's an adjacent target.
     if( has_effect( effect_grabbing ) ) {
         auto found_grabbed_target = false;

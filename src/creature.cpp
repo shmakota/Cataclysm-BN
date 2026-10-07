@@ -299,7 +299,6 @@ void Creature::process_turn()
     if( is_dead_state() ) {
         return;
     }
-    process_effects();
 
     // Call this in case any effects have changed our stats
     if( !g->u.in_skip_state ||
@@ -307,6 +306,7 @@ void Creature::process_turn()
         reset_bonuses();
         reset_stats();
     }
+    process_effects();
 
     // add an appropriate number of moves
     if( !has_effect( effect_ridden ) ) {

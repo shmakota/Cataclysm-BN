@@ -376,6 +376,10 @@ class Character : public Creature, public location_visitable<Character>
         virtual void mod_dex_bonus( int ndex );
         virtual void mod_per_bonus( int nper );
         virtual void mod_int_bonus( int nint );
+        void mod_str_bonus( int nstr, bool force_on_tick );
+        void mod_dex_bonus( int ndex, bool force_on_tick );
+        void mod_per_bonus( int nper, bool force_on_tick );
+        void mod_int_bonus( int nint, bool force_on_tick );
 
         // Prints message(s) about current health
         void print_health() const;
