@@ -1,5 +1,26 @@
 #pragma once
 
+#include "bodypart.h" // body_part::num_bp
+#include "calendar.h"
+#include "catalua_type_operators.h"
+#include "color.h" // nc_color
+#include "coordinates.h"
+#include "damage.h"
+#include "data_vars.h"
+#include "enums.h" // point
+#include "explosion.h"
+#include "game_constants.h"
+#include "hsv_color.h"
+#include "iuse.h" // use_function
+#include "map/mapdata.h"
+#include "pldata.h" // add_type
+#include "shape.h"
+#include "stomach.h"
+#include "translations.h"
+#include "type_id.h"
+#include "units.h"
+#include "value_ptr.h"
+
 #include <array>
 #include <iosfwd>
 #include <map>
@@ -9,27 +30,6 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
-
-#include "bodypart.h" // body_part::num_bp
-#include "calendar.h"
-#include "catalua_type_operators.h"
-#include "coordinates.h"
-#include "color.h" // nc_color
-#include "damage.h"
-#include "data_vars.h"
-#include "enums.h" // point
-#include "explosion.h"
-#include "game_constants.h"
-#include "hsv_color.h"
-#include "iuse.h" // use_function
-#include "mapdata.h"
-#include "pldata.h" // add_type
-#include "shape.h"
-#include "stomach.h"
-#include "translations.h"
-#include "type_id.h"
-#include "units.h"
-#include "value_ptr.h"
 
 class Item_factory;
 class item;
@@ -1007,6 +1007,9 @@ struct itype {
 
         /** Action to take BEFORE the item is placed on map. If it returns non-zero, item won't be placed. */
         use_function drop_action;
+
+        /** Field to spread when a liquid is spilled onto ordinary ground. */
+        field_type_id spill_field;
 
         /** Lua callback actors (non-owning, owned by Item_factory) */
         const lua_iwieldable_actor *iwieldable_callbacks = nullptr;

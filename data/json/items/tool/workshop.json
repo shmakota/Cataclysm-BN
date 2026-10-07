@@ -117,7 +117,7 @@
     "material": [ "steel", "plastic" ],
     "symbol": "/",
     "color": "yellow",
-    "qualities": [ [ "GRIND", 2 ] ],
+    "qualities": [ [ "GRIND", 2 ], [ "SANDING", 1 ] ],
     "ammo": "battery",
     "charges_per_use": 1,
     "power_draw": 800000,
@@ -162,7 +162,7 @@
   },
   {
     "id": "chipper",
-    "type": "GENERIC",
+    "type": "TOOL",
     "category": "tools_workshop",
     "name": { "str": "paint chipper" },
     "description": "A tool similar to a chisel, designed to remove paint.",
@@ -175,6 +175,8 @@
     "material": [ "steel", "wood" ],
     "symbol": ";",
     "color": "brown",
+    "item_vars": { "PAINT_COLOR": "#00000000" },
+    "use_action": { "type": "paint_stuff", "charge_cost": 0 },
     "flags": [ "BELT_CLIP" ]
   },
   {
@@ -927,7 +929,7 @@
     "color": "light_gray",
     "ammo": "battery",
     "flags": [ "TRADER_AVOID" ],
-    "magazines": [ [ "battery", [ "light_battery_cell" ] ] ],
+    "magazines": [ [ "battery", [ "light_battery_cell", "light_minus_battery_cell" ] ] ],
     "magazine_well": "250 ml"
   },
   {
@@ -1220,6 +1222,7 @@
           "aluminum",
           "copper",
           "bronze",
+          "brass",
           "silver",
           "gold",
           "platinum",

@@ -1,9 +1,3 @@
-#include "player.h" // IWYU pragma: associated
-
-#include <array>
-#include <cstdlib>
-#include <memory>
-
 #include "action_time_scale.h"
 #include "activity_handlers.h"
 #include "avatar.h"
@@ -15,18 +9,20 @@
 #include "enums.h"
 #include "event.h"
 #include "event_bus.h"
-#include "field_type.h"
 #include "game.h"
 #include "int_id.h"
-#include "map.h"
+#include "map/field_type.h"
+#include "map/map.h"
+#include "map/mapdata.h"
 #include "map_iterator.h"
-#include "mapdata.h"
 #include "martialarts.h"
 #include "messages.h"
-#include "morale_types.h"
 #include "mongroup.h"
 #include "monster.h"
+#include "morale_types.h"
 #include "mutation_data.h"
+#include "profile.h"
+#include "player.h" // IWYU pragma: associated
 #include "player_activity.h"
 #include "pldata.h"
 #include "rng.h"
@@ -38,10 +34,14 @@
 #include "text_snippets.h"
 #include "translations.h"
 #include "type_id.h"
-#include "weather.h"
 #include "vitamin.h"
+#include "weather/weather.h"
+
 #include <algorithm>
+#include <array>
+#include <cstdlib>
 #include <functional>
+#include <memory>
 
 static const activity_id ACT_FIRSTAID( "ACT_FIRSTAID" );
 
@@ -293,11 +293,11 @@ static void eff_fun_hallu( player &u, effect &it )
         u.add_effect( effect_visuals, time_duration::from_turns( peakTime - comedownTime ) );
     } else if( dur > comedownTime && dur < peakTime ) {
         // Full symptoms
-        u.mod_per_bonus( -2 );
-        u.mod_int_bonus( -1 );
-        u.mod_dex_bonus( -2 );
+        u.mod_per_bonus( -2, true );
+        u.mod_int_bonus( -1, true );
+        u.mod_dex_bonus( -2, true );
         u.add_miss_reason( _( "Dancing fractals distract you." ), 2 );
-        u.mod_str_bonus( -1 );
+        u.mod_str_bonus( -1, true );
         if( u.is_player() && one_in( 50 ) ) {
             g->spawn_hallucination( u.bub_pos() + tripoint_rel_ms( rng( -10, 10 ), rng( -10, 10 ), 0 ) );
         }
@@ -330,17 +330,17 @@ struct temperature_effect {
 
     void apply( player &u ) const {
         if( str_pen > 0 ) {
-            u.mod_str_bonus( -str_pen );
+            u.mod_str_bonus( -str_pen, true );
         }
         if( dex_pen > 0 ) {
-            u.mod_dex_bonus( -dex_pen );
+            u.mod_dex_bonus( -dex_pen, true );
             u.add_miss_reason( _( miss_msg ), dex_pen );
         }
         if( int_pen > 0 ) {
-            u.mod_int_bonus( -int_pen );
+            u.mod_int_bonus( -int_pen, true );
         }
         if( per_pen > 0 ) {
-            u.mod_per_bonus( -per_pen );
+            u.mod_per_bonus( -per_pen, true );
         }
         if( !msg.empty() && !u.has_effect( effect_sleep ) && one_in( msg_chance ) ) {
             u.add_msg_if_player( m_warning, "%s", _( msg ) );
@@ -418,7 +418,7 @@ static void eff_fun_hot( player &u, effect &it )
             debugmsg( "%s has no head(?!)", u.disp_name() );
             return;
         }
-        int temp_cur = iter->second.get_temp_cur();
+        const auto temp_cur = units::to_legacy_bodypart_temp( iter->second.get_temp_cur() );
         if( one_in( std::max( 25, std::min( 89500, 90000 - temp_cur ) ) ) ) {
             u.vomit();
         }
@@ -491,6 +491,7 @@ static void eff_fun_mutating( player &u, effect &it )
 
 void Character::hardcoded_effects( effect &it )
 {
+    ZoneScoped;
     if( auto buff = ma_buff::from_effect( it ) ) {
         if( buff->is_valid_character( *this ) ) {
             buff->apply_character( *this );
@@ -593,24 +594,24 @@ void Character::hardcoded_effects( effect &it )
         }
         if( lesserEvil ) {
             // Only minor effects, some even good!
-            mod_str_bonus( dur > 450_minutes ? 10.0 : dur / 45_minutes );
+            mod_str_bonus( dur > 450_minutes ? 10.0 : dur / 45_minutes, true );
             if( dur < 1_hours ) {
-                mod_dex_bonus( 1 );
+                mod_dex_bonus( 1, true );
             } else {
                 int dex_mod = -( dur > 360_minutes ? 10.0 : ( dur - 1_hours ) / 30_minutes );
-                mod_dex_bonus( dex_mod );
+                mod_dex_bonus( dex_mod, true );
                 add_miss_reason( _( "Why waste your time on that insignificant speck?" ), -dex_mod );
             }
-            mod_int_bonus( -( dur > 300_minutes ? 10.0 : ( dur - 50_minutes ) / 25_minutes ) );
-            mod_per_bonus( -( dur > 480_minutes ? 10.0 : ( dur - 80_minutes ) / 40_minutes ) );
+            mod_int_bonus( -( dur > 300_minutes ? 10.0 : ( dur - 50_minutes ) / 25_minutes ), true );
+            mod_per_bonus( -( dur > 480_minutes ? 10.0 : ( dur - 80_minutes ) / 40_minutes ), true );
         } else {
             // Major effects, all bad.
-            mod_str_bonus( -( dur > 500_minutes ? 10.0 : dur / 50_minutes ) );
+            mod_str_bonus( -( dur > 500_minutes ? 10.0 : dur / 50_minutes ), true );
             int dex_mod = -( dur > 600_minutes ? 10.0 : dur / 60_minutes );
-            mod_dex_bonus( dex_mod );
+            mod_dex_bonus( dex_mod, true );
             add_miss_reason( _( "Why waste your time on that insignificant speck?" ), -dex_mod );
-            mod_int_bonus( -( dur > 450_minutes ? 10.0 : dur / 45_minutes ) );
-            mod_per_bonus( -( dur > 400_minutes ? 10.0 : dur / 40_minutes ) );
+            mod_int_bonus( -( dur > 450_minutes ? 10.0 : dur / 45_minutes ), true );
+            mod_per_bonus( -( dur > 400_minutes ? 10.0 : dur / 40_minutes ), true );
         }
     } else if( id == effect_attention ) {
         if( intense > 6 ) {
@@ -1214,12 +1215,12 @@ void Character::hardcoded_effects( effect &it )
             // Cold or heat may wake you up.
             // Player will sleep through cold or heat if fatigued enough
             for( const auto &pr : get_body() ) {
-                int temp_cur = pr.second.get_temp_cur();
-                if( temp_cur < BODYTEMP_VERY_COLD - get_fatigue() / 2 ) {
+                const auto temp_cur = units::to_legacy_bodypart_temp( pr.second.get_temp_cur() );
+                if( temp_cur < units::to_legacy_bodypart_temp( BODYTEMP_VERY_COLD ) - get_fatigue() / 2 ) {
                     if( one_in( 30000 ) ) {
                         add_msg_if_player( _( "You toss and turn trying to keep warm." ) );
                     }
-                    if( temp_cur < BODYTEMP_FREEZING - get_fatigue() / 2 ||
+                    if( temp_cur < units::to_legacy_bodypart_temp( BODYTEMP_FREEZING ) - get_fatigue() / 2 ||
                         one_in( temp_cur * 6 + 30000 ) ) {
                         add_msg_if_player( m_bad, _( "It's too cold to sleep." ) );
                         // Set ourselves up for removal
@@ -1227,11 +1228,11 @@ void Character::hardcoded_effects( effect &it )
                         woke_up = true;
                         break;
                     }
-                } else if( temp_cur > BODYTEMP_VERY_HOT + get_fatigue() / 2 ) {
+                } else if( temp_cur > units::to_legacy_bodypart_temp( BODYTEMP_VERY_HOT ) + get_fatigue() / 2 ) {
                     if( one_in( 30000 ) ) {
                         add_msg_if_player( _( "You toss and turn in the heat." ) );
                     }
-                    if( temp_cur > BODYTEMP_SCORCHING + get_fatigue() / 2 ||
+                    if( temp_cur > units::to_legacy_bodypart_temp( BODYTEMP_SCORCHING ) + get_fatigue() / 2 ||
                         one_in( 90000 - temp_cur ) ) {
                         add_msg_if_player( m_bad, _( "It's too hot to sleep." ) );
                         // Set ourselves up for removal

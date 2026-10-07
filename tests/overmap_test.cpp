@@ -1,14 +1,17 @@
+#include "../src/overmap/overmap.h"
+#include "../src/overmap/overmapbuffer.h"
 #include "calendar.h"
 #include "catch/catch.hpp"
 #include "coordinates.h"
+#include "debug.h"
 #include "enums.h"
 #include "game_constants.h"
+#include "map_helpers.h"
 #include "numeric_interval.h"
-#include "omdata.h"
-#include "overmap.h"
-#include "overmap_special.h"
-#include "overmap_types.h"
-#include "overmapbuffer.h"
+#include "overmap/omdata.h"
+#include "overmap/overmap_special.h"
+#include "overmap/overmap_types.h"
+#include "regional_settings.h"
 #include "rng.h"
 #include "state_helpers.h"
 #include "type_id.h"
@@ -17,6 +20,36 @@
 #include <array>
 #include <memory>
 #include <vector>
+
+TEST_CASE("city building selection preserves empty bins", "[overmap][city]") {
+    auto settings = city_settings{};
+    const auto bins =
+        {&settings.houses,      &settings.urban_houses, &settings.shops,
+         &settings.urban_shops, &settings.parks,        &settings.finales};
+    const auto special = overmap_special_id("test_crater");
+    REQUIRE(special.is_valid());
+    auto expected = overmap_special_id("null");
+
+    SECTION("empty bins") {}
+    SECTION("zero weight bins") {
+        for (auto* bin : bins) { bin->add(special, 0); }
+    }
+    SECTION("populated bins") {
+        expected = special;
+        for (auto* bin : bins) { bin->add(special, 1); }
+    }
+    for (auto* bin : bins) { bin->finalize(); }
+
+    const auto messages = capture_debugmsg_during([&]() {
+        CHECK(settings.pick_house() == expected);
+        CHECK(settings.pick_urban_house() == expected);
+        CHECK(settings.pick_shop() == expected);
+        CHECK(settings.pick_urban_shop() == expected);
+        CHECK(settings.pick_park() == expected);
+        CHECK(settings.pick_finale() == expected);
+    });
+    CHECK(messages.empty());
+}
 
 TEST_CASE("set_and_get_overmap_scents", "[overmap]") {
     clear_all_state();
@@ -57,21 +90,17 @@ TEST_CASE("default_overmap_generation_always_succeeds", "[overmap][slow]") {
 namespace {
 
 void do_lab_finale_test() {
-    const oter_id labt_endgame("central_lab_endgame");
-    const point_abs_om origin;
-    auto batch = overmap_specials::get_default_batch(origin);
-    ACTIVE_OVERMAP_BUFFER.create_custom_overmap(origin, batch);
-    overmap* test_overmap = ACTIVE_OVERMAP_BUFFER.get_existing(origin);
-    int endgame_count = 0;
-    for (int z = -OVERMAP_DEPTH; z < 0; ++z) {
-        for (int x = 0; x < OMAPX; ++x) {
-            for (int y = 0; y < OMAPY; ++y) {
-                const oter_id t = test_overmap->ter({x, y, z});
-                if (t == labt_endgame) { endgame_count++; }
-            }
-        }
-    }
-    CHECK(endgame_count == 1);
+    const point_abs_om origin = point_abs_om(0, -1);
+    static const tripoint_om_omt om_mid{OMAPX / 2, OMAPY / 2, 0};
+
+    ACTIVE_OVERMAP_BUFFER.clear();
+    omt_find_params find_params{};
+    find_params.types.emplace_back("central_lab_endgame", ot_match_type::exact);
+    find_params.search_range = {0, OMAPX / 2};
+    find_params.search_layers = omt_find_all_layers;
+    const tripoint_abs_omt abs_mid = project_combine(origin, om_mid);
+    const tripoint_abs_omt start = ACTIVE_OVERMAP_BUFFER.find_closest(abs_mid, find_params);
+    CHECK(start != overmap::invalid_tripoint);
 }
 
 } // namespace

@@ -54,6 +54,9 @@ trajectory mode_throw_vehicle( avatar &you, const tripoint_bub_ms &grabbed_part_
 /** Reach attacking */
 trajectory mode_reach( avatar &you, item &weapon );
 
+/** Reach attacking */
+trajectory mode_unarmed_reach( avatar &you );
+
 /** Manually firing vehicle turret */
 trajectory mode_turret_manual( avatar &you, turret_data &turret );
 
@@ -163,6 +166,12 @@ double aim_multiplier_from_volume( const item &gun );
 
 /** Calculates aim improvement per move spent aiming at a given @param recoil */
 double aim_per_move( const Character &who, const item &gun, double recoil );
+
+/** Calculates if you're an 'amateur' with that weapon, which doubles your dispersion */
+bool is_amateur( const Character &who, const item &gun );
+
+/** Calculates if you can point shoot and what the point shoot multiplier will be */
+double get_point_shoot_modifier( const Character &who, const item &gun );
 
 /** Get maximum recoil penalty due to vehicle motion */
 double recoil_vehicle( const Character &who );

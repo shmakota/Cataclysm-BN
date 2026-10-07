@@ -207,6 +207,7 @@
     "melee_dice": 3,
     "melee_dice_sides": 5,
     "melee_cut": 0,
+    "grab_strength": 2,
     "//": "Armor values that of swat armor.",
     "armor_bash": 17,
     "armor_cut": 28,
@@ -238,7 +239,20 @@
     "death_drops": "mon_zombie_swat_death_drops",
     "death_function": [ "NORMAL" ],
     "burn_into": "mon_zombie_scorched",
-    "flags": [ "SEES", "HEARS", "SMELLS", "STUMBLES", "WARM", "BASHES", "GROUP_BASH", "POISON", "NO_BREATHE", "REVIVES", "PUSH_MON" ]
+    "flags": [
+      "SEES",
+      "HEARS",
+      "SMELLS",
+      "STUMBLES",
+      "WARM",
+      "BASHES",
+      "GROUP_BASH",
+      "POISON",
+      "NO_BREATHE",
+      "REVIVES",
+      "PUSH_MON",
+      "NO_SLIP"
+    ]
   },
   {
     "id": "mon_zombie_crawler",
@@ -450,7 +464,8 @@
       "NO_BREATHE",
       "REVIVES",
       "PUSH_MON",
-      "NO_FUNG_DMG"
+      "NO_FUNG_DMG",
+      "NO_SLIP"
     ]
   },
   {
@@ -521,6 +536,7 @@
     "melee_dice": 4,
     "melee_dice_sides": 3,
     "melee_cut": 1,
+    "grab_strength": 2,
     "dodge": 1,
     "armor_bash": 2,
     "armor_cut": 1,

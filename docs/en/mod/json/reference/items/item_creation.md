@@ -27,6 +27,7 @@
 "description": "Socks. Put 'em on your feet.", // Description of the item
 "ascii_picture": "ascii_socks", // Id of the asci_art used for this item
 "phase": "solid",                            // (Optional, default = "solid") What phase it is
+"spill_field": "fd_water",                   // (Optional) For liquids dropped onto ordinary ground, create this field before any drop_action runs.
 "weight": "350 g",                           // Weight, weight in grams, mg and kg can be used - "50 mg", "5 g" or "5 kg". For stackable items (ammo, comestibles) this is the weight per charge.
 "volume": "250 ml",                          // Volume, volume in ml and L can be used - "50 ml" or "2 L". For stackable items (ammo, comestibles) this is the volume of stack_size charges.
 "integral_volume": 0,                        // Volume added to base item when item is integrated into another (eg. a gunmod integrated to a gun). Volume in ml and L can be used - "50 ml" or "2 L". Can be negative to reduce parent volume. Clamped at 1% of parent base volume.
@@ -84,6 +85,25 @@
 },
 "repair_difficulty": 2                       // Overrites recipe difficulty being used for repair difficulty
 ```
+
+`spill_field` is intended for liquids. If a liquid item with a `spill_field` is dropped onto
+ordinary ground, the game marks the liquid dirty when appropriate, creates the specified field,
+and then still runs any `drop_action` the item defines. The liquid item is consumed: its charges
+and item state are not stored in the field, and the puddle cannot be collected as liquid again.
+Tiles with the `LIQUIDCONT` flag do not convert liquids to spill fields.
+
+Spill visuals are volume-based rather than charge-count-based. The current implementation treats
+each liter of liquid as one unit of visible spill intensity, with a minimum of one unit for any
+non-zero spill. When additional liquid is poured into an existing connected spill of the same
+field type, the spill deepens existing tiles first by raising field intensity, then expands
+outward into adjacent passable tiles. The visible footprint is capped, so very large spills stop
+growing visually while still consuming the poured liquid.
+
+In practice, `spill_field` is usually many-to-one. Multiple related liquids can intentionally map
+to the same visible field to avoid JSON bloat and unnecessary field type proliferation. For
+example, `tea`, `coca_tea`, and `sweet_tea` can all spill as `fd_tea`, producing the same visible
+`puddle of tea` field. A separate field type is only needed when the puddle has different effects
+or appearance. See [Field Types](../map/field_type.md) for field properties.
 
 #### damage_instance
 
@@ -864,6 +884,18 @@ The contents of use_action fields can either be a string indicating a built-in f
 the item is activated (defined in iuse.cpp), or one of several special definitions that invoke a
 more structured function.
 
+All object defined use actions support the following two types.
+
+```jsonc
+"use_action": {
+  "menu_text": "xyz", // What string is shown in the activate menu
+  // Unique key for the iuse, defaults to the `type`
+  // Note: This should only be used on repeated type definitions
+  // WARN: This does not work on `repair_item` iuse actors -> they have their own special `item_action_type`
+  "internal_name": "test"
+}
+```
+
 ```json
 "use_action": {
     "type": "transform",  // The type of method, in this case one that transforms the item.
@@ -1137,7 +1169,7 @@ more structured function.
     "charges_to_start": 50, // Static cost per item crafted
     "charges_per_minute": 1, // Cost per minute of craft time
     "time_mult": 1, //Multiplier for craft time, 2 is twice as long, 0.5 is half as long, 0 is instant
-    "recipes": [ "water_clean" ], //Any specific item itype in this list can be crafted
+    "recipes": [ "water_clean" ], //Any recipie ident (crafted item + its suffix, e.g water_clean_using_water_purifier) in this list can be crafted
     "subcategories": [ "CSC_FOOD_MEAT", "CSC_FOOD_VEGGI", "CSC_FOOD_PASTA" ], //Any item in these subcategories can be crafted
     "temporary_tools": [ "hotplate", "tongs", "toolset", "pot" ] //Temporary items spawned when crafting to allow for innate qualities
 },

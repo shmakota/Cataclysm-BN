@@ -825,6 +825,30 @@
     ]
   },
   {
+    "result": "broken_talon_m2hb",
+    "type": "uncraft",
+    "skill_used": "electronics",
+    "difficulty": 6,
+    "time": "2 h",
+    "using": [ [ "soldering_standard", 20 ], [ "welding_standard", 5 ] ],
+    "qualities": [ { "id": "SCREW", "level": 1 }, { "id": "SAW_M", "level": 1 } ],
+    "components": [
+      [ [ "ai_module", 1 ] ],
+      [ [ "sensor_module", 1 ] ],
+      [ [ "memory_module", 1 ] ],
+      [ [ "pathfinding_module", 1 ] ],
+      [ [ "targeting_module", 1 ] ],
+      [ [ "identification_module", 1 ] ],
+      [ [ "omni_wheel", 1 ] ],
+      [ [ "copbot_chassis", 1 ] ],
+      [ [ "gun_module", 1 ] ],
+      [ [ "power_supply", 4 ] ],
+      [ [ "solar_cell", 2 ] ],
+      [ [ "m2browning", 1 ] ],
+      [ [ "canister_empty", 1 ] ]
+    ]
+  },
+  {
     "result": "broken_skitterbot",
     "type": "uncraft",
     "skill_used": "electronics",
@@ -1966,6 +1990,13 @@
     "flags": [ "BLIND_EASY" ]
   },
   {
+    "result": "aviators",
+    "type": "uncraft",
+    "time": "6 s",
+    "components": [ [ [ "glass_tinted", 1 ] ] ],
+    "flags": [ "BLIND_EASY" ]
+  },
+  {
     "result": "felt_patch",
     "type": "uncraft",
     "time": "6 m",
@@ -2560,32 +2591,6 @@
     "time": "30 s",
     "components": [ [ [ "paper", 10 ] ] ],
     "flags": [ "BLIND_NO_EFFECT" ]
-  },
-  {
-    "result": "mininuke",
-    "type": "uncraft",
-    "time": "3 h",
-    "skill_used": "electronics",
-    "difficulty": 8,
-    "skills_required": [ [ "fabrication", 4 ], [ "mechanics", 6 ] ],
-    "using": [ [ "soldering_standard", 150 ], [ "welding_standard", 6 ] ],
-    "qualities": [
-      { "id": "SCREW", "level": 1 },
-      { "id": "SCREW_FINE", "level": 1 },
-      { "id": "WRENCH", "level": 2 },
-      { "id": "WRENCH_FINE", "level": 1 },
-      { "id": "SAW_M", "level": 2 },
-      { "id": "SAW_M_FINE", "level": 1 }
-    ],
-    "components": [
-      [ [ "cable", 12 ] ],
-      [ [ "chem_rdx", 20 ] ],
-      [ [ "circuit", 6 ] ],
-      [ [ "plut_cell", 6 ] ],
-      [ [ "power_supply", 1 ] ],
-      [ [ "scrap", 200 ] ],
-      [ [ "small_storage_battery", 2 ] ]
-    ]
   },
   {
     "result": "money_bundle",

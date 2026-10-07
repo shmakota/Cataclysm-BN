@@ -310,6 +310,7 @@
       { "item": "smart_lamp", "prob": 1 },
       { "item": "runner_bag", "prob": 5 },
       { "item": "flip_flops", "prob": 35 },
+      { "item": "crocs", "prob": 35 },
       { "item": "lowtops", "prob": 45 },
       { "item": "dress_shoes", "prob": 50 },
       { "item": "dance_shoes", "prob": 5 },
@@ -444,6 +445,7 @@
     "subtype": "distribution",
     "entries": [
       { "group": "snacks", "prob": 370 },
+      { "item": "lactaid", "prob": 10 },
       { "item": "aluminum_foil", "prob": 25 },
       { "item": "cereal", "prob": 50 },
       { "item": "cereal2", "prob": 60 },
@@ -852,6 +854,7 @@
       { "item": "sunglasses", "prob": 90 },
       { "item": "fitover_sunglasses", "prob": 60 },
       { "item": "fancy_sunglasses", "prob": 5 },
+      { "item": "aviators", "prob": 5 },
       { "item": "glasses_reading", "prob": 90 },
       { "item": "glasses_bifocal", "prob": 90 },
       { "item": "towel", "prob": 40 },

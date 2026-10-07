@@ -26,7 +26,8 @@
       "CLIMBS",
       "PATH_AVOID_DANGER_1",
       "WARM",
-      "HIT_AND_RUN"
+      "HIT_AND_RUN",
+      "NO_SLIP"
     ]
   },
   {
@@ -476,6 +477,7 @@
     "melee_dice_sides": 6,
     "melee_cut": 6,
     "melee_damage": [ { "damage_type": "stab", "amount": 15, "armor_penetration": 10 } ],
+    "grab_strength": 2,
     "special_attacks": [
       [ "GRAB_DRAG", 12 ],
       [ "EAT_FOOD", 2400 ],

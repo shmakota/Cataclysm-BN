@@ -1,41 +1,33 @@
-#include "avatar_functions.h"
-#include "npc.h"
-#include "pickup.h"
-#include "player.h" // IWYU pragma: associated
 #include "consumption.h" // IWYU pragma: associated
-#include "character.h"
-
-#include <algorithm>
-#include <array>
-#include <cstdlib>
-#include <memory>
-#include <optional>
-#include <string>
-#include <tuple>
 
 #include "activity_handlers.h"
 #include "addiction.h"
 #include "avatar.h"
+#include "avatar_functions.h"
 #include "bionics.h"
 #include "calendar.h"
 #include "cata_utility.h"
+#include "character.h"
 #include "craft_command.h"
 #include "debug.h"
 #include "enchantments/enchantment.h"
 #include "enums.h"
-#include "flat_set.h"
 #include "flag.h"
+#include "flat_set.h"
 #include "game.h"
 #include "item_contents.h"
 #include "itype.h"
-#include "map.h"
+#include "map/map.h"
 #include "material.h"
 #include "messages.h"
 #include "monster.h"
 #include "morale_types.h"
 #include "mtype.h"
 #include "mutation.h"
+#include "npc.h"
 #include "options.h"
+#include "pickup.h"
+#include "player.h" // IWYU pragma: associated
 #include "pldata.h"
 #include "recipe.h"
 #include "recipe_dictionary.h"
@@ -48,7 +40,15 @@
 #include "type_id.h"
 #include "units.h"
 #include "vitamin.h"
-#include "weather.h"
+#include "weather/weather.h"
+
+#include <algorithm>
+#include <array>
+#include <cstdlib>
+#include <memory>
+#include <optional>
+#include <string>
+#include <tuple>
 
 static const std::string comesttype_DRINK( "DRINK" );
 static const std::string comesttype_FOOD( "FOOD" );
@@ -74,6 +74,7 @@ static const efftype_id effect_paincysts( "paincysts" );
 static const efftype_id effect_poison( "poison" );
 static const efftype_id effect_tapeworm( "tapeworm" );
 static const efftype_id effect_visuals( "visuals" );
+static const efftype_id effect_lactaid( "lactaid" );
 
 static const itype_id itype_syringe( "syringe" );
 
@@ -638,6 +639,9 @@ morale_type Character::allergy_type( const item &food ) const
     for( const auto &tp : allergy_tuples ) {
         if( has_trait( std::get<0>( tp ) ) &&
             food.has_vitamin( std::get<1>( tp ) ) ) {
+            if( std::get<0>( tp ) == trait_LACTOSE && has_effect( effect_lactaid ) ) {
+                continue;
+            }
             return std::get<2>( tp );
         }
     }
@@ -790,7 +794,7 @@ ret_val<edible_rating> Character::will_eat( const item &food, bool interactive )
     }
 
     if( !food.has_infinite_charges() &&
-        ( ( food_kcal > 0 &&
+        ( ( food_kcal > 0 && !has_active_mutation( trait_EATHEALTH ) &&
             get_stored_kcal() + stomach.get_calories() + food_kcal
             > max_stored_kcal() ) ||
           ( comest->quench > 0 && get_thirst() < comest->quench && !has_trait( trait_NO_THIRST ) ) ) ) {

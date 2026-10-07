@@ -560,6 +560,8 @@ List of known flags, used in both `terrain.json` and `furniture.json`.
 - `LIQUID` Blocks movement, but isn't a wall (lava, water, etc.)
 - `MINEABLE` Can be mined with a pickaxe/jackhammer.
 - `MOUNTABLE` Suitable for guns with the `MOUNTED_GUN` flag.
+- `NANOFAB_BODY` A terrain/furniture with this flag is required within range 1 for nanofab use action to work
+- `NANOFORGE_BODY` A terrain/furniture with this flag is required within range 1 for nanoforge use action to work
 - `NOCOLLIDE` Feature that simply doesn't collide with vehicles at all.
 - `NOITEM` Items cannot be added here but may overflow to adjacent tiles. See also `DESTROY_ITEM`
 - `NO_FLOOR` Things should fall when placed on this tile
@@ -1086,6 +1088,7 @@ Multiple death functions can be used. Not all combinations make sense.
 - `MILKABLE` Produces milk when milked.
 - `NIGHT_INVISIBILITY` Monster becomes invisible if it's more than one tile away and the lighting on
   its tile is LL_LOW or less. Visibility is not affected by night vision.
+- `CAMOUFLAGE` Monster becomes invisible at a range greater than the player's current perception + half of survival skill rounded down.
 - `NOGIB` Does not leave gibs / meat chunks when killed with huge damage.
 - `NOHEAD` Headshots not allowed!
 - `NO_BREATHE` Creature can't drown and is unharmed by gas, smoke or poison.

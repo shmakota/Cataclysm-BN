@@ -1,17 +1,9 @@
 #include "creature.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdint>
-#include <cstdlib>
-#include <map>
-#include <memory>
-#include <optional>
-
 #include "action_time_scale.h"
 #include "anatomy.h"
 #include "avatar.h"
+#include "cached_options.h"
 #include "calendar.h"
 #include "catalua_hooks.h"
 #include "catalua_sol.h"
@@ -25,42 +17,51 @@
 #include "enums.h"
 #include "event.h"
 #include "event_bus.h"
-#include "field.h"
 #include "flag.h"
 #include "game.h"
 #include "game_constants.h"
 #include "int_id.h"
 #include "item.h"
 #include "json.h"
-#include "lightmap.h"
 #include "line.h"
 #include "locations.h"
-#include "map.h"
-#include "mapbuffer.h"
-#include "mapbuffer_registry.h"
+#include "map/field.h"
+#include "map/lightmap.h"
+#include "map/map.h"
+#include "map/mapbuffer.h"
+#include "map/mapbuffer_registry.h"
+#include "map/mapdata.h"
+#include "map/submap_load_manager.h"
 #include "map_iterator.h"
-#include "mapdata.h"
 #include "messages.h"
 #include "monster.h"
 #include "mtype.h"
 #include "npc.h"
 #include "output.h"
+#include "overmap/overmapbuffer_registry.h"
 #include "player.h"
 #include "point.h"
+#include "profile.h"
 #include "projectile.h"
 #include "ranged.h"
 #include "rng.h"
 #include "string_id.h"
 #include "string_utils.h"
-#include "submap_load_manager.h"
-#include "utils/string_to_int.h"
 #include "translations.h"
+#include "utils/string_to_int.h"
 #include "value_ptr.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vpart_position.h"
-#include "overmapbuffer_registry.h"
-#include "profile.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <map>
+#include <memory>
+#include <optional>
 
 auto Creature::get_dimension() const -> const dimension_id &
 {
@@ -272,6 +273,7 @@ void Creature::bleed() const
 
 void Creature::reset_bonuses()
 {
+    ZoneScopedN( "creature_reset_bonuses" );
     num_blocks = 1;
     num_dodges = 1;
     num_blocks_bonus = 0;
@@ -293,15 +295,18 @@ void Creature::reset_bonuses()
 
 void Creature::process_turn()
 {
+    ZoneScopedN( "creature_process_turn" );
     if( is_dead_state() ) {
         return;
     }
-    reset_bonuses();
-
-    process_effects();
 
     // Call this in case any effects have changed our stats
-    reset_stats();
+    if( !g->u.in_skip_state ||
+        action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        reset_bonuses();
+        reset_stats();
+    }
+    process_effects();
 
     // add an appropriate number of moves
     if( !has_effect( effect_ridden ) ) {
@@ -405,6 +410,7 @@ bool Creature::sees( const Creature &critter ) const
     } else if( ( wanted_range > 1 && critter.digging() ) ||
                ( critter.has_flag( MF_NIGHT_INVISIBILITY ) &&
                  here.light_at( critter.bub_pos() ) <= lit_level::LOW ) ||
+               ( critter.has_flag( MF_CAMOUFLAGE ) && wanted_range > spotting_range() ) ||
                ( critter.is_underwater() && !is_underwater() && here.is_divable( critter.bub_pos() ) ) ||
                ( here.has_flag_ter_or_furn( TFLAG_HIDE_PLACE, critter.bub_pos() ) &&
                  !( std::abs( bub_pos().x() - critter.bub_pos().x() ) <= 1 &&
@@ -413,44 +419,46 @@ bool Creature::sees( const Creature &critter ) const
                  critter.get_size() <= creature_size::medium ) ) {
         return false;
     }
+    double range_mod = 1;
     if( ch != nullptr ) {
         if( ch->movement_mode_is( CMM_CROUCH ) || ch->movement_mode_is( CMM_PRONE ) ) {
             const int coverage = here.obstacle_coverage( bub_pos(), critter.bub_pos() );
             const int threshold = ch->movement_mode_is( CMM_PRONE ) ? 15 : 30;
-            if( coverage < threshold ) {
-                return sees( critter.bub_pos(), critter.is_avatar() ) && visible( ch );
+            if( coverage > threshold ) {
+                float size_modifier = 1.0;
+                switch( ch->get_size() ) {
+                    case creature_size::tiny:
+                        size_modifier = 2.0;
+                        break;
+                    case creature_size::small:
+                        size_modifier = 1.4;
+                        break;
+                    case creature_size::medium:
+                        break;
+                    case creature_size::large:
+                        size_modifier = 0.6;
+                        break;
+                    case creature_size::huge:
+                        size_modifier = 0.15;
+                        break;
+                    default:
+                        break;
+                }
+                range_mod = ( 0.5 * coverage * size_modifier ) / 30.0;
             }
-            float size_modifier = 1.0;
-            switch( ch->get_size() ) {
-                case creature_size::tiny:
-                    size_modifier = 2.0;
-                    break;
-                case creature_size::small:
-                    size_modifier = 1.4;
-                    break;
-                case creature_size::medium:
-                    break;
-                case creature_size::large:
-                    size_modifier = 0.6;
-                    break;
-                case creature_size::huge:
-                    size_modifier = 0.15;
-                    break;
-                default:
-                    break;
-            }
-            const int vision_modifier = 30 - 0.5 * coverage * size_modifier;
-            if( vision_modifier > 1 ) {
-                return sees( critter.bub_pos(), critter.is_avatar(), vision_modifier ) && visible( ch );
-            }
-            return false;
         }
+        range_mod *= ( double( ch->visibility() ) / 100.0 );
     }
-    return sees( critter.bub_pos(), critter.is_avatar() ) && visible( ch );
+    return sees( critter.bub_pos(), critter.is_avatar(), 0, range_mod ) && visible( ch );
 }
 
-bool Creature::sees( const tripoint_bub_ms &t, bool /*is_avatar*/, int range_mod ) const
+bool Creature::sees( const tripoint_bub_ms &t, bool /*is_avatar*/, int range_limit,
+                     double range_mod ) const
 {
+    if( range_mod <= 0 ) {
+        return false;
+    }
+
     map &here = get_map();
     // A creature in a different dimension from the current render map cannot
     // perform a valid sight check through that map's terrain data.
@@ -475,24 +483,24 @@ bool Creature::sees( const tripoint_bub_ms &t, bool /*is_avatar*/, int range_mod
         tl_range.range_night = sight_range( 0 );
         tl_range.range_max  = std::max( tl_range.range_day, tl_range.range_night );
     }
-    const auto range_max = tl_range.range_max;
+    const int range_max = tl_range.range_max * range_mod;
     const auto wanted_range = rl_dist( bub_pos(), t );
     if( wanted_range > range_max ) {
         return false;
     }
     const auto ambient = here.ambient_light_at( t );
-    const auto range_cur = sight_range( ambient );
-    const auto range_min = std::min( range_cur, range_max );
+    const int range_cur = sight_range( ambient ) * range_mod;
+    const int range_min = std::min( range_cur, range_max );
     const auto natural_light = g->natural_light_level( t.z() );
     const auto is_lit = ambient > natural_light;
     if( wanted_range <= range_min ||
         ( wanted_range <= range_max && is_lit ) ) {
-        auto range = is_lit ? g_max_view_distance : range_min;
+        int range = is_lit ? g_max_view_distance * range_mod : range_min;
         if( has_effect( effect_no_sight ) ) {
             range = 1;
         }
-        if( range_mod > 0 ) {
-            range = std::min( range, range_mod );
+        if( range_limit > 0 ) {
+            range = std::min( range, range_limit );
         }
         return here.sees( bub_pos(), t, range );
     } else {
@@ -1352,7 +1360,14 @@ void Creature::deal_damage_handle_type( const damage_unit &du, bodypart_id bp, i
             // Cause bleed if high damage goes through armor and enemy is made of flesh
             if( adjusted_damage > 15 ) {
                 if( !is_immune_effect( effect_bleed ) ) {
-                    add_effect( effect_bleed, 1_minutes * rng( 1, adjusted_damage ), bp.id() );
+                    int bleed_intensity = std::min( 3, std::max( 1, adjusted_damage / 25 ) );
+                    for( int i = 0; i < bleed_intensity; i++ ) {
+                        if( is_monster() ) {
+                            add_effect( effect_bleed, 4_seconds * rng( 1, adjusted_damage ), bp.id() );
+                        } else {
+                            add_effect( effect_bleed, 1_minutes * rng( 1, adjusted_damage ), bp.id() );
+                        }
+                    }
                 }
             }
             break;
@@ -1362,7 +1377,14 @@ void Creature::deal_damage_handle_type( const damage_unit &du, bodypart_id bp, i
             // Cause bleed if high damage goes through armor and enemy is made of flesh
             if( adjusted_damage > 15 ) {
                 if( !is_immune_effect( effect_bleed ) ) {
-                    add_effect( effect_bleed, 1_minutes * rng( 1, adjusted_damage ), bp.id() );
+                    int bleed_intensity = std::min( 3, std::max( 1, adjusted_damage / 25 ) );
+                    for( int i = 0; i < bleed_intensity; i++ ) {
+                        if( is_monster() ) {
+                            add_effect( effect_bleed, 4_seconds * rng( 1, adjusted_damage ), bp.id() );
+                        } else {
+                            add_effect( effect_bleed, 1_minutes * rng( 1, adjusted_damage ), bp.id() );
+                        }
+                    }
                 }
             }
             break;
@@ -1536,6 +1558,10 @@ void Creature::add_effect( const efftype_id &eff_id, const time_duration &dur,
             if( is_player() && !type.get_apply_message().empty() ) {
                 add_msg( type.gain_game_message_type(), _( type.get_apply_message() ) );
             }
+            // Knockdown changes your stance.
+            if( eff_id == effect_downed ) {
+                ch->force_movement_mode( CMM_PRONE );
+            }
         }
         on_effect_int_change( e.get_id(), e.get_intensity(), e.get_bp() );
         // Perform any effect addition effects.
@@ -1592,6 +1618,10 @@ bool Creature::remove_effect( const efftype_id &eff_id, const bodypart_str_id &b
             }
         }
         g->events().send<event_type::character_loses_effect>( ch->getID(), eff_id );
+        // Stand back up after knockdown, unless we're aiming since we're busy retaliating against what knocked us over
+        if( eff_id == effect_downed && !ch->has_activity( activity_id( "ACT_AIM" ) ) ) {
+            ch->force_movement_mode( CMM_WALK );
+        }
     }
 
     if( type.has_flag( flag_EFFECT_LUA_ON_REMOVED ) ) {
@@ -1762,6 +1792,7 @@ struct removed_effect {
 
 void Creature::process_effects()
 {
+    ZoneScopedN( "creature_process_effects" );
     process_effects_internal();
 
     // id's and body_part's of all effects to be removed. If we ever get player or
@@ -1773,6 +1804,7 @@ void Creature::process_effects()
 
     // Decay/removal of effects
     for( auto &elem : *effects ) {
+        ZoneScopedN( "creature_decay_effects" );
         for( auto &_it : elem.second ) {
             if( _it.second.is_removed() ) {
                 to_remove.emplace_back( elem.first, _it.first, false );
@@ -1800,6 +1832,7 @@ void Creature::process_effects()
 
     // Run the on-remove effects
     for( const removed_effect &r : to_remove ) {
+        ZoneScopedN( "creature_remove_effects" );
         const auto &add_after = r.type->get_effects_on_remove();
         if( !add_after.empty() ) {
             bool found = false;
@@ -1827,6 +1860,7 @@ void Creature::process_effects()
     }
     // Actually remove effects. This should be the last thing done in process_effects().
     for( const removed_effect &r : to_remove ) {
+        ZoneScopedN( "creature_remove_effects_pt2" );
         if( !r.bp ) {
             effects->erase( r.type );
         } else {
@@ -1839,6 +1873,7 @@ void Creature::process_effects()
     }
 
     for( const effect &eff : to_add ) {
+        ZoneScopedN( "creature_add_effects" );
         add_effect( eff );
     }
 }
@@ -2060,6 +2095,10 @@ float Creature::get_dodge() const
 float Creature::get_hit() const
 {
     return get_hit_base() + get_hit_bonus();
+}
+int Creature::spotting_range() const
+{
+    return 0;
 }
 
 anatomy_id Creature::get_anatomy() const

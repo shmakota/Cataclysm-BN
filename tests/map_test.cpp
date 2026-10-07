@@ -1,3 +1,7 @@
+#include "../src/map/map.h"
+#include "../src/map/mapdata.h"
+#include "../src/map/submap.h"
+#include "../src/map/submap_load_manager.h"
 #include "avatar.h"
 #include "avatar_action.h"
 #include "cata_utility.h"
@@ -7,31 +11,66 @@
 #include "coordinates.h"
 #include "data_vars.h"
 #include "enums.h"
-#include "field_type.h"
 #include "game.h"
 #include "game_constants.h"
+#include "iexamine.h"
 #include "item.h"
-#include "map.h"
+#include "iuse_actor.h"
+#include "map/field.h"
+#include "map/field_type.h"
+#include "map/mapbuffer.h"
+#include "map/mapbuffer_registry.h"
+#include "map/submap_fields.h"
 #include "map_helpers.h"
-#include "mapbuffer.h"
-#include "mapbuffer_registry.h"
-#include "mapgen_constructor.h"
+#include "mapgen/mapgen_constructor.h"
+#include "messages.h"
 #include "monster.h"
 #include "npc.h"
+#include "options.h"
 #include "options_helpers.h"
+#include "player_helpers.h"
+#include "projectile.h"
 #include "state_helpers.h"
-#include "submap.h"
-#include "submap_load_manager.h"
 #include "type_id.h"
-#include "vehicle.h"
+#include "units.h"
+#include "vehicle/vehicle.h"
 
+#include <algorithm>
 #include <memory>
+#include <ranges>
 #include <vector>
 
 namespace {
 
 static const auto effect_in_pit = efftype_id("in_pit");
+static const auto effect_bleed = efftype_id("bleed");
+static const auto effect_downed = efftype_id("downed");
 static const auto skill_dodge = skill_id("dodge");
+
+auto burden_jumping_player(avatar& you, const float burden_proportion) -> void {
+    const auto target_weight_grams = static_cast<int>(
+        you.weight_capacity() * burden_proportion / 1_gram);
+    const auto current_weight_grams = static_cast<int>(you.weight_carried() / 1_gram);
+    const auto weight_to_add = std::max(0, target_weight_grams - current_weight_grams);
+    if (weight_to_add > 0) {
+        you.i_add(item::spawn("test_platinum_bit", calendar::turn, weight_to_add));
+    }
+}
+
+auto reset_jumping_player(player& you, const tripoint_bub_ms& origin, const int dexterity) -> void {
+    clear_character(you, false);
+    you.setpos(origin);
+    you.str_cur = 8;
+    you.dex_cur = dexterity;
+    you.moves = 1000;
+}
+
+auto spawn_window_jump_npc(const tripoint_bub_ms& origin, const int dexterity) -> npc& {
+    g->place_player(origin + tripoint_rel_ms::south());
+    auto& jumper = spawn_npc(origin, "test_talker");
+    reset_jumping_player(jumper, origin, dexterity);
+    return jumper;
+}
 
 struct adjacent_pit_move {
     tripoint_bub_ms origin;
@@ -76,6 +115,28 @@ auto mapgen_item_count_in_radius(
     auto result = size_t{0};
     for (const auto& candidate : tm.points_in_radius(center, radius)) {
         result += tm.i_at(candidate).size();
+    }
+    return result;
+}
+
+auto count_field_tiles_in_radius(
+    map& here, const tripoint_bub_ms& center, const size_t radius, const field_type_id& field_id)
+    -> int {
+    auto result = 0;
+    for (const auto& pos : here.points_in_radius(center, radius)) {
+        result += here.get_field(pos, field_id) != nullptr ? 1 : 0;
+    }
+    return result;
+}
+
+auto total_field_intensity_in_radius(
+    map& here, const tripoint_bub_ms& center, const size_t radius, const field_type_id& field_id)
+    -> int {
+    auto result = 0;
+    for (const auto& pos : here.points_in_radius(center, radius)) {
+        if (const auto* field = here.get_field(pos, field_id)) {
+            result += field->get_field_intensity();
+        }
     }
     return result;
 }
@@ -182,6 +243,329 @@ TEST_CASE("moving_between_adjacent_pit_traps") {
     }
 }
 
+TEST_CASE("moving through a sharp window frame can cause bleeding") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto origin = tripoint_bub_ms(60, 60, 0);
+    const auto destination = origin + tripoint_rel_ms::east();
+    const auto dangerous_prompt = override_option("DANGEROUS_TERRAIN_WARNING_PROMPT", "IGNORE");
+    here.ter_set(origin, ter_id("t_floor"));
+    here.furn_set(origin, furn_id("f_null"));
+    here.ter_set(destination, ter_id("t_window_frame"));
+    here.furn_set(destination, furn_id("f_null"));
+
+    auto started_bleeding = false;
+    for (const auto attempt : std::views::iota(0, 64)) {
+        (void)attempt;
+        reset_jumping_player(g->u, origin, 2);
+
+        REQUIRE(g->walk_move(destination, false));
+        if (g->u.has_effect(effect_bleed)) {
+            started_bleeding = true;
+            break;
+        }
+    }
+
+    CHECK(started_bleeding);
+}
+
+TEST_CASE("jump_over_tile_is_generic_but_reuses_ledge_landing_rules", "[map][movement][jump]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto origin = tripoint_bub_ms(60, 60, 1);
+    const auto middle = origin + tripoint_rel_ms::east();
+    const auto landing = middle + tripoint_rel_ms::east();
+    const auto landing_below = landing + tripoint_rel_ms::below();
+    for (const auto& pos : here.points_in_radius(origin, 2)) {
+        here.ter_set(pos, ter_id("t_floor"));
+        here.furn_set(pos, furn_id("f_null"));
+        const auto below = pos + tripoint_rel_ms::below();
+        here.ter_set(below, ter_id("t_floor"));
+        here.furn_set(below, furn_id("f_null"));
+    }
+
+    g->place_player(origin);
+    g->u.str_cur = 8;
+    g->u.moves = 1000;
+
+    SECTION("can jump across clear adjacent ground") {
+        const auto moves_before = g->u.moves;
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+        CHECK(g->u.moves < moves_before);
+    }
+
+    SECTION("can jump over a low obstacle") {
+        here.ter_set(middle, ter_id("t_railing"));
+
+        const auto moves_before = g->u.moves;
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+        CHECK(g->u.moves < moves_before);
+    }
+
+    SECTION("can jump into open air and immediately resolve the ledge fall") {
+        const auto dangerous_prompt = override_option("DANGEROUS_TERRAIN_WARNING_PROMPT", "IGNORE");
+        here.ter_set(landing, ter_id("t_open_air"));
+        const auto moves_before = g->u.moves;
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing_below);
+        CHECK(g->u.moves < moves_before);
+    }
+
+    SECTION("cannot jump over impassable furniture") {
+        here.furn_set(middle, furn_id("f_bookcase"));
+
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
+    }
+
+    SECTION("can jump over CLIMB_SIMPLE furniture") {
+        here.furn_set(middle, furn_id("f_barricade_road"));
+
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+    }
+
+    SECTION("cannot jump through walls") {
+        here.ter_set(middle, ter_id("t_wall"));
+
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
+    }
+
+    SECTION("cannot jump through trees") {
+        here.ter_set(middle, ter_id("t_tree"));
+
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
+    }
+
+    SECTION("can jump through a closed window and bash it out") {
+        here.ter_set(middle, ter_id("t_window"));
+        auto& jumper = spawn_window_jump_npc(origin, 8);
+
+        CHECK(iexamine::can_jump_over_tile(jumper, middle));
+        REQUIRE(iexamine::jump_over_tile(jumper, middle));
+        CHECK(jumper.bub_pos() == landing);
+        CHECK(here.ter(middle) == ter_id("t_window_frame"));
+    }
+
+    SECTION("cannot jump through reinforced boarded windows") {
+        here.ter_set(middle, ter_id("t_window_reinforced"));
+        reset_jumping_player(g->u, origin, 20);
+
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
+    }
+
+    SECTION("jumping through a closed window can cut exposed body parts") {
+        auto& jumper = spawn_window_jump_npc(origin, 2);
+        auto took_damage = false;
+        for (const auto attempt : std::views::iota(0, 16)) {
+            (void)attempt;
+            here.ter_set(middle, ter_id("t_window"));
+            reset_jumping_player(jumper, origin, 2);
+
+            const auto hp_before = jumper.get_hp();
+            CHECK(iexamine::can_jump_over_tile(jumper, middle));
+            REQUIRE(iexamine::jump_over_tile(jumper, middle));
+            if (jumper.get_hp() < hp_before) {
+                took_damage = true;
+                break;
+            }
+        }
+
+        CHECK(took_damage);
+    }
+
+    SECTION("jumping over sharp terrain can cut exposed body parts") {
+        auto took_damage = false;
+        for (const auto attempt : std::views::iota(0, 16)) {
+            (void)attempt;
+            here.ter_set(middle, ter_id("t_fence_barbed"));
+            reset_jumping_player(g->u, origin, 2);
+
+            const auto hp_before = g->u.get_hp();
+            CHECK(iexamine::can_jump_over_tile(g->u, middle));
+            REQUIRE(iexamine::jump_over_tile(g->u, middle));
+            if (g->u.get_hp() < hp_before) {
+                took_damage = true;
+                break;
+            }
+        }
+
+        CHECK(took_damage);
+    }
+
+    SECTION("jumping over sharp terrain can cause bleeding") {
+        auto started_bleeding = false;
+        for (const auto attempt : std::views::iota(0, 32)) {
+            (void)attempt;
+            here.ter_set(middle, ter_id("t_fence_barbed"));
+            reset_jumping_player(g->u, origin, 2);
+
+            CHECK(iexamine::can_jump_over_tile(g->u, middle));
+            REQUIRE(iexamine::jump_over_tile(g->u, middle));
+            if (g->u.has_effect(effect_bleed)) {
+                started_bleeding = true;
+                break;
+            }
+        }
+
+        CHECK(started_bleeding);
+    }
+
+    SECTION("jumping through a closed window with only hands exposed damages an arm") {
+        auto& jumper = spawn_window_jump_npc(origin, 2);
+        auto took_arm_damage = false;
+        for (const auto attempt : std::views::iota(0, 16)) {
+            (void)attempt;
+            here.ter_set(middle, ter_id("t_window"));
+            reset_jumping_player(jumper, origin, 2);
+            REQUIRE_FALSE(jumper.wear_item(item::spawn("longshirt"), false));
+            REQUIRE_FALSE(jumper.wear_item(item::spawn("jeans"), false));
+
+            const auto arm_hp_before =
+                jumper.get_part_hp_cur(bodypart_id("arm_l"))
+                + jumper.get_part_hp_cur(bodypart_id("arm_r"));
+            CHECK(iexamine::can_jump_over_tile(jumper, middle));
+            REQUIRE(iexamine::jump_over_tile(jumper, middle));
+            const auto arm_hp_after =
+                jumper.get_part_hp_cur(bodypart_id("arm_l"))
+                + jumper.get_part_hp_cur(bodypart_id("arm_r"));
+            if (arm_hp_after < arm_hp_before) {
+                took_arm_damage = true;
+                break;
+            }
+        }
+
+        CHECK(took_arm_damage);
+    }
+
+    SECTION("can trip and end up downed when jumping over furniture") {
+        here.furn_set(middle, furn_id("f_chair"));
+        g->u.dex_cur = 1;
+        const auto limb_hp_before =
+            g->u.get_part_hp_cur(bodypart_id("arm_l")) + g->u.get_part_hp_cur(bodypart_id("arm_r"))
+            + g->u.get_part_hp_cur(bodypart_id("leg_l"))
+            + g->u.get_part_hp_cur(bodypart_id("leg_r"));
+
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+        CHECK(g->u.has_effect(effect_downed));
+        const auto limb_hp_after =
+            g->u.get_part_hp_cur(bodypart_id("arm_l")) + g->u.get_part_hp_cur(bodypart_id("arm_r"))
+            + g->u.get_part_hp_cur(bodypart_id("leg_l"))
+            + g->u.get_part_hp_cur(bodypart_id("leg_r"));
+        CHECK(limb_hp_after < limb_hp_before);
+        const auto downed_duration = g->u.get_effect(effect_downed).get_duration();
+        CHECK(downed_duration >= 2_turns);
+        CHECK(downed_duration <= 3_turns);
+    }
+
+    SECTION("cannot jump over creatures our size or larger") {
+        here.ter_set(middle, ter_id("t_floor"));
+        auto& blocking_creature = spawn_test_monster("mon_zombie", middle);
+        REQUIRE(blocking_creature.get_size() >= g->u.get_size());
+
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
+    }
+
+    SECTION("can jump over creatures smaller than us") {
+        here.ter_set(middle, ter_id("t_floor"));
+        auto& blocking_creature = spawn_test_monster("mon_dog", middle);
+        REQUIRE(blocking_creature.get_size() < g->u.get_size());
+
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+    }
+
+    SECTION("can jump while carrying more than a quarter of capacity") {
+        burden_jumping_player(g->u, 0.3f);
+
+        CHECK(iexamine::can_jump_over_tile(g->u, middle));
+        REQUIRE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == landing);
+    }
+
+    SECTION("jumping burns stamina and heavier carried loads burn more") {
+        struct jump_stamina_result {
+            int actual_burn;
+            int expected_burn;
+        };
+
+        const auto jump_stamina_burn = [&](const float burden_proportion) {
+            clear_character(g->u, false);
+            g->u.setpos(origin);
+            g->u.str_cur = 8;
+            g->u.moves = 1000;
+            g->u.set_stamina(g->u.get_stamina_max());
+            burden_jumping_player(g->u, burden_proportion);
+
+            const auto move_cost = g->u.run_cost(200);
+            const auto base_stamina_burn = divide_round_up(
+                get_option<int>("PLAYER_BASE_STAMINA_BURN_RATE") * move_cost * 14, 100);
+            const auto carried_weight_grams = units::to_gram(g->u.weight_carried());
+            const auto carry_capacity_grams = units::to_gram(
+                std::max(g->u.weight_capacity(), 1_gram));
+            const auto carried_weight_percentage = std::
+                clamp(static_cast<int>(carried_weight_grams * 100 / carry_capacity_grams), 0, 100);
+            const auto stamina_before = g->u.get_stamina();
+            CHECK(iexamine::can_jump_over_tile(g->u, middle));
+            REQUIRE(iexamine::jump_over_tile(g->u, middle));
+            return jump_stamina_result{
+                .actual_burn = stamina_before - g->u.get_stamina(),
+                .expected_burn =
+                    divide_round_up(base_stamina_burn * (100 + carried_weight_percentage), 100),
+            };
+        };
+
+        const auto unburdened_burn = jump_stamina_burn(0.0f);
+        const auto burdened_burn = jump_stamina_burn(0.2f);
+
+        CHECK(unburdened_burn.actual_burn == unburdened_burn.expected_burn);
+        CHECK(burdened_burn.actual_burn == burdened_burn.expected_burn);
+        CHECK(unburdened_burn.actual_burn > 0);
+        CHECK(burdened_burn.actual_burn > unburdened_burn.actual_burn);
+    }
+
+    SECTION("cannot start when too weak to jump") {
+        g->u.str_max = 3;
+        g->u.set_str_bonus(0);
+        g->u.str_cur = g->u.get_str();
+
+        CHECK_FALSE(iexamine::can_start_jump_over_tile(g->u));
+    }
+
+    SECTION("cannot start when stamina is below the jump cost") {
+        const auto move_cost = g->u.run_cost(200);
+        const auto required_stamina =
+            divide_round_up(get_option<int>("PLAYER_BASE_STAMINA_BURN_RATE") * move_cost * 14, 100);
+        REQUIRE(required_stamina > 0);
+        g->u.set_stamina(required_stamina - 1);
+
+        CHECK_FALSE(iexamine::can_start_jump_over_tile(g->u));
+        CHECK_FALSE(iexamine::can_jump_over_tile(g->u, middle));
+        CHECK_FALSE(iexamine::jump_over_tile(g->u, middle));
+        CHECK(g->u.bub_pos() == origin);
+    }
+}
+
 TEST_CASE("destroy_grabbed_furniture") {
     clear_all_state();
     GIVEN("Furniture grabbed by the player") {
@@ -201,6 +585,192 @@ TEST_CASE("destroy_grabbed_furniture") {
     }
 }
 
+TEST_CASE("spilled_liquids_become_fields_without_dropping_items", "[map][item][liquid][field]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto center = tripoint_bub_ms(60, 60, 0);
+    for (const auto& pos : here.points_in_radius(center, 2)) {
+        here.i_clear(pos);
+        here.remove_field(pos, fd_blood);
+        here.ter_set(pos, ter_id("t_floor"));
+        here.furn_set(pos, furn_id("f_null"));
+    }
+
+    auto spilled_blood = item::spawn("blood", calendar::turn);
+    spilled_blood->charges = 10;
+
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(spilled_blood), false));
+
+    auto center_items = here.i_at(center);
+    CHECK(center_items.empty());
+
+    CHECK(count_field_tiles_in_radius(here, center, 2, fd_blood) > 1);
+}
+
+TEST_CASE("repeated_liquid_spills_intensify_before_expanding", "[map][item][liquid][field]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto center = tripoint_bub_ms(60, 60, 0);
+    const auto water_field = field_type_id("fd_water");
+    for (const auto& pos : here.points_in_radius(center, 2)) {
+        here.i_clear(pos);
+        here.remove_field(pos, water_field);
+        here.ter_set(pos, ter_id("t_floor"));
+        here.furn_set(pos, furn_id("f_null"));
+    }
+
+    auto first_pour = item::spawn("water", calendar::turn);
+    first_pour->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(first_pour), false));
+    CHECK(count_field_tiles_in_radius(here, center, 2, water_field) == 1);
+    REQUIRE(here.get_field(center, water_field) != nullptr);
+    CHECK(here.get_field(center, water_field)->get_field_intensity() == 1);
+
+    auto second_pour = item::spawn("water", calendar::turn);
+    second_pour->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(second_pour), false));
+    CHECK(count_field_tiles_in_radius(here, center, 2, water_field) == 1);
+    REQUIRE(here.get_field(center, water_field) != nullptr);
+    CHECK(here.get_field(center, water_field)->get_field_intensity() == 2);
+
+    auto third_pour = item::spawn("water", calendar::turn);
+    third_pour->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(third_pour), false));
+    CHECK(count_field_tiles_in_radius(here, center, 2, water_field) == 1);
+    REQUIRE(here.get_field(center, water_field) != nullptr);
+    CHECK(here.get_field(center, water_field)->get_field_intensity()
+          == water_field.obj().get_max_intensity());
+
+    auto fourth_pour = item::spawn("water", calendar::turn);
+    fourth_pour->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(fourth_pour), false));
+
+    auto center_items = here.i_at(center);
+    CHECK(center_items.empty());
+    CHECK(count_field_tiles_in_radius(here, center, 2, water_field) > 1);
+}
+
+TEST_CASE(
+    "liquid_drop_on_independent_map_consumes_its_source_item",
+    "[map][item][liquid][field][fluid_regression]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([]() { clear_all_state(); });
+    g->place_player(tripoint_bub_ms(60, 60, 0));
+
+    auto independent = map(2);
+    independent.load(get_map().get_abs_sub(), false);
+    const auto center = tripoint_bub_ms(13, 13, 0);
+    const auto water_field = field_type_id("fd_water");
+    REQUIRE(&independent != &get_map());
+    REQUIRE(independent.get_submap_at(center) != nullptr);
+    for (const auto& tile : independent.points_in_radius(center, 2)) {
+        independent.ter_set(tile, ter_id("t_floor"));
+        independent.furn_set(tile, f_null);
+        independent.i_clear(tile);
+        independent.remove_field(tile, water_field);
+    }
+
+    auto direct_water = item::spawn("water_clean", calendar::turn);
+    direct_water->charges = 1;
+    const auto direct_result =
+        independent.add_item_or_charges(center, std::move(direct_water), false);
+    REQUIRE_FALSE(direct_result);
+    CHECK_FALSE(direct_water);
+    CHECK(independent.get_field(center, water_field) != nullptr);
+    CHECK(independent.i_at(center).empty());
+
+    independent.remove_field(center, water_field);
+    independent.furn_set(center, furn_id("f_grave_stone"));
+    REQUIRE(independent.has_flag("NOITEM", center));
+    REQUIRE(independent.passable(center));
+
+    auto overflow_water = item::spawn("water_clean", calendar::turn);
+    overflow_water->charges = 1;
+    const auto overflow_result =
+        independent.add_item_or_charges(center, std::move(overflow_water), true);
+    REQUIRE_FALSE(overflow_result);
+    CHECK_FALSE(overflow_water);
+    CHECK(independent.get_field(center, water_field) == nullptr);
+    CHECK(count_field_tiles_in_radius(independent, center, 1, water_field) == 1);
+    CHECK(std::ranges::all_of(independent.points_in_radius(center, 1), [&](const auto& tile) {
+        return independent.i_at(tile).empty();
+    }));
+}
+
+TEST_CASE(
+    "gasoline_spills_scale_with_volume_instead_of_raw_charges", "[map][item][liquid][field]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto center = tripoint_bub_ms(60, 60, 0);
+    const auto fuel_field = field_type_id("fd_fuel");
+    for (const auto& pos : here.points_in_radius(center, 12)) {
+        here.i_clear(pos);
+        here.remove_field(pos, fuel_field);
+        here.ter_set(pos, ter_id("t_floor"));
+        here.furn_set(pos, furn_id("f_null"));
+    }
+
+    auto spilled_gasoline = item::spawn("gasoline", calendar::turn);
+    spilled_gasoline->charges = 10000;
+    const auto max_fuel_intensity = fuel_field.obj().get_max_intensity();
+    static constexpr auto spill_tile_volume = 1_liter;
+    const auto spill_tiles = divide_round_up(
+        units::to_milliliter(spilled_gasoline->volume()), units::to_milliliter(spill_tile_volume));
+    const auto expected_visual_intensity = std::min(
+        static_cast<int>(std::max<decltype(spill_tiles)>(1, spill_tiles)), 90 * max_fuel_intensity);
+
+    REQUIRE_FALSE(here.add_item_or_charges(center, std::move(spilled_gasoline), false));
+    CHECK(count_field_tiles_in_radius(here, center, 12, fuel_field) <= 90);
+    CHECK(
+        total_field_intensity_in_radius(here, center, 12, fuel_field) == expected_visual_intensity);
+    REQUIRE(here.get_field(center, fuel_field) != nullptr);
+    CHECK(here.get_field(center, fuel_field)->get_field_intensity() == max_fuel_intensity);
+}
+TEST_CASE("mop_spills_respects_jsonized_field_property", "[map][field][mop]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto center = tripoint_bub_ms(60, 60, 0);
+    g->place_player(center);
+
+    SECTION("moppable fields are removed") {
+        const auto bile_field = field_type_id("fd_bile");
+        here.add_field(center, bile_field);
+
+        CHECK(here.mop_spills(center));
+        CHECK(here.get_field(center, bile_field) == nullptr);
+    }
+
+    SECTION("spilled liquid fields are removed") {
+        const auto water_field = field_type_id("fd_water");
+        auto spilled_water = item::spawn("water_clean", calendar::turn);
+        spilled_water->charges = 1;
+
+        REQUIRE_FALSE(here.add_item_or_charges(center, std::move(spilled_water), false));
+        CHECK(here.get_field(center, water_field) != nullptr);
+        CHECK(here.mop_spills(center));
+        CHECK(here.get_field(center, water_field) == nullptr);
+    }
+
+    SECTION("non-moppable fields remain") {
+        const auto fire_field = field_type_id("fd_fire");
+        here.add_field(center, fire_field);
+
+        CHECK_FALSE(here.mop_spills(center));
+        CHECK(here.get_field(center, fire_field) != nullptr);
+    }
+
+    SECTION("plain liquid fields are removed when marked moppable") {
+        const auto water_field = field_type_id("fd_water");
+        here.add_field(center, water_field);
+
+        CHECK(here.mop_spills(center));
+        CHECK(here.get_field(center, water_field) == nullptr);
+    }
+}
 TEST_CASE("mapbuffer_vehicle_lookup_uses_absolute_coordinates") {
     clear_all_state();
 
@@ -230,6 +800,126 @@ TEST_CASE("place_player_can_safely_move_multiple_submaps") {
     g->place_player(tripoint_bub_ms::zero());
     CHECK(get_map().check_submap_active_item_consistency().empty());
     CHECK(get_map().get_abs_sub() == player_reality_bubble_origin().xy());
+}
+
+TEST_CASE("json_flammable_terrain_counts_as_flammable", "[map][fire]") {
+    clear_all_state();
+
+    auto& here = get_map();
+    const auto pos = tripoint_bub_ms(60, 60, 0);
+    here.ter_set(pos, ter_str_id("t_test_flammable_bool").id());
+
+    CHECK(here.is_flammable(pos));
+    CHECK_FALSE(here.has_flag("FLAMMABLE", pos));
+}
+
+TEST_CASE(
+    "removing_inherited_flammable_flag_clears_terrain_flammability",
+    "[map][fire][fluid_regression]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([]() { clear_all_state(); });
+
+    auto& here = get_map();
+    const auto pos = tripoint_bub_ms{60, 60, 0};
+    here.furn_set(pos, f_null);
+    here.ter_set(pos, ter_str_id("t_test_flammable_hard_parent").id());
+    REQUIRE(here.has_flag("FLAMMABLE_HARD", pos));
+    CHECK(here.is_flammable(pos));
+
+    here.ter_set(pos, ter_str_id("t_test_flammable_hard_removed").id());
+    REQUIRE_FALSE(here.has_flag("FLAMMABLE_HARD", pos));
+    CHECK_FALSE(here.is_flammable(pos));
+}
+
+TEST_CASE(
+    "replacing_inherited_flammable_flag_updates_fire_classification",
+    "[map][fire][fluid_regression]") {
+    const auto& terrain = ter_str_id("t_test_flammable_hard_replaced_with_ash").obj();
+
+    REQUIRE_FALSE(terrain.has_flag("FLAMMABLE_HARD"));
+    REQUIRE(terrain.has_flag("FLAMMABLE_ASH"));
+    CHECK(terrain.is_flammable());
+    CHECK(terrain.is_ash_flammable());
+    CHECK_FALSE(terrain.is_hard_flammable());
+    CHECK_FALSE(terrain.is_basic_flammable());
+}
+
+TEST_CASE(
+    "explicit_terrain_flammability_survives_inheritance_and_flag_changes",
+    "[map][fire][fluid_regression]") {
+    const auto& inherited_true = ter_str_id("t_test_flammable_true_child").obj();
+    CHECK(inherited_true.is_flammable());
+    CHECK(inherited_true.is_basic_flammable());
+
+    const auto& explicit_false = ter_str_id("t_test_flammable_false_override").obj();
+    REQUIRE(explicit_false.has_flag("FLAMMABLE_HARD"));
+    CHECK_FALSE(explicit_false.is_flammable());
+    CHECK_FALSE(explicit_false.is_hard_flammable());
+
+    const auto& inherited_false = ter_str_id("t_test_flammable_false_child").obj();
+    REQUIRE(inherited_false.has_flag("FLAMMABLE_HARD"));
+    CHECK_FALSE(inherited_false.is_flammable());
+    CHECK_FALSE(inherited_false.is_hard_flammable());
+
+    const auto& inherited_false_with_changed_flags =
+        ter_str_id("t_test_flammable_false_grandchild").obj();
+    REQUIRE_FALSE(inherited_false_with_changed_flags.has_flag("FLAMMABLE_HARD"));
+    REQUIRE(inherited_false_with_changed_flags.has_flag("FLAMMABLE_ASH"));
+    CHECK_FALSE(inherited_false_with_changed_flags.is_flammable());
+    CHECK_FALSE(inherited_false_with_changed_flags.is_ash_flammable());
+
+    const auto& explicit_true = ter_str_id("t_test_flammable_true_override").obj();
+    REQUIRE(explicit_true.has_flag("FLAMMABLE_ASH"));
+    CHECK(explicit_true.is_flammable());
+    CHECK(explicit_true.is_ash_flammable());
+}
+
+TEST_CASE(
+    "gasoline_spilled_on_fire_fuels_the_same_tile",
+    "[map][field][fire][liquid][fluid_regression]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([]() { clear_all_state(); });
+
+    auto& here = get_map();
+    const auto pos = tripoint_bub_ms{60, 60, 0};
+    const auto furniture = furn_id(GENERATE("f_null", "f_brazier"));
+    const auto fuel_before_fire = GENERATE(true, false);
+    const auto fuel_field = field_type_id("fd_fuel");
+    CAPTURE(furniture.id().str(), fuel_before_fire);
+    here.ter_set(pos, ter_id("t_rock_floor"));
+    here.furn_set(pos, furniture);
+
+    auto* sm = here.get_submap_at(pos);
+    REQUIRE(sm != nullptr);
+    const auto abs_sm = project_to<coords::sm>(map_local_to_abs(here, pos));
+    const auto process_fields = [&]() {
+        process_fields_in_submap(get_avatar().get_dimension(), *sm, abs_sm, MAPBUFFER);
+    };
+
+    if (!fuel_before_fire) {
+        REQUIRE(here.add_field(pos, fd_fire, 1));
+        process_fields();
+    }
+
+    auto gasoline = item::spawn("gasoline", calendar::turn);
+    gasoline->charges = 1;
+    REQUIRE_FALSE(here.add_item_or_charges(pos, std::move(gasoline), false));
+    REQUIRE(here.get_field(pos, fuel_field) != nullptr);
+    CHECK(here.i_at(pos).empty());
+
+    if (fuel_before_fire) {
+        REQUIRE(here.add_field(pos, fd_fire, 1));
+        process_fields();
+    }
+
+    REQUIRE(here.get_field(pos, fd_fire) != nullptr);
+    const auto fire_age_before = here.get_field(pos, fd_fire)->get_field_age();
+    process_fields();
+
+    CHECK(here.get_field(pos, fuel_field) == nullptr);
+    const auto* fire_after = here.get_field(pos, fd_fire);
+    REQUIRE(fire_after != nullptr);
+    CHECK(fire_after->get_field_age() != fire_age_before);
 }
 
 TEST_CASE("mapbuffer_resident_lookup_uses_absolute_coordinates") {
@@ -697,6 +1387,37 @@ TEST_CASE("monster_tracker_uses_absolute_positions") {
     CHECK(g->critter_at<monster>(player_shifted_monster_pos) == nullptr);
 }
 
+TEST_CASE("binding_dimensions_rebuilds_vehicle_caches", "[map][vehicle][dimension]") {
+    clear_all_state();
+    auto& here = get_map();
+    const auto original_dim = here.get_bound_dimension();
+    const auto other_dim = dimension_id("vehicle_cache_rebinding");
+    const auto cleanup = on_out_of_scope([&]() {
+        here.bind_dimension(original_dim);
+        MAPBUFFER_REGISTRY.unload_dimension(other_dim);
+        clear_vehicles();
+    });
+    const auto pos = tripoint_bub_ms(60, 60, 0);
+    here.ter_set(pos, ter_id("t_floor"));
+    auto* const veh = here.add_vehicle(vproto_id("none"), pos, 0_degrees, 0, 0);
+    REQUIRE(veh != nullptr);
+    REQUIRE(veh->install_part(tripoint_mnt_veh::zero(), vpart_id("frame_vertical")) >= 0);
+    here.add_vehicle_to_cache(veh);
+    REQUIRE(here.get_cache_ref(0).vehicle_list.contains(veh));
+    REQUIRE_FALSE(here.get_vehicles().empty());
+
+    here.bind_dimension(other_dim);
+    CHECK(here.get_cache_ref(0).vehicle_list.empty());
+    CHECK(here.get_cache_ref(0).veh_cached_parts.empty());
+    CHECK(here.get_vehicles().empty());
+
+    here.bind_dimension(original_dim);
+    CHECK(here.get_cache_ref(0).vehicle_list.contains(veh));
+    CHECK_FALSE(here.get_vehicles().empty());
+    here.bind_dimension(original_dim);
+    CHECK(here.get_cache_ref(0).vehicle_list.contains(veh));
+}
+
 TEST_CASE("placed_monsters_inherit_bound_dimension") {
     clear_all_state();
 
@@ -718,7 +1439,7 @@ TEST_CASE("placed_monsters_inherit_bound_dimension") {
     CHECK(mon->get_dimension() == test_dim);
 }
 
-static std::ostream& operator<<(std::ostream& os, const ter_id& tid) {
+static auto operator<<(std::ostream& os, const ter_id& tid) -> std::ostream& { // *NOPAD*
     os << tid.id().c_str();
     return os;
 }
@@ -825,4 +1546,44 @@ TEST_CASE("bash_through_roof_can_destroy_multiple_times") {
             }
         }
     }
+}
+
+TEST_CASE("flammable_fields_can_be_ignited", "[map][field][fire]") {
+    clear_all_state();
+    const auto cleanup = on_out_of_scope([]() { clear_all_state(); });
+    auto& here = get_map();
+    const auto pos = tripoint_bub_ms(60, 60, 0);
+    here.ter_set(pos, ter_str_id("t_rock_floor").id());
+    here.furn_set(pos, f_null);
+    const auto fuel = field_type_id(
+        GENERATE("fd_fuel", "fd_sticky_fuel", "fd_oil", "fd_alcohol_strong", "test_fd_flammable"));
+    const auto inert = field_type_id(GENERATE("test_fd_nonflammable", "fd_alcohol"));
+    REQUIRE(here.add_field(pos, inert));
+    CHECK_FALSE(here.is_flammable(pos));
+    const auto intensity = GENERATE(1, 2, 3);
+    REQUIRE(here.add_field(pos, fuel, intensity));
+    CHECK(here.is_flammable(pos));
+
+    SECTION("firestarter") { firestarter_actor::resolve_firestarter_use(get_avatar(), pos); }
+    SECTION("heat projectile") {
+        auto shot = projectile{};
+        shot.impact.add_damage(DT_HEAT, 1);
+        here.shoot(pos, pos, shot, false);
+    }
+    SECTION("mixed combustible fields") {
+        const auto other_fuel =
+            fuel == field_type_id("test_fd_flammable")
+                ? field_type_id("fd_fuel")
+                : field_type_id("test_fd_flammable");
+        REQUIRE(here.add_field(pos, other_fuel, intensity));
+        firestarter_actor::resolve_firestarter_use(get_avatar(), pos);
+        CHECK(here.get_field(pos, other_fuel) == nullptr);
+    }
+
+    CHECK(here.get_field(pos, fuel) == nullptr);
+    CHECK(here.get_field(pos, inert) != nullptr);
+    const auto* fire = here.get_field(pos, fd_fire);
+    REQUIRE(fire != nullptr);
+    CHECK(fire->get_field_intensity() == std::max(2, intensity));
+    CHECK(fire->get_field_age() == -10_minutes * intensity);
 }

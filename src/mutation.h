@@ -20,6 +20,7 @@
 #include "point.h"
 #include "translations.h"
 #include "type_id.h"
+#include "units/body_temperature.h"
 #include "value_ptr.h"
 
 class Character;
@@ -117,9 +118,9 @@ struct mutation_branch {
         // costs are consumed every cooldown turns,
         int cooldown   = 0;
         // bodytemp elements:
-        int bodytemp_min = 0;
-        int bodytemp_max = 0;
-        int bodytemp_sleep = 0;
+        units::temperature_delta bodytemp_min = 0_c_delta;
+        units::temperature_delta bodytemp_max = 0_c_delta;
+        units::temperature_delta bodytemp_sleep = 0_c_delta;
         // Pain Recovery per turn:
         float pain_recovery = 0.0f;
         // Healing per turn
@@ -462,6 +463,7 @@ struct mutation_category_trait {
         std::string junkie_message() const;
         std::string memorial_message_male() const;
         std::string memorial_message_female() const;
+        std::vector<trait_id> get_mutations() const;
 
         // Mutation category i.e "BIRD", "CHIMERA"
         mutation_category_id id;

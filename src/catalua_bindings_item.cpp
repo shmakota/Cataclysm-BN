@@ -1,36 +1,34 @@
+#include "ammo.h"
+#include "ammo_effect.h"
+#include "artifact.h"
+#include "avatar.h"
 #include "catalua_bindings.h"
-
-#include <ranges>
-
 #include "catalua_bindings_utils.h"
 #include "catalua_luna.h"
 #include "catalua_luna_doc.h"
-
-#include "artifact.h"
-#include "avatar.h"
+#include "character.h"
+#include "disease.h"
+#include "enum_conversions.h"
+#include "explosion.h"
+#include "faction.h"
+#include "fault.h"
+#include "flag.h"
+#include "gun_mode.h"
 #include "hsv_color.h"
 #include "itype.h"
-#include "mtype.h"
-#include "material.h"
-#include "faction.h"
-#include "character.h"
+#include "map/emit.h"
 #include "martialarts.h"
-#include "relic.h"
-#include "vitamin.h"
-#include "gun_mode.h"
+#include "material.h"
 #include "mod_manager.h"
-#include "ammo_effect.h"
 #include "mongroup.h"
-#include "disease.h"
-#include "skill.h"
-#include "ammo.h"
-#include "flag.h"
-#include "emit.h"
-#include "fault.h"
+#include "mtype.h"
 #include "recipe.h"
-#include "explosion.h"
-#include "enum_conversions.h"
+#include "relic.h"
+#include "skill.h"
 #include "translations.h"
+#include "vitamin.h"
+
+#include <ranges>
 
 namespace
 {
@@ -347,6 +345,8 @@ void reg_item( sol::state &lua )
         } );
 
         DOC( "Spawns a new item. Same as gapi.create_item " );
+        DOC( "`count` sets the item's charges, not the number of items: exactly one item is created." );
+        DOC( "For stackable (count-by-charges) items such as ammo, `count` is the stack size. For non-stackable items, pass a negative value (e.g. -1), since a positive one is still applied as charges. Tools spawned with a negative value get their default charges." );
         luna::set_fx( ut, "spawn", []( const itype_id & itype, int count )
         {
             return item::spawn( itype, calendar::turn, count );
@@ -485,6 +485,12 @@ void reg_item( sol::state &lua )
         luna::set_fx( ut, "remove_technique",
                       sol::resolve<void( const matec_id & )> ( &item::remove_technique ) );
 
+        DOC( "Adds an enchantment to this item" );
+        luna::set_fx( ut, "add_enchantment", sol::overload(
+                          sol::resolve<bool( const enchantment_id & )>( &item::add_enchantment ),
+                          sol::resolve<bool( const enchantment & )>( &item::add_enchantment )
+                      ) );
+
         DOC( "Checks if this item can contain another" );
         luna::set_fx( ut, "can_contain",
                       sol::resolve<bool( const item & ) const>
@@ -518,7 +524,9 @@ void reg_item( sol::state &lua )
 
         SET_FX( get_reload_time );
 
-        DOC( "Adds an item(s) to contents" );
+        DOC( "Creates an item with the given id and adds it to contents." );
+        DOC( "`count` sets the item's charges, not the number of items: exactly one item is created." );
+        DOC( "For stackable (count-by-charges) items such as ammo, `count` is the stack size. For non-stackable items, pass a negative value (e.g. -1), since a positive one is still applied as charges. Tools spawned with a negative value get their default charges." );
         SET_FX( add_item_with_id );
 
         DOC( "Checks item contents for a given item id" );

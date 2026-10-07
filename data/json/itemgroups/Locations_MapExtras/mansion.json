@@ -506,7 +506,7 @@
       [ "boots", 100 ],
       [ "pants", 100 ],
       [ "jacket_army", 100 ],
-      [ "chestrig", 75 ],
+      [ "belt_magazine", 75 ],
       [ "rucksack", 50 ],
       { "distribution": [ { "item": "helmet_steel", "prob": 75 }, { "item": "beret", "prob": 25 } ] }
     ]
@@ -886,6 +886,7 @@
       [ "candy", 20 ],
       [ "slingshot", 10 ],
       [ "rock", 10 ],
+      [ "super_soaker", 10 ],
       [ "bat", 10 ],
       [ "creepy_doll", 3 ],
       [ "portable_game", 5 ],
@@ -1459,7 +1460,8 @@
       { "group": "swimmer_pants", "prob": 20 },
       { "group": "swimmer_head", "prob": 20 },
       { "group": "magazines", "prob": 20 },
-      [ "flip_flops", 30 ]
+      [ "flip_flops", 30 ],
+      [ "crocs", 30 ]
     ]
   },
   {

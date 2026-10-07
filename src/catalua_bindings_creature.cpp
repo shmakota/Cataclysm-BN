@@ -1,40 +1,35 @@
-#include "catalua_bindings.h"
-#include "catalua_coord.h"
-
-#include <climits>
-#include <iterator>
-#include <ranges>
-#include <sstream>
-#include <string_view>
-
 #include "activity_type.h"
 #include "avatar.h"
 #include "bionics.h"
 #include "bodypart.h"
 #include "calendar.h"
 #include "catalua.h"
+#include "catalua_bindings.h"
 #include "catalua_bindings_utils.h"
-#include "calendar.h"
+#include "catalua_coord.h"
 #include "catalua_impl.h"
 #include "catalua_log.h"
 #include "catalua_luna.h"
 #include "catalua_luna_doc.h"
 #include "catalua_serde.h"
 #include "character.h"
+#include "character_martial_arts.h"
+#include "craft_command.h"
+#include "crafting.h"
 #include "creature.h"
 #include "damage.h"
 #include "disease.h"
 #include "enums.h"
-#include "field.h"
-#include "field_type.h"
 #include "flag.h"
-#include "make_static.h"
 #include "flag_trait.h"
 #include "game.h"
 #include "inventory.h"
 #include "json.h"
 #include "magic/magic.h"
-#include "map.h"
+#include "make_static.h"
+#include "map/field.h"
+#include "map/field_type.h"
+#include "map/map.h"
 #include "monfaction.h"
 #include "monster.h"
 #include "morale_types.h"
@@ -47,8 +42,14 @@
 #include "recipe.h"
 #include "requirements.h"
 #include "skill.h"
-#include "type_id.h"
 #include "trap.h"
+#include "type_id.h"
+
+#include <climits>
+#include <iterator>
+#include <ranges>
+#include <sstream>
+#include <string_view>
 
 LUNA_VAL( player_activity, "PlayerActivity" )
 
@@ -84,7 +85,16 @@ struct lua_activity_options {
 
 auto parse_lua_activity_options( const sol::table &opts ) -> lua_activity_options
 {
-    const auto pos = opts.get<sol::optional<tripoint_bub_ms>>( "pos" );
+    // Read the pos option through the direct coord conversion helper.
+    // Going through sol::optional<tripoint_bub_ms> relies on sol's ADL-based
+    // conversion dispatch, which silently drops the option on MSVC builds.
+    std::optional<tripoint_bub_ms> pos;
+    if( const sol::object raw_pos = opts["pos"]; raw_pos.get_type() == sol::type::userdata ) {
+        pos = cata::detail::lua_coords::as_cpp<tripoint_bub_ms>( raw_pos );
+        if( !pos ) {
+            debugmsg( "assign_lua_activity: pos option is not a TripointBubMs coordinate" );
+        }
+    }
     const auto on_finish = opts.get<sol::optional<std::string>>( "on_finish" );
     const auto on_turn = opts.get<sol::optional<std::string>>( "on_turn" );
     const auto interruptable = opts.get<sol::optional<bool>>( "interruptable" );
@@ -93,7 +103,7 @@ auto parse_lua_activity_options( const sol::table &opts ) -> lua_activity_option
         .duration = opts.get<time_duration>( "duration" ),
         .on_finish = on_finish.value_or( "" ),
         .on_turn = on_turn.value_or( "" ),
-        .pos = pos ? std::make_optional( *pos ) : std::nullopt,
+        .pos = pos,
         .name = opts.get_or<std::string>( "name", "" ),
         .interruptable = interruptable.value_or( true ),
         .data = {},
@@ -433,6 +443,10 @@ void cata::detail::reg_monster( sol::state &lua )
         SET_MEMB( faction );
         SET_MEMB( death_drops );
         SET_MEMB( unique_name );
+        DOC( "Pet training level gained through pet training." );
+        SET_MEMB_RO( training_level );
+        DOC( "Bond level with the character this pet is bonded to." );
+        SET_MEMB_RO( pet_bond_level );
 
         // Methods
         // I really don't want to break the uniformity, but...
@@ -443,6 +457,39 @@ void cata::detail::reg_monster( sol::state &lua )
         SET_FX_T( try_upgrade, void( bool ) );
         SET_FX_T( try_reproduce, void() );
         SET_FX_T( refill_udders, void() );
+        DOC( "Whether this monster's current type and runtime state contain the exact attack ID." );
+        SET_FX_T( has_special_attack, bool( const std::string & ) const );
+        DOC( "Checks only enabled state and zero cooldown; does not predict range, target, sight or ammo." );
+        SET_FX_T( special_attack_ready, bool( const std::string & ) const );
+        DOC( "Calls a ready special attack once. True means the actor handled use, not necessarily a hit or shot." );
+        DOC( "Resets cooldown only on true. Actor side effects are not rolled back on false." );
+        DOC( "Does not apply the scheduler's pacified/hallucination restrictions or plan a target." );
+        DOC( "On true the stock scheduler skips its own pick for the rest of this action." );
+        SET_FX_T( use_special_attack, bool( const std::string & ) );
+        DOC( "Whether this action's one special attack has already been spent." );
+        SET_FX_N_T( special_attack_budget_spent, "special_attack_budget_spent", bool() const );
+        DOC( "Frees the budget so a further use_special_attack can run in the same action." );
+        DOC( "Only for a deliberately multi-attack action; the budget is what stops Lua and" );
+        DOC( "the stock scheduler from stacking attacks onto one action." );
+        SET_FX_N_T( clear_special_attack_budget, "clear_special_attack_budget", void() );
+        DOC( "Sorted IDs of every special attack this monster's current type defines." );
+        SET_FX_N_T( special_attack_ids, "get_special_attack_ids",
+                    std::vector<std::string>() const );
+        DOC( "Whether the attack is enabled. False for attacks this monster does not have." );
+        SET_FX_N_T( special_attack_enabled, "special_attack_enabled",
+                    bool( const std::string & ) const );
+        DOC( "Enables or disables an attack without touching its cooldown." );
+        DOC( "The enabled flag is serialized, so it persists across save/load." );
+        DOC( "A disabled attack is skipped by the stock scheduler and by special_attack_ready." );
+        SET_FX_N_T( set_special_attack_enabled, "set_special_attack_enabled",
+                    void( const std::string &, bool ) );
+        DOC( "Remaining cooldown in turns, or nil for attacks this monster does not have." );
+        SET_FX_N_T( get_special_attack_cooldown, "get_special_attack_cooldown",
+                    std::optional<int>( const std::string & ) const );
+        DOC( "Sets the remaining cooldown in turns. Negative values are clamped to 0." );
+        DOC( "Does nothing for attacks this monster does not have." );
+        SET_FX_N_T( set_special_attack_cooldown, "set_special_attack_cooldown",
+                    void( const std::string &, int ) );
         SET_FX_T( spawn, void( const tripoint_bub_ms & ) );
 
         SET_FX_T( name, std::string( unsigned int ) const );
@@ -458,9 +505,23 @@ void cata::detail::reg_monster( sol::state &lua )
         SET_FX_T( flies, bool() const );
         SET_FX_T( climbs, bool() const );
         SET_FX_T( swims, bool() const );
+        SET_FX_T( made_of, bool( const material_id & ) const );
 
         SET_FX_T( move_target, tripoint_bub_ms() );
         SET_FX_N_T( is_wandering, "is_wandering", bool() const );
+        DOC( "Hostile creature this monster sees at its move target, or nil while wandering." );
+        SET_FX_T( attack_target, Creature * () );
+        DOC( "Whether this monster flees from the given character." );
+        SET_FX_T( is_fleeing, bool( Character & ) const );
+        DOC( "Whether this monster has moves left and is not stunned, downed or webbed." );
+        SET_FX_T( can_act, bool() const );
+        DOC( "Whether this monster has an effect that impairs movement." );
+        SET_FX_T( movement_impaired, bool() );
+        DOC( "Intensity of the grabbed effect this monster applies." );
+        SET_FX_T( get_grab_strength, int() const );
+        DOC( "Whether this monster is dead or at 0 HP. Unlike is_dead, which checks only HP," );
+        DOC( "this also includes monsters that already died with HP left, e.g. by self-destructing." );
+        SET_FX_N_T( is_dead, "is_dead_or_dying", bool() const );
 
         SET_FX_T( wander_to, void( const tripoint_bub_ms & p, int f ) );
         luna::set_fx( ut, "add_armor_item", []( monster & m, detached_ptr<item> &armor ) { return m.set_armor_item( std::move( armor ) ); } );
@@ -703,17 +764,41 @@ void cata::detail::reg_character( sol::state &lua )
 
         SET_FX_T( has_watch, bool() const );
 
-        // These are named with 'BTU' (body temperature units) because other
-        // body temperature measurements might/can/should be added later.
-        DOC( "Gets the current temperature of a specific body part (in Body Temperature Units)." );
-        SET_FX_N_T( get_part_temp_cur, "get_part_temp_btu", int( const bodypart_id & id ) const );
-        DOC( "Sets a specific body part to a given temperature (in Body Temperature Units)." );
-        SET_FX_N_T( set_part_temp_cur, "set_part_temp_btu", void( const bodypart_id & id, int temp ) );
-        DOC( "Gets all bodyparts and their associated temperatures (in Body Temperature Units)." );
-        // May want to remove the 'resolve' call, but it clarifies the type...
-        luna::set_fx( ut, "get_temp_btu", sol::resolve< std::map<bodypart_id, int>() >( &UT_CLASS::get_temp_cur ) );
-        DOC( "Sets ALL body parts on a creature to the given temperature (in Body Temperature Units)." );
-        SET_FX_N_T( set_temp_cur, "set_temp_btu", void( int temp ) );
+        DOC( "Gets the current temperature of a specific body part in Celsius." );
+        SET_FX_N_T( get_part_temp_cur, "get_part_temp_celsius", units::temperature( const bodypart_id & id ) const );
+        DOC( "Sets a specific body part to a temperature in Celsius." );
+        SET_FX_N_T( set_part_temp_cur, "set_part_temp_celsius", void( const bodypart_id & id, units::temperature temp ) );
+        DOC( "Gets all bodyparts and their associated temperatures in Celsius." );
+        luna::set_fx( ut, "get_temp_celsius", sol::resolve< std::map<bodypart_id, units::temperature>() >( &UT_CLASS::get_temp_cur ) );
+        DOC( "Sets ALL body parts on a creature to the given temperature in Celsius." );
+        SET_FX_N_T( set_temp_cur, "set_temp_celsius", void( units::temperature temp ) );
+
+        // These legacy functions are named with 'BTU' (body temperature units).
+        DOC( "Deprecated: use get_part_temp_celsius instead. Gets the current temperature of a specific body part in legacy Body Temperature Units." );
+        luna::set_fx( ut, "get_part_temp_btu", static_cast<int ( * )( const UT_CLASS &, const bodypart_id & )>(
+        []( const UT_CLASS & charac, const bodypart_id & id ) -> int {
+            return units::to_legacy_bodypart_temp( charac.get_part_temp_cur( id ) );
+        } ) );
+        DOC( "Deprecated: use set_part_temp_celsius instead. Sets a specific body part to a given legacy Body Temperature Units value." );
+        luna::set_fx( ut, "set_part_temp_btu", static_cast<void ( * )( UT_CLASS &, const bodypart_id &, int )>(
+        []( UT_CLASS & charac, const bodypart_id & id, int temp ) -> void {
+            charac.set_part_temp_cur( id, units::from_legacy_bodypart_temp( temp ) );
+        } ) );
+        DOC( "Deprecated: use get_temp_celsius instead. Gets all bodyparts and their associated temperatures in legacy Body Temperature Units." );
+        luna::set_fx( ut, "get_temp_btu", static_cast<std::map<bodypart_id, int>( * )( UT_CLASS & )>(
+        []( UT_CLASS & charac ) -> std::map<bodypart_id, int> {
+            auto legacy_temps = std::map<bodypart_id, int>{};
+            for( const auto &[bp, temp] : charac.get_temp_cur() )
+            {
+                legacy_temps.emplace( bp, units::to_legacy_bodypart_temp( temp ) );
+            }
+            return legacy_temps;
+        } ) );
+        DOC( "Deprecated: use set_temp_celsius instead. Sets ALL body parts on a creature to the given legacy Body Temperature Units value." );
+        luna::set_fx( ut, "set_temp_btu", static_cast<void ( * )( UT_CLASS &, int )>(
+        []( UT_CLASS & charac, int temp ) -> void {
+            charac.set_temp_cur( units::from_legacy_bodypart_temp( temp ) );
+        } ) );
 
         SET_FX_T( blood_loss, int( const bodypart_id & bp ) const );
 
@@ -754,6 +839,8 @@ void cata::detail::reg_character( sol::state &lua )
         SET_FX_T( has_base_trait, bool( const trait_id & b ) const );
 
         SET_FX_T( has_trait_flag, bool( const trait_flag_str_id & b ) const );
+
+        SET_FX_T( has_trait_type, bool( const std::string & mut_type ) const );
 
         SET_FX_T( has_opposite_trait, bool( const trait_id & flag ) const );
 
@@ -837,7 +924,10 @@ void cata::detail::reg_character( sol::state &lua )
 
         SET_FX_T( mutation_ok, bool( const trait_id &, bool, bool ) const );
 
-        SET_FX_T( mutate_category, void( const mutation_category_id & ) );
+        luna::set_fx( ut, "mutate_category", sol::overload(
+                          sol::resolve<void( const mutation_category_id & )>( &UT_CLASS::mutate_category ),
+                          sol::resolve<void( const mutation_category_id &, bool )>( &UT_CLASS::mutate_category )
+                      ) );
 
         luna::set_fx( ut, "mutate_towards", sol::overload(
                           sol::resolve<bool( std::vector<trait_id>, int )>( &UT_CLASS::mutate_towards ),
@@ -1051,7 +1141,9 @@ void cata::detail::reg_character( sol::state &lua )
             c.i_add( std::move( i ) );
         } );
 
-        DOC( "Creates and an item with the given id and amount to the player inventory" );
+        DOC( "Creates an item with the given id and adds it to the player inventory." );
+        DOC( "`count` sets the item's charges, not the number of items: exactly one item is created." );
+        DOC( "For stackable (count-by-charges) items such as ammo, `count` is the stack size. For non-stackable items, pass a negative value (e.g. -1), since a positive one is still applied as charges. Tools spawned with a negative value get their default charges." );
         luna::set_fx( ut, "create_item", []( UT_CLASS & c, const itype_id & itype, int count )
         {
             return &c.add_item_with_id( itype, count );
@@ -1192,6 +1284,10 @@ void cata::detail::reg_character( sol::state &lua )
         SET_FX_T( set_stamina, void( int ) );
         SET_FX_T( mod_stamina, void( int ) );
 
+        SET_FX_T( vitamin_get, int( const vitamin_id & ) const );
+        SET_FX_T( vitamin_set, bool( const vitamin_id &, int ) );
+        SET_FX_T( vitamin_mod, int( const vitamin_id &, int, bool ) );
+
         SET_FX_T( sound_hallu, void() );
 
         SET_FX_T( wake_up, void() );
@@ -1244,6 +1340,9 @@ void cata::detail::reg_character( sol::state &lua )
 
         luna::set_fx( ut, "knows_recipe", []( const UT_CLASS & utObj, const recipe_id & rec ) -> bool { return utObj.knows_recipe( &( rec.obj() ) ); } );
         luna::set_fx( ut, "learn_recipe", []( UT_CLASS & utObj, const recipe_id & rec ) -> void { utObj.learn_recipe( &( rec.obj() ) ); } );
+
+        luna::set_fx( ut, "knows_martial_art", []( const UT_CLASS & utObj, const matype_id & ma_type_id ) -> bool { return utObj.martial_arts_data->has_martialart( ma_type_id ); } );
+        luna::set_fx( ut, "learn_martial_art", []( const UT_CLASS & utObj, const matype_id & ma_type_id ) -> void { utObj.martial_arts_data->add_martialart( ma_type_id ); } );
 
         SET_FX_T( suffer, void() );
 
@@ -1305,6 +1404,23 @@ void cata::detail::reg_character( sol::state &lua )
         DOC( "Invalidates the cached crafting inventory" );
         SET_FX_T( invalidate_crafting_inventory, void() );
 
+        DOC( "Consumes a requirement's items from the inventory" );
+        luna::set_fx( ut, "consume_requirement", []( UT_CLASS & ch, const requirement_data & req, const sol::table & opts ) -> bool {
+            int range = opts.get_or( "range", PICKUP_RANGE );
+            int size = opts.get_or( "count", 1 );
+            inventory map_inv;
+            map_inv.form_from_map( ch.bub_pos(), range );
+            for( const auto &it : req.get_components() )
+            {
+                auto chosen = ch.select_item_component( it, size, map_inv, true );
+                if( chosen.use_from == usage_from::cancel ) {
+                    return false;
+                }
+                ch.consume_items( chosen, size );
+            }
+            return true;
+        } );
+
         DOC( "Consumes items from inventory based on item component list" );
         luna::set_fx( ut, "consume_items", []( UT_CLASS & ch, const std::vector<item_comp> &components ) -> void {
             ch.consume_items( components );
@@ -1315,6 +1431,11 @@ void cata::detail::reg_character( sol::state &lua )
             ch.consume_tools( tools );
         } );
 
+        DOC( "Gets the bonus from the enchantment value. Doesn't handle max logic itself." );
+        luna::set_fx( ut, "bonus_from_enchantments", []( UT_CLASS & ch, const double base, const enchantment_value_id & ench_val_id, sol::optional<bool> round ) -> double {
+            return ch.bonus_from_enchantments( base, ench_val_id, round.value_or( false ) );
+        } );
+        SET_FX( has_enchantment_flag );
     }
 #undef UT_CLASS // #define UT_CLASS Character
 

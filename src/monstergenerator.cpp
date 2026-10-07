@@ -1,13 +1,4 @@
-#include "mattack_common.h" // IWYU pragma: associated
 #include "monstergenerator.h" // IWYU pragma: associated
-
-#include <algorithm>
-#include <cmath>
-#include <cstdlib>
-#include <optional>
-#include <set>
-#include <utility>
-#include <vector>
 
 #include "assign.h"
 #include "bodypart.h"
@@ -22,7 +13,9 @@
 #include "item.h"
 #include "item_group.h"
 #include "json.h"
+#include "map/legacy_pathfinding.h"
 #include "mattack_actors.h"
+#include "mattack_common.h" // IWYU pragma: associated
 #include "monattack.h"
 #include "mondeath.h"
 #include "mondefense.h"
@@ -30,11 +23,18 @@
 #include "monster.h"
 #include "mtype.h"
 #include "options.h"
-#include "legacy_pathfinding.h"
 #include "rng.h"
 #include "string_id.h"
 #include "translations.h"
 #include "units.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <optional>
+#include <set>
+#include <utility>
+#include <vector>
 
 namespace io
 {
@@ -161,6 +161,7 @@ std::string enum_to_string<m_flag>( m_flag data )
         case MF_GROUP_MORALE: return "GROUP_MORALE";
         case MF_INTERIOR_AMMO: return "INTERIOR_AMMO";
         case MF_NIGHT_INVISIBILITY: return "NIGHT_INVISIBILITY";
+        case MF_CAMOUFLAGE: return "CAMOUFLAGE";
         case MF_REVIVES_HEALTHY: return "REVIVES_HEALTHY";
         case MF_NO_NECRO: return "NO_NECRO";
         case MF_PACIFIST: return "PACIFIST";
@@ -170,6 +171,7 @@ std::string enum_to_string<m_flag>( m_flag data )
         case MF_AVOID_DANGER_1: return "PATH_AVOID_DANGER_1";
         case MF_AVOID_DANGER_2: return "PATH_AVOID_DANGER_2";
         case MF_AVOID_FALL: return "PATH_AVOID_FALL";
+        case MF_NO_SLIP: return "NO_SLIP";
         case MF_AVOID_FIRE: return "PATH_AVOID_FIRE";
         case MF_PRIORITIZE_TARGETS: return "PRIORITIZE_TARGETS";
         case MF_NOT_HALLU: return "NOT_HALLUCINATION";
@@ -804,6 +806,8 @@ void mtype::load( const JsonObject &jo, const std::string &src )
 
     assign( jo, "mountable_weight_ratio", mountable_weight_ratio, strict );
 
+    optional( jo, was_loaded, "mountable_pixels_up", mountable_pixels_up, 6 );
+
     assign( jo, "attack_cost", attack_cost, strict, 0 );
     assign( jo, "melee_skill", melee_skill, strict, 0 );
     assign( jo, "melee_dice", melee_dice, strict, 0 );
@@ -826,6 +830,8 @@ void mtype::load( const JsonObject &jo, const std::string &src )
 
     assign( jo, "vision_day", vision_day, strict, 0 );
     assign( jo, "vision_night", vision_night, strict, 0 );
+    optional( jo, was_loaded, "clairvoyance", clairvoyance, 0 );
+
     optional( jo, was_loaded, "preferred_z", preferred_z );
 
     optional( jo, was_loaded, "regenerates", regenerates, 0 );

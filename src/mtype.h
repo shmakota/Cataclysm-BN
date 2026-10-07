@@ -1,27 +1,27 @@
 #pragma once
 
-#include <map>
-#include <optional>
-#include <set>
-#include <array>
-#include <string>
-#include <variant>
-#include <vector>
-
 #include "behavior.h"
 #include "calendar.h"
+#include "catalua_type_operators.h"
 #include "color.h"
 #include "cursesdef.h"
 #include "damage.h"
 #include "enum_bitset.h"
 #include "enums.h"
+#include "map/legacy_pathfinding.h"
 #include "mattack_common.h"
-#include "legacy_pathfinding.h"
 #include "pathfinding.h"
 #include "translations.h"
 #include "type_id.h"
 #include "units.h"
-#include "catalua_type_operators.h"
+
+#include <array>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <variant>
+#include <vector>
 
 class lua_monster_callback_actor;
 class Creature;
@@ -164,12 +164,14 @@ enum m_flag : int {
     MF_PUSH_MON,            // Monsters that can push creatures out of their way
     MF_PUSH_VEH,            // Monsters that can push vehicles out of their way
     MF_NIGHT_INVISIBILITY,  // Monsters that are invisible in poor light conditions
+    MF_CAMOUFLAGE,          // Monsters that are invisible at a range greater than the player's current perception + half of survival skill rounded down.
     MF_REVIVES_HEALTHY,     // When revived, this monster has full hitpoints and speed
     MF_NO_NECRO,            // This monster can't be revived by necros. It will still rise on its own.
     MF_AVOID_DANGER_1,      // This monster will path around some dangers instead of through them.
     MF_AVOID_DANGER_2,      // This monster will path around most dangers instead of through them.
     MF_AVOID_FIRE,          // This monster will path around heat-related dangers instead of through them.
     MF_AVOID_FALL,          // This monster will path around cliffs instead of off of them.
+    MF_NO_SLIP,             // This monster cannot slip in fields.
     MF_PRIORITIZE_TARGETS,  // This monster will prioritize targets depending on their danger levels
     MF_NOT_HALLU,           // Monsters that will NOT appear when player's producing hallucinations
     MF_CANPLAY,             // This monster can be played with if it's a pet.
@@ -339,6 +341,8 @@ struct mtype {
 
         // mountable ratio for rider weight vs. mount weight, default 0.3
         float mountable_weight_ratio = 0.3;
+        // how many pixels up does player go
+        int mountable_pixels_up = 6;
 
         int attack_cost = 100;  /** moves per regular attack */
         int melee_skill = 0;    /** melee hit skill, 20 is superhuman hitting abilities */
@@ -390,6 +394,9 @@ struct mtype {
         // Vision range is linearly scaled depending on lighting conditions
         int vision_day = 40;    /** vision range in bright light */
         int vision_night = 1;   /** vision range in total darkness */
+
+        // Clairvoyance
+        int clairvoyance = 0;
 
         damage_instance melee_damage; // Basic melee attack damage
         harvest_id harvest;

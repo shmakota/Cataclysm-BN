@@ -848,7 +848,15 @@
     "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
     "subtype": "collection",
     "ammo": 100,
-    "entries": [ { "item": "colt_ring", "ammo-group": "on_hand_44paper", "charges": [ 0, 9 ] }, { "group": "on_hand_44paper" } ]
+    "entries": [ { "item": "colt_ring", "ammo-group": "on_hand_44paper", "charges": [ 0, 8 ] }, { "group": "on_hand_44paper" } ]
+  },
+  {
+    "id": "nested_colt_ring_36",
+    "type": "item_group",
+    "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
+    "subtype": "collection",
+    "ammo": 100,
+    "entries": [ { "item": "colt_ring_36", "ammo-group": "on_hand_36paper", "charges": [ 0, 8 ] }, { "group": "on_hand_36paper" } ]
   },
   {
     "id": "nested_pistol_flintlock",
@@ -971,6 +979,32 @@
       { "item": "ump45mag", "ammo-group": "on_hand_45" },
       { "item": "ump45mag", "ammo-group": "on_hand_45", "prob": 50 },
       { "group": "on_hand_45" }
+    ]
+  },
+  {
+    "id": "nested_hk_ump45_retool_40",
+    "type": "item_group",
+    "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
+    "subtype": "collection",
+    "ammo": 100,
+    "entries": [
+      { "item": "hk_ump45_retool_40", "ammo-group": "on_hand_40", "charges": [ 0, 30 ] },
+      { "item": "ump40mag", "ammo-group": "on_hand_40" },
+      { "item": "ump40mag", "ammo-group": "on_hand_40", "prob": 50 },
+      { "group": "on_hand_40" }
+    ]
+  },
+  {
+    "id": "nested_hk_ump45_retool_9mm",
+    "type": "item_group",
+    "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
+    "subtype": "collection",
+    "ammo": 100,
+    "entries": [
+      { "item": "hk_ump45_retool_9mm", "ammo-group": "on_hand_9mm", "charges": [ 0, 30 ] },
+      { "item": "ump9mag", "ammo-group": "on_hand_9mm" },
+      { "item": "ump9mag", "ammo-group": "on_hand_9mm", "prob": 50 },
+      { "group": "on_hand_9mm" }
     ]
   },
   {
@@ -1473,6 +1507,18 @@
     ]
   },
   {
+    "id": "nested_m1919browning",
+    "type": "item_group",
+    "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
+    "subtype": "collection",
+    "ammo": 100,
+    "entries": [
+      { "item": "m1919browning", "ammo-group": "on_hand_3006", "charges": [ 0, 100 ] },
+      { "item": "belt3006", "ammo-group": "on_hand_3006", "charges": 100, "prob": 50 },
+      { "group": "on_hand_3006" }
+    ]
+  },
+  {
     "id": "nested_mosin44_ebr",
     "type": "item_group",
     "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
@@ -1675,6 +1721,18 @@
     ]
   },
   {
+    "id": "nested_PKM",
+    "type": "item_group",
+    "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
+    "subtype": "collection",
+    "ammo": 100,
+    "entries": [
+      { "item": "PKM", "ammo-group": "on_hand_762R", "charges": [ 0, 100 ] },
+      { "item": "belt762R", "ammo-group": "on_hand_762R", "charges": 100, "prob": 50 },
+      { "group": "on_hand_762R" }
+    ]
+  },
+  {
     "id": "nested_m2browning",
     "type": "item_group",
     "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
@@ -1835,7 +1893,7 @@
     "subtype": "collection",
     "ammo": 100,
     "entries": [
-      { "item": "acr_300blk", "ammo-group": "on_hand_300BLK", "charges": [ 0, 30 ] },
+      { "item": "sig_mcx", "ammo-group": "on_hand_300BLK", "charges": [ 0, 30 ] },
       { "group": "nested_stanag_mag_300" },
       { "group": "nested_stanag_mag_300", "prob": 50 },
       { "group": "on_hand_300BLK" }
@@ -1852,6 +1910,19 @@
       { "group": "nested_ak47_mag" },
       { "group": "nested_ak47_mag", "prob": 50 },
       { "group": "on_hand_762" }
+    ]
+  },
+  {
+    "id": "nested_SVD",
+    "type": "item_group",
+    "//": "this is a distribution for the gun, reasonable number of backup mags, and some ammo to repack",
+    "subtype": "collection",
+    "ammo": 100,
+    "entries": [
+      { "item": "SVD", "ammo-group": "on_hand_762R", "charges": [ 0, 10 ] },
+      { "item": "SVDmag", "ammo-group": "on_hand_762R" },
+      { "item": "SVDmag", "ammo-group": "on_hand_762R", "prob": 50 },
+      { "group": "on_hand_762R" }
     ]
   },
   {

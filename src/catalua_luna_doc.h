@@ -51,6 +51,9 @@ class distribution_grid;
 class distribution_grid_tracker;
 class effect;
 class overmapbuffer;
+class enchantment;
+class enchantment_value;
+class enchantment_flag;
 class effect_type;
 class item;
 class item_stack;
@@ -85,6 +88,7 @@ struct dealt_damage_instance;
 struct fake_spell;
 struct field_type;
 struct mutation_branch;
+struct mutation_category_trait;
 struct mission_type;
 struct npc_opinion;
 struct npc_personality;
@@ -134,6 +138,9 @@ using volume = quantity<std::int64_t, volume_in_milliliter_tag>;
 
 class sound_in_decibel_tag;
 using sound = quantity<int, sound_in_decibel_tag>;
+
+class temperature_in_millidegree_celsius_tag;
+using temperature = quantity<int, temperature_in_millidegree_celsius_tag>;
 } // namespace units
 
 struct islot_container;
@@ -226,6 +233,7 @@ LUNA_VAL( uilist_entry, "UiListEntry" );
 LUNA_VAL( units::angle, "Angle" );
 LUNA_VAL( units::energy, "Energy" );
 LUNA_VAL( units::mass, "Mass" );
+LUNA_VAL( units::temperature, "Temperature" );
 LUNA_VAL( units::volume, "Volume" );
 LUNA_VAL( units::sound, "Sound" );
 LUNA_VAL( relic, "Relic" )
@@ -246,6 +254,9 @@ LUNA_ID( activity_type, "ActivityType" )
 LUNA_ID( bionic_data, "BionicData" )
 LUNA_ID( body_part_type, "BodyPartType" )
 LUNA_ID( disease_type, "DiseaseType" )
+LUNA_VAL_WITH_ID( enchantment, "Enchantment" )
+LUNA_ID( enchantment_value, "EnchantmentValue" )
+LUNA_ID( enchantment_flag, "EnchantmentFlag" )
 LUNA_ID( effect_type, "EffectType" )
 LUNA_ID( faction, "Faction" )
 LUNA_ID( field_type, "FieldType" )

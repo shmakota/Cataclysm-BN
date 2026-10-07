@@ -1,34 +1,18 @@
 #include "init.h"
 
-#include <algorithm>
-#include <cassert>
-#include <cstddef>
-#include <exception>
-#include <fstream>
-#include <iterator>
-#include <memory>
-#include <set>
-#include <sstream> // for throwing errors
-#include <stdexcept>
-#include <string>
-#include <vector>
-#include <ranges>
-
 #include "achievement.h"
 #include "activity_type.h"
 #include "ammo.h"
 #include "ammo_effect.h"
 #include "anatomy.h"
-#include "ascii_art.h"
 #include "artifact.h"
+#include "ascii_art.h"
 #include "behavior.h"
 #include "bionics.h"
 #include "bodypart.h"
-#include "catalua.h"
 #include "cata_utility.h"
+#include "catalua.h"
 #include "catalua_impl.h"
-#include "lua_sidebar_widgets.h"
-#include "panels.h"
 #include "clothing_mod.h"
 #include "clzones.h"
 #include "construction.h"
@@ -43,18 +27,17 @@
 #include "disease.h"
 #include "effect.h"
 #include "enchantments/enchantment.h"
-#include "enchantments/enchantment_value.h"
-#include "enchantments/enchantment_flag.h"
 #include "enchantments/enchantment_condition.h"
-#include "emit.h"
+#include "enchantments/enchantment_flag.h"
+#include "enchantments/enchantment_value.h"
+#include "enchantments/enchantment_vision.h"
 #include "event_statistics.h"
 #include "faction.h"
 #include "fault.h"
-#include "field_type.h"
 #include "filesystem.h"
-#include "fstream_utils.h"
 #include "flag.h"
 #include "flag_trait.h"
+#include "fstream_utils.h"
 #include "gates.h"
 #include "harvest.h"
 #include "item_action.h"
@@ -64,14 +47,18 @@
 #include "language.h"
 #include "loading_ui.h"
 #include "lru_cache.h"
+#include "lua_sidebar_widgets.h"
 #include "magic/magic.h"
 #include "magic/magic_ter_furn_transform.h"
-#include "map_extras.h"
-#include "mapbuffer.h"
-#include "map_feature_descriptions.h"
-#include "mapdata.h"
-#include "mapgen.h"
-#include "mapgen_async.h"
+#include "map/emit.h"
+#include "map/field_type.h"
+#include "map/map_feature_descriptions.h"
+#include "map/mapbuffer.h"
+#include "map/mapdata.h"
+#include "mapgen/map_extras.h"
+#include "mapgen/mapgen.h"
+#include "mapgen/mapgen_async.h"
+#include "mapgen/mapgen_color_palette.h"
 #include "martialarts.h"
 #include "material.h"
 #include "mission.h"
@@ -80,17 +67,18 @@
 #include "mongroup.h"
 #include "monstergenerator.h"
 #include "morale_types.h"
-#include "mutation_data.h"
 #include "mutation.h"
+#include "mutation_data.h"
 #include "npc.h"
 #include "npc_class.h"
-#include "omdata.h"
 #include "overlay_ordering.h"
-#include "overmap.h"
-#include "overmapbuffer.h"
-#include "overmap_connection.h"
-#include "overmap_location.h"
-#include "overmap_special.h"
+#include "overmap/omdata.h"
+#include "overmap/overmap.h"
+#include "overmap/overmap_connection.h"
+#include "overmap/overmap_location.h"
+#include "overmap/overmap_special.h"
+#include "overmap/overmapbuffer.h"
+#include "panels.h"
 #include "profession.h"
 #include "recipe_dictionary.h"
 #include "recipe_groups.h"
@@ -110,14 +98,29 @@
 #include "translations.h"
 #include "trap.h"
 #include "type_id.h"
-#include "veh_type.h"
-#include "vehicle_group.h"
-#include "vehicle_palette.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle_group.h"
+#include "vehicle/vehicle_palette.h"
 #include "vitamin.h"
-#include "weather.h"
-#include "weather_type.h"
+#include "weather/weather.h"
+#include "weather/weather_gen.h"
+#include "weather/weather_type.h"
 #include "world_type.h"
 #include "worldfactory.h"
+
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <exception>
+#include <fstream>
+#include <iterator>
+#include <memory>
+#include <ranges>
+#include <set>
+#include <sstream> // for throwing errors
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #if defined(TILES)
 #  include "mod_tileset.h"
@@ -263,11 +266,16 @@ void DynamicDataLoader::initialize()
     // Static Function Access
     add( "WORLD_OPTION", &load_world_option );
     add( "EXTERNAL_OPTION", &load_external_option );
+    add( "OPTION", &load_ignored_type );
+    add( "OPTION_GROUP", &load_ignored_type );
+    add( "OPTION_SPACE", &load_ignored_type );
     add( "json_flag", &json_flag::load_all );
     add( "mutation_flag", &json_trait_flag::load_all );
     add( "fault", &fault::load_fault );
     add( "field_type", &field_types::load );
     add( "weather_type", &weather_types::load );
+    add( "weather_pattern", &weather_patterns::load );
+    add( "base_weather", &base_weathers::load );
     add( "world_type", &world_types::load );
     add( "ammo_effect", &ammo_effects::load );
     add( "emit", &emit::load_emit );
@@ -298,6 +306,7 @@ void DynamicDataLoader::initialize()
     add( "enchantment_value", &enchantment_value::load_enchantment_values );
     add( "enchantment_flag", &enchantment_flag::load_enchantment_flags );
     add( "enchantment_condition", &enchantment_condition::load_enchantment_conditions );
+    add( "enchantment_vision", &enchantment_vision::load_enchantment_vision );
     add( "hit_range", &Creature::load_hit_range );
     add( "scent_type", &scent_type::load_scent_type );
     add( "disease_type", &disease_type::load_disease_type );
@@ -419,6 +428,7 @@ void DynamicDataLoader::initialize()
     add( "construction_category", &construction_categories::load );
     add( "construction_group", &construction_groups::load );
     add( "construction", &constructions::load );
+    add( "mapgen_color_palette",  &MapgenColorPalette::load_palette );
     add( "mapgen", &load_mapgen );
     add( "overmap_land_use_code", &overmap_land_use_codes::load );
     add( "overmap_connection", &overmap_connections::load );
@@ -479,6 +489,7 @@ void DynamicDataLoader::initialize()
     add( "score", &score::load_score );
     add( "achievement", &achievement::load_achievement );
     add( "named_color", &RGBColor::load_named_color );
+    add( "vehicle_blacklist", &vehicle_prototype::load_vehicle_blacklist );
 #if defined(TILES)
     add( "mod_tileset", &load_mod_tileset );
 #else
@@ -488,7 +499,7 @@ void DynamicDataLoader::initialize()
 }
 
 void DynamicDataLoader::load_data_from_path( const std::string &path, const std::string &src,
-        loading_ui &ui )
+        loading_ui &ui, const bool mod_interactions )
 {
     assert( !finalized && "Can't load additional data after finalization.  Must be unloaded first." );
     // We assume that each folder is consistent in itself,
@@ -498,7 +509,26 @@ void DynamicDataLoader::load_data_from_path( const std::string &path, const std:
     // But not the other way round.
 
     // get a list of all files in the directory
-    str_vec files = get_files_from_path( ".json", path, true, true );
+    str_vec files;
+    if( mod_interactions ) {
+        std::string general_mod_interact_path = path + "/mod_interactions";
+        if( dir_exist( general_mod_interact_path ) ) {
+            auto &mods = world_generator->active_world->info->active_mod_order;
+            for( mod_id mod_info_id : mods ) {
+                std::string mod_interact_path = general_mod_interact_path + "/" + mod_info_id.str();
+                if( dir_exist( mod_interact_path ) ) {
+                    str_vec mod_compat_files = get_files_from_path( ".json", mod_interact_path, true, true );
+                    files.insert( files.end(), mod_compat_files.begin(), mod_compat_files.end() );
+                }
+            }
+        }
+        if( files.empty() ) {
+            return;
+        }
+    } else {
+        files = get_files_from_path_exclude( ".json", "mod_interactions", path, true, true );
+    }
+
     if( files.empty() ) {
         std::ifstream tmp( path.c_str(), std::ios::in );
         if( tmp ) {
@@ -589,6 +619,7 @@ void DynamicDataLoader::unload_data()
     enchantment_value::reset();
     enchantment_flag::reset();
     enchantment_condition::reset();
+    enchantment_vision::reset();
     event_statistic::reset();
     event_transformation::reset();
     faction_template::reset();
@@ -602,6 +633,7 @@ void DynamicDataLoader::unload_data()
     json_trait_flag::reset();
     MapExtras::reset();
     map_feature_descriptions::reset_map_feature_descriptions();
+    MapgenColorPalette::reset();
     mapgen_palette::reset();
     materials::reset();
     mission_type::reset();
@@ -657,6 +689,8 @@ void DynamicDataLoader::unload_data()
     vpart_info::reset();
     weapon_category::reset();
     weather_types::reset();
+    weather_patterns::reset();
+    base_weathers::reset();
     world_types::reset();
     zone_type::reset_zones();
     l10n_data::unload_mod_catalogues();
@@ -690,6 +724,8 @@ void DynamicDataLoader::finalize_loaded_data( loading_ui &ui )
             { _( "Body parts" ), &body_part_type::finalize_all },
             { _( "Bionics" ), &bionic_data::finalize_all },
             { _( "Weather types" ), &weather_types::finalize_all },
+            { _( "Weather patterns" ), &weather_patterns::finalize_all },
+            { _( "Base weather" ), &base_weathers::finalize_all },
             { _( "World types" ), &world_types::finalize_all },
             { _( "Field types" ), &field_types::finalize_all },
             { _( "Ammo effects" ), &ammo_effects::finalize_all },
@@ -707,6 +743,7 @@ void DynamicDataLoader::finalize_loaded_data( loading_ui &ui )
                 }
             },
             { _( "Vehicle parts" ), &vpart_info::finalize_all },
+            { _( "Vehicle Groupss" ), &VehicleGroup::finalize },
             { _( "Traps" ), &trap::finalize },
             { _( "Terrain" ), &set_ter_ids },
             { _( "Furniture" ), &finalize_furn },
@@ -775,6 +812,8 @@ void DynamicDataLoader::check_consistency( loading_ui &ui )
             },
             { _( "Vitamins" ), &vitamin::check_consistency },
             { _( "Weather types" ), &weather_types::check_consistency },
+            { _( "Weather patterns" ), &weather_patterns::check_consistency },
+            { _( "Base weather" ), &base_weathers::check_consistency },
             { _( "World types" ), &world_types::check_consistency },
             { _( "Field types" ), &field_types::check_consistency },
             { _( "Ammo effects" ), &ammo_effects::check_consistency },
@@ -792,6 +831,7 @@ void DynamicDataLoader::check_consistency( loading_ui &ui )
             { _( "Vehicle palettes" ), &VehiclePalette::check_definitions },
             { _( "Vehicle groups" ), &VehicleGroup::check },
             { _( "Mapgen definitions" ), &check_mapgen_definitions },
+            { _( "Mapgen Color palettes" ), &MapgenColorPalette::check_definitions },
             { _( "Mapgen palettes" ), &mapgen_palette::check_definitions },
             {
                 _( "Monster types" ), []()
@@ -838,6 +878,7 @@ void DynamicDataLoader::check_consistency( loading_ui &ui )
             { _( "Enchantment Values" ), &enchantment_value::check_consistency },
             { _( "Enchantment Flags" ), &enchantment_flag::check_consistency },
             { _( "Enchantment Conditions" ), &enchantment_condition::check_consistency },
+            { _( "Enchantment Vision" ), &enchantment_vision::check_consistency },
             { _( "Transformations" ), &event_transformation::check_consistency },
             { _( "Statistics" ), &event_statistic::check_consistency },
             { _( "Scent types" ), &scent_type::check_scent_consistency },
@@ -914,7 +955,16 @@ static void load_and_finalize_packs( loading_ui &ui, const std::string &msg,
     cata::reg_lua_icallback_actors( *loader.lua, *item_controller );
 
     for( const mod_id &mod : available ) {
-        loader.load_data_from_path( mod->path, mod.str(), ui );
+        loader.load_data_from_path( mod->path, mod.str(), ui, false );
+        ui.proceed();
+    }
+    ui.new_context( msg );
+    for( const mod_id &e : available ) {
+        ui.add_entry( e->name() );
+    }
+    ui.show();
+    for( const mod_id &mod : available ) {
+        loader.load_data_from_path( mod->path, mod.str(), ui, true );
         ui.proceed();
     }
 
@@ -1113,5 +1163,5 @@ void init::load_soundpack_files( const std::string &soundpack_path )
     // It's not a mod, so we avoid the regular mod loading routines.
     // clear_loaded_data() is not needed here, tileset gets loaded on game init before any mods
     loading_ui ui( false );
-    DynamicDataLoader::get_instance().load_data_from_path( soundpack_path, "sound_core", ui );
+    DynamicDataLoader::get_instance().load_data_from_path( soundpack_path, "sound_core", ui, false );
 }

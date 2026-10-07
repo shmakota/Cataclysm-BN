@@ -7,6 +7,7 @@
 #include "clone_ptr.h"
 #include "coordinates.h"
 #include "type_id.h"
+#include "translations.h"
 #include "units.h"
 
 class map;
@@ -223,6 +224,8 @@ class iuse_actor
 {
     protected:
         iuse_actor( const std::string &type, int cost = -1 ) : type( type ), cost( cost ) {}
+        bool use_local_display_name = false;
+        translation display_name;
 
     public:
         /**
@@ -260,13 +263,23 @@ class iuse_actor
          * Returns the translated name of the action. It is used for the item action menu.
          */
         virtual std::string get_name() const;
+
+        void set_name( std::string name ) {
+            use_local_display_name = true;
+            display_name = to_translation( name );
+        }
+
         /**
          * Finalizes the actor. Must be called after all items are loaded.
          */
         virtual void finalize( const itype_id &/*my_item_type*/ ) { }
+        /**
+         * Checks the actor.
+         */
+        virtual std::string check() const { return ""; }
 
         virtual void on_spawned( item & ) const {}
-        virtual void on_placed( item &, const map &, const tripoint_bub_ms & ) const {}
+        virtual void on_placed( item &, const tripoint_abs_ms & ) const {}
 };
 
 struct use_function {

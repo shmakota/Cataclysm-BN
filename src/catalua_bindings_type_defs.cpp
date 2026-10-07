@@ -1,13 +1,11 @@
+#include "bodypart.h"
 #include "catalua_bindings.h"
-
 #include "catalua_bindings_utils.h"
 #include "catalua_luna_doc.h"
-
-#include "bodypart.h"
 #include "damage.h"
 #include "faction.h"
 #include "itype.h"
-#include "mapdata.h"
+#include "map/mapdata.h"
 #include "material.h"
 #include "mtype.h"
 #include "type_id.h"
@@ -46,6 +44,14 @@ auto cata::detail::reg_types( sol::state &lua ) -> void
         SET_MEMB_RO( id );
         SET_MEMB_RO( difficulty );
         SET_MEMB_RO( difficulty_base );
+        DOC( "Number of dice of bonus bashing damage on melee hit." );
+        SET_MEMB_RO( melee_dice );
+        DOC( "Number of sides of the melee bonus damage dice." );
+        SET_MEMB_RO( melee_sides );
+        DOC( "Base melee attack damage." );
+        SET_MEMB_RO( melee_damage );
+        DOC( "Intensity of the grabbed effect this monster type applies." );
+        SET_MEMB_RO( grab_strength );
         SET_FX_T( nname, std::string( unsigned int ) const );
     }
 #undef UT_CLASS

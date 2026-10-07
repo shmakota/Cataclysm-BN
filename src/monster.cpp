@@ -1,5 +1,78 @@
 #include "monster.h"
 
+#include "action_time_scale.h"
+#include "avatar.h"
+#include "bodypart.h"
+#include "cata_utility.h"
+#include "catalua.h"
+#include "catalua_hooks.h"
+#include "catalua_icallback_actor.h"
+#include "catalua_impl.h"
+#include "catalua_sol.h"
+#include "character.h"
+#include "coordinates.h"
+#include "creature.h"
+#include "creature_tracker.h"
+#include "cursesdef.h"
+#include "debug.h"
+#include "effect.h"
+#include "enums.h"
+#include "event.h"
+#include "event_bus.h"
+#include "explosion.h"
+#include "flag.h"
+#include "flat_set.h"
+#include "game.h"
+#include "game_constants.h"
+#include "init.h"
+#include "int_id.h"
+#include "item.h"
+#include "item_category.h"
+#include "item_factory.h"
+#include "item_group.h"
+#include "itype.h"
+#include "line.h"
+#include "locations.h"
+#include "make_static.h"
+#include "map/field_type.h"
+#include "map/map.h"
+#include "map/mapbuffer.h"
+#include "map/mapdata.h"
+#include "map/submap.h"
+#include "map_iterator.h"
+#include "mattack_actors.h"
+#include "mattack_common.h"
+#include "melee.h"
+#include "messages.h"
+#include "mission.h"
+#include "mod_manager.h"
+#include "mondeath.h"
+#include "mondefense.h"
+#include "monfaction.h"
+#include "mongroup.h"
+#include "morale_types.h"
+#include "mtype.h"
+#include "mutation.h"
+#include "npc.h"
+#include "options.h"
+#include "output.h"
+#include "overmap/overmapbuffer.h"
+#include "pimpl.h"
+#include "player.h"
+#include "profile.h"
+#include "projectile.h"
+#include "rng.h"
+#include "sounds.h"
+#include "string_formatter.h"
+#include "string_id.h"
+#include "string_utils.h"
+#include "text_snippets.h"
+#include "translations.h"
+#include "trap.h"
+#include "type_id.h"
+#include "units_utility.h"
+#include "weather/weather.h"
+
 #include <algorithm>
 #include <cmath>
 #include <iterator>
@@ -10,76 +83,6 @@
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
-
-#include "action_time_scale.h"
-#include "avatar.h"
-#include "bodypart.h"
-#include "catalua.h"
-#include "catalua_hooks.h"
-#include "catalua_icallback_actor.h"
-#include "catalua_impl.h"
-#include "catalua_sol.h"
-#include "character.h"
-#include "coordinates.h"
-#include "creature_tracker.h"
-#include "cursesdef.h"
-#include "debug.h"
-#include "effect.h"
-#include "enums.h"
-#include "event_bus.h"
-#include "event.h"
-#include "explosion.h"
-#include "field_type.h"
-#include "flag.h"
-#include "flat_set.h"
-#include "game_constants.h"
-#include "game.h"
-#include "int_id.h"
-#include "init.h"
-#include "item_group.h"
-#include "item_factory.h"
-#include "item.h"
-#include "item_category.h"
-#include "itype.h"
-#include "line.h"
-#include "locations.h"
-#include "make_static.h"
-#include "mapdata.h"
-#include "map.h"
-#include "mapbuffer.h"
-#include "map_iterator.h"
-#include "mattack_common.h"
-#include "melee.h"
-#include "messages.h"
-#include "mission.h"
-#include "mod_manager.h"
-#include "mondeath.h"
-#include "mondefense.h"
-#include "monfaction.h"
-#include "mongroup.h"
-#include "mattack_actors.h"
-#include "morale_types.h"
-#include "mtype.h"
-#include "mutation.h"
-#include "npc.h"
-#include "options.h"
-#include "output.h"
-#include "overmapbuffer.h"
-#include "pimpl.h"
-#include "player.h"
-#include "projectile.h"
-#include "rng.h"
-#include "sounds.h"
-#include "string_formatter.h"
-#include "string_id.h"
-#include "string_utils.h"
-#include "submap.h"
-#include "text_snippets.h"
-#include "translations.h"
-#include "trap.h"
-#include "weather.h"
-#include "profile.h"
-#include "units_utility.h"
 
 static const ammo_effect_str_id ammo_effect_WHIP( "WHIP" );
 
@@ -221,6 +224,40 @@ auto report_missing_lua_attitude( const std::string &method ) -> void
     debugmsg( "Lua monster attitude function '%s' is not defined", method );
 }
 
+auto report_recursive_special_attack( const std::string &mon_name,
+                                      const std::string &attack_id ) -> void
+{
+    static auto warned = std::unordered_set<std::string> {};
+    if( !warned.insert( attack_id ).second ) {
+        return;
+    }
+    debugmsg( "%s re-entered use_special_attack( '%s' ) from inside a special attack; "
+              "the nested call was refused.", mon_name, attack_id );
+}
+
+auto report_spent_special_attack( const std::string &mon_name,
+                                  const std::string &attack_id ) -> void
+{
+    static auto warned = std::unordered_set<std::string> {};
+    if( !warned.insert( attack_id ).second ) {
+        return;
+    }
+    debugmsg( "%s already spent this action's special attack, so use_special_attack( '%s' ) "
+              "was refused. Call clear_special_attack_budget() first if the second attack "
+              "is deliberate.", mon_name, attack_id );
+}
+
+auto report_recursive_lua_attitude( const std::string &method ) -> void
+{
+    static auto warned = std::unordered_set<std::string> {};
+    if( !warned.insert( method ).second ) {
+        return;
+    }
+    debugmsg( "Lua monster attitude function '%s' triggered attitude evaluation again; "
+              "the nested call fell back to the stock rules. This usually means it called "
+              "use_special_attack() or another action that resolves a target.", method );
+}
+
 auto report_invalid_lua_attitude_return( const std::string &method, const sol::object &value,
         sol::state &lua ) -> void
 {
@@ -235,6 +272,8 @@ auto report_invalid_lua_attitude_return( const std::string &method, const sol::o
               method, raw_name );
 }
 
+std::mutex lua_monster_attitude_lock;
+
 auto get_lua_monster_attitude( const monster &mon,
                                const Character *target ) -> std::optional<monster_attitude>
 {
@@ -243,6 +282,7 @@ auto get_lua_monster_attitude( const monster &mon,
         return std::nullopt;
     }
 
+    std::unique_lock lock( lua_monster_attitude_lock );
     auto *lua_state = DynamicDataLoader::get_instance().lua.get();
     if( lua_state == nullptr ) {
         return std::nullopt;
@@ -391,7 +431,6 @@ monster::monster( const mtype_id &id ) : monster()
     if( monster::has_flag( MF_AQUATIC ) ) {
         fish_population = dice( 1, 20 );
     }
-    upgrade_time = next_upgrade_time() + to_days<int>( calendar::turn - calendar::turn_zero );
 }
 
 monster::monster( const mtype_id &id, const tripoint_bub_ms &p ) : monster( id )
@@ -1049,6 +1088,40 @@ static std::pair<std::string, nc_color> speed_description( float mon_speed_ratin
     return std::make_pair( _( "Unknown" ), c_white );
 }
 
+/// How many process_turn ticks until leftover moves are positive (can_act).
+/// Empty when the card should stay qualitative-only (immobile / inattentive).
+static std::optional<std::pair<std::string, nc_color>> action_readiness_description(
+            const monster &mon )
+{
+    if( mon.has_flag( MF_IMMOBILE ) ) {
+        return std::nullopt;
+    }
+    if( get_avatar().has_trait( trait_INATTENTIVE ) ) {
+        return std::nullopt;
+    }
+
+    const int cur_moves = mon.get_moves();
+    if( cur_moves > 0 ) {
+        return std::make_pair( _( "It can act right now." ), c_red );
+    }
+
+    const int64_t credit = static_cast<int64_t>( mon.get_speed() ) *
+                           action_time_scale::monster_tick_action_factor() /
+                           action_time_scale::factor_denominator;
+    if( credit <= 0 ) {
+        return std::make_pair( _( "It is not recovering." ), c_dark_gray );
+    }
+
+    // can_act() requires moves > 0.
+    const int64_t need = static_cast<int64_t>( 1 ) - cur_moves;
+    const int turns = static_cast<int>( ( need + credit - 1 ) / credit );
+    if( turns <= 1 ) {
+        return std::make_pair( _( "It will be ready next turn." ), c_yellow );
+    }
+    return std::make_pair( string_format( _( "It will be ready in %d turns." ), turns ),
+                           c_light_green );
+}
+
 int monster::print_info( const catacurses::window &w, int vStart, int vLines, int column ) const
 {
     const int vEnd = vStart + vLines;
@@ -1082,9 +1155,15 @@ int monster::print_info( const catacurses::window &w, int vStart, int vLines, in
     const auto speed_desc = speed_description( speed_rating(), has_flag( MF_IMMOBILE ) );
     mvwprintz( w, point( column, ++vStart ), speed_desc.second, speed_desc.first );
 
+    if( const auto ready = action_readiness_description( *this ) ) {
+        mvwprintz( w, point( column, ++vStart ), ready->second, ready->first );
+    }
+
     if( debug_mode ) {
         mvwprintz( w, point( column, ++vStart ), c_light_gray,
                    _( " Difficulty " ) + std::to_string( type->difficulty ) );
+        mvwprintz( w, point( column, ++vStart ), c_light_gray,
+                   string_format( _( "Moves: %d  Speed: %d" ), get_moves(), get_speed() ) );
     }
     if( display_mod_source ) {
         const std::string mod_src = enumerate_as_string( type->src.begin(),
@@ -1171,6 +1250,9 @@ std::string monster::extended_description() const
                 speed_rating(),
                 has_flag( MF_IMMOBILE ) );
     ss += colorize( speed_desc.first, speed_desc.second ) + "\n";
+    if( const auto ready = action_readiness_description( *this ) ) {
+        ss += colorize( ready->first, ready->second ) + "\n";
+    }
 
     ss += "--\n";
     ss += "<color_light_gray>" + type->get_description() + "</color>\n";
@@ -1311,6 +1393,7 @@ std::string monster::extended_description() const
 
     if( debug_mode ) {
         ss += string_format( _( "Current Speed: %1$d" ), get_speed() ) + "\n";
+        ss += string_format( _( "Current Moves: %1$d" ), get_moves() ) + "\n";
         ss += string_format( _( "Anger: %1$d" ), anger ) + "\n";
         if( !faction_anger.empty() ) {
             ss += string_format( _( "Anger by faction:" ) ) + "\n";
@@ -1395,6 +1478,31 @@ bool monster::has_flag( const m_flag f ) const
     return type->has_flag( f ) || monster_flags.contains( f );
 }
 
+bool monster::sees( const Creature &ch ) const
+{
+    if( type->clairvoyance > 0 ) {
+        const int wanted_range = rl_dist( bub_pos(), ch.bub_pos() );
+        // Clairvoyance is now pretty cheap, so we can check it early
+        if( wanted_range < type->clairvoyance ) {
+            return true;
+        }
+    }
+    return Creature::sees( ch );
+}
+bool monster::sees( const tripoint_bub_ms &t, bool is_player, int range_limit,
+                    double range_mod ) const
+{
+    if( type->clairvoyance > 0 ) {
+        const int wanted_range = rl_dist( bub_pos(), t );
+
+        // Clairvoyance is now pretty cheap, so we can check it early
+        if( wanted_range < type->clairvoyance ) {
+            return true;
+        }
+    }
+    return Creature::sees( t, is_player, range_limit, range_mod );
+}
+
 bool monster::can_see() const
 {
     return has_flag( MF_SEES ) && !effect_cache[VISION_IMPAIRED];
@@ -1477,6 +1585,11 @@ int monster::sight_range( const int light_level ) const
     range /= default_daylight;
 
     return range;
+}
+
+int monster::spotting_range() const
+{
+    return std::max( type->vision_night / 8, type->vision_day / 8 );
 }
 
 bool monster::made_of( const material_id &m ) const
@@ -1783,8 +1896,21 @@ std::string io::enum_to_string<monster_attitude>( monster_attitude att )
 
 auto monster::attitude( const Character *u ) const -> monster_attitude
 {
-    if( const auto lua_attitude = get_lua_monster_attitude( *this, u ); lua_attitude ) {
-        return *lua_attitude;
+    // A Lua attitude function that causes attitude to be evaluated again — directly, or by
+    // calling use_special_attack(), whose actor resolves its target through attitude_to() —
+    // would recurse until the stack overflows. Serve the nested call from the stock rules.
+    // Gated on lua_attitude so ordinary monsters, which call this from the movement hot
+    // loop, pay the same single check they did before the guard existed.
+    if( type->lua_attitude ) {
+        if( evaluating_lua_attitude ) {
+            report_recursive_lua_attitude( *type->lua_attitude );
+        } else {
+            evaluating_lua_attitude = true;
+            const auto restore = on_out_of_scope( [this]() { evaluating_lua_attitude = false; } );
+            if( const auto lua_attitude = get_lua_monster_attitude( *this, u ); lua_attitude ) {
+                return *lua_attitude;
+            }
+        }
     }
 
     if( friendly != 0 ) {
@@ -3054,6 +3180,109 @@ void monster::reset_stats()
     // Nothing here yet
 }
 
+auto monster::has_special_attack( const std::string &attack_id ) const -> bool
+{
+    return type->special_attacks.contains( attack_id ) && special_attacks.contains( attack_id );
+}
+
+auto monster::special_attack_ready( const std::string &attack_id ) const -> bool
+{
+    const auto attack = special_attacks.find( attack_id );
+    return type->special_attacks.contains( attack_id ) && attack != special_attacks.end() &&
+           attack->second.enabled && attack->second.cooldown == 0;
+}
+
+auto monster::use_special_attack( const std::string &attack_id ) -> bool
+{
+    // Actors reach into the map and into their target; a corpse must not act. This has to be
+    // is_dead(), not is_dead_state(): monster::die() only raises the dead flag, so an actor
+    // that kills outright without dealing damage (mattack::suicide) leaves hp positive. The
+    // stock scheduler is gated by the caller's is_dead() check, which one Lua AI call does
+    // not repeat, so an actor that kills this monster must not be followed by another.
+    if( is_dead() || !special_attack_ready( attack_id ) ) {
+        return false;
+    }
+    // One special attack per action, whoever spends it. Lua chooses which attack; the engine
+    // keeps the action economy, because an accidental second attack is silent in play while a
+    // refused deliberate one shows up immediately in testing.
+    if( special_attack_spent ) {
+        report_spent_special_attack( disp_name(), attack_id );
+        return false;
+    }
+    // An actor can re-enter Lua (an attitude function, an on-hit hook) which can call back
+    // into here. The cooldown is not reset until call() returns, so a nested call for the
+    // same attack would still look ready and recurse until the stack overflows.
+    if( dispatching_special_attack ) {
+        report_recursive_special_attack( disp_name(), attack_id );
+        return false;
+    }
+    dispatching_special_attack = true;
+    const auto restore = on_out_of_scope( [this]() { dispatching_special_attack = false; } );
+    // The actor may replace the runtime state through poly(), including the supplied ID.
+    const auto used_id = attack_id;
+    if( !type->special_attacks.at( used_id )->call( *this ) ) {
+        return false;
+    }
+    // The actor may have killed this monster outright (mattack::suicide, mattack::kamikaze).
+    // Leave the corpse's cooldowns alone; it will not act again.
+    if( !is_dead() && has_special_attack( used_id ) ) {
+        reset_special( used_id );
+    }
+    // Consume this action's special budget so the stock scheduler does not add a second
+    // attack on top of the one Lua picked. monster::move() clears it every action.
+    special_attack_spent = true;
+    return true;
+}
+
+auto monster::special_attack_ids() const -> std::vector<std::string>
+{
+    namespace ranges = std::ranges;
+    using namespace std::views;
+
+    // Hoisted out of the pipeline: an inline lambda there breaks astyle's continuation
+    // indent. See mongroup.cpp for the same pipeline shape without one.
+    const auto tracked = [this]( const auto & id ) { return special_attacks.contains( id ); };
+    // type->special_attacks is a std::map, so the result is already sorted by ID.
+    return type->special_attacks
+           | keys
+           | filter( tracked )
+           | ranges::to<std::vector<std::string>>();
+}
+
+auto monster::special_attack_enabled( const std::string &attack_id ) const -> bool
+{
+    const auto attack = special_attacks.find( attack_id );
+    return type->special_attacks.contains( attack_id ) && attack != special_attacks.end() &&
+           attack->second.enabled;
+}
+
+auto monster::set_special_attack_enabled( const std::string &attack_id, bool enabled ) -> void
+{
+    if( enabled ) {
+        enable_special( attack_id );
+    } else {
+        disable_special( attack_id );
+    }
+}
+
+auto monster::set_special_attack_cooldown( const std::string &attack_id, int turns ) -> void
+{
+    if( !has_special_attack( attack_id ) ) {
+        return;
+    }
+    set_special( attack_id, std::max( 0, turns ) );
+}
+
+auto monster::get_special_attack_cooldown( const std::string &attack_id ) const ->
+std::optional<int>
+{
+    const auto attack = special_attacks.find( attack_id );
+    if( !type->special_attacks.contains( attack_id ) || attack == special_attacks.end() ) {
+        return std::nullopt;
+    }
+    return attack->second.cooldown;
+}
+
 void monster::reset_special( const std::string &special_name )
 {
     const auto iter = type->special_attacks.find( special_name );
@@ -3085,6 +3314,16 @@ void monster::disable_special( const std::string &special_name )
     const auto iter = special_attacks.find( special_name );
     if( iter != special_attacks.end() ) {
         iter->second.enabled = false;
+    } else {
+        debugmsg( "%s has no special attack %s", disp_name(), special_name );
+    }
+}
+
+void monster::enable_special( const std::string &special_name )
+{
+    const auto iter = special_attacks.find( special_name );
+    if( iter != special_attacks.end() ) {
+        iter->second.enabled = true;
     } else {
         debugmsg( "%s has no special attack %s", disp_name(), special_name );
     }
@@ -3183,6 +3422,12 @@ void monster::process_turn()
 
         local_attack_data.cooldown = std::max( 0, local_attack_data.cooldown -
                                                action_time_scale::calendar_turns_this_tick() );
+    }
+    // A player-held monster must be released after any separation, including teleportation.
+    const auto &you = get_avatar();
+    if( has_effect( effect_grabbed ) &&
+        ( bub_pos().z() != you.bub_pos().z() || square_dist( bub_pos(), you.bub_pos() ) > 1 ) ) {
+        remove_effect( effect_grabbed );
     }
     // Persist grabs as long as there's an adjacent target.
     if( has_effect( effect_grabbing ) ) {
@@ -3404,6 +3649,7 @@ void monster::die( Creature *nkiller )
         // *only* set to true in this function!
         return;
     }
+
     // We were carrying a creature, deposit the rider
     if( has_effect( effect_ridden ) && mounted_player ) {
         mounted_player->forced_dismount();
@@ -3611,7 +3857,7 @@ static void process_item_valptr( item *ptr, monster &mon )
 {
     if( ptr && ptr->needs_processing() ) {
         ptr->attempt_detach( [&mon]( detached_ptr<item> &&it ) {
-            return item::process( std::move( it ), nullptr, mon.bub_pos(), false );
+            return item::process( std::move( it ), nullptr, mon.bub_pos(), false, 1 );
         } );
     }
 }
@@ -3622,7 +3868,7 @@ void monster::process_items()
     if( !inv.empty() ) {
         inv.remove_with( [this]( detached_ptr<item> &&it ) {
             if( it->needs_processing() ) {
-                return item::process( std::move( it ), nullptr, bub_pos(), false );
+                return item::process( std::move( it ), nullptr, bub_pos(), false, 1 );
             }
             return std::move( it );
         } );
@@ -3791,8 +4037,8 @@ void monster::process_one_effect( effect &it, bool is_new )
         }
     } else if( id == effect_bleed ) {
         int intense = it.get_intensity();
-        if( one_in( 36 / intense ) ) {
-            apply_damage( nullptr, bodypart_id( "torso" ), 1 );
+        if( one_in( 9 / intense ) ) {
+            apply_damage( nullptr, bodypart_id( "torso" ), 3 );
             bleed();
         }
     } else if( id == effect_run ) {
@@ -4317,23 +4563,23 @@ void monster::hear_sound( const sound_event &source, const short heard_vol, cons
     int max_error = ( goodhearing ) ? 0 : 2;
     if( volume < -1000 ) {
         // -10dB or greater below ambient
-        max_error = ( goodhearing ) ? 8 : 16;
+        max_error = ( goodhearing ) ? 8 : 0;
 
     } else if( volume < 0 ) {
         // -10 - 0 dB below ambient
-        max_error = ( goodhearing ) ? 6 : 12;
+        max_error = ( goodhearing ) ? 6 : 0;
 
     } else if( volume < 1000 ) {
         // 0-10dB greater than ambient
-        max_error = ( goodhearing ) ? 4 : 10;
+        max_error = ( goodhearing ) ? 5 : 12;
 
     } else if( volume < 2000 ) {
         // 10-20dB greater than ambient
-        max_error = ( goodhearing ) ? 3 : 8;
+        max_error = ( goodhearing ) ? 4 : 10;
 
     } else if( volume < 4000 ) {
         // 20-40dB greater than ambient
-        max_error = ( goodhearing ) ? 2 : 6;
+        max_error = ( goodhearing ) ? 3 : 8;
 
     } else if( volume < 8000 ) {
         // 40-80dB greater than ambient

@@ -21,8 +21,6 @@
 #include "calendar.h"
 #include "cata_utility.h"
 #include "catacharset.h"
-#include "catalua.h"
-#include "catalua_impl.h"
 #include "color.h"
 #include "coordinates.h"
 #include "damage.h"
@@ -61,9 +59,9 @@ class player;
 #include "ui.h"
 #include "units.h"
 #include "value_ptr.h"
-#include "veh_type.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/wheel_dimensions.h"
 #include "vitamin.h"
-#include "wheel_dimensions.h"
 
 class player;
 struct tripoint;
@@ -667,6 +665,17 @@ void Item_factory::finalize_post( itype &obj )
         return false;
     } );
 
+    if( !obj.magazines.empty() ) {
+        for( const auto [ammotype, mags] : obj.magazines ) {
+            for( const auto &mag : mags ) {
+                if( magazines_like.contains( mag ) ) {
+                    const auto &mags_like = magazines_like[mag];
+                    obj.magazines[ammotype].insert( mags_like.begin(), mags_like.end() );
+                }
+            }
+        }
+    }
+
     // handle complex firearms as a special case
     if( obj.gun && !obj.has_flag( flag_PRIMITIVE_RANGED_WEAPON ) ) {
         std::copy( gun_tools.begin(), gun_tools.end(), std::inserter( obj.repair, obj.repair.begin() ) );
@@ -693,15 +702,6 @@ void Item_factory::finalize_post( itype &obj )
         }
     }
 
-    if( !obj.magazines.empty() ) {
-        for( const auto &[mag, mags_like] : magazines_like ) {
-            for( const auto [ammotype, mags] : obj.magazines ) {
-                if( mags.contains( mag ) ) {
-                    obj.magazines[ammotype].insert( mags_like.begin(), mags_like.end() );
-                }
-            }
-        }
-    }
     if( obj.mod && !obj.mod->magazine_adaptor.empty() ) {
         for( const auto &[mag, mags_like] : magazines_like ) {
             for( const auto [ammotype, mags] : obj.mod->magazine_adaptor ) {
@@ -1162,6 +1162,7 @@ void Item_factory::init()
     add_actor( std::make_unique<hand_crank_actor>() );
     add_actor( std::make_unique<sex_toy_actor>() );
     add_actor( std::make_unique<train_skill_actor>() );
+    // Obsolete
     add_actor( std::make_unique<iuse_music_player>() );
     add_actor( std::make_unique<iuse_prospect_pick>() );
     add_actor( std::make_unique<iuse_reveal_contents>() );
@@ -1645,6 +1646,7 @@ void Item_factory::check_definitions() const
             if( actor->type == "CABLE_ATTACH" && !vpart_id( type->id.str() ).is_valid() ) {
                 msg += string_format( "no valid vehicle part for CABLE_ATTACH action\n" );
             }
+            msg += actor->check();
         }
 
         if( type->fuel && !type->count_by_charges() ) {
@@ -2915,6 +2917,8 @@ void Item_factory::load_basic_info( const JsonObject &jo, itype &def, const std:
         }
     }
 
+    assign( jo, "spill_field", def.spill_field );
+
     jo.read( "looks_like", def.looks_like );
 
     if( jo.has_member( "conditional_names" ) ) {
@@ -3329,7 +3333,7 @@ bool Item_factory::load_string( std::vector<std::string> &vec, const JsonObject 
 
 namespace
 {
-auto load_postprocessors( std::vector<ItemFn> &xs, const JsonObject &obj ) -> bool
+auto load_active( std::vector<ItemFn> &xs, const JsonObject &obj ) -> bool
 {
     const bool result = obj.has_bool( "active" ) && obj.get_bool( "active" );
     if( result ) {
@@ -3337,52 +3341,6 @@ auto load_postprocessors( std::vector<ItemFn> &xs, const JsonObject &obj ) -> bo
             it->activate();
             return std::move( it );
         } );
-    }
-    if( obj.has_string( "postprocessor" ) ) {
-        const std::string postprocess = obj.get_string( "postprocessor" );
-        xs.emplace_back( [postprocess]( detached_ptr<item> &&it ) {
-            auto &loader = DynamicDataLoader::get_instance();
-            if( !loader.is_data_finalized() ) {
-                // We ignore these functions during checks
-                return std::move( it );
-            }
-            auto &state = *loader.lua.get();
-            auto func = cata::get_lua_callback( state, "itemgroup_postprocessors", postprocess );
-            if( !func ) {
-                debugmsg( "Lua callback %s for `itemgroup_postprocessors does not exist.", postprocess );
-                return std::move( it );
-            }
-            auto params = state.lua.create_table();
-            params["item"] = &*it;
-            sol::protected_function_result res = func( params );
-
-            check_func_result( res );
-            return std::move( it );
-        } );
-        return true;
-    } else if( obj.has_array( "postprocessor" ) ) {
-        for( const std::string postprocess : obj.get_array( "postprocessor" ) ) {
-            xs.emplace_back( [postprocess]( detached_ptr<item> &&it ) {
-                auto &loader = DynamicDataLoader::get_instance();
-                if( !loader.is_data_finalized() ) {
-                    // We ignore these functions during checks
-                    return std::move( it );
-                }
-                auto &state = *loader.lua.get();
-                auto func = cata::get_lua_callback( state, "itemgroup_postprocessors", postprocess );
-                if( !func ) {
-                    debugmsg( "Lua callback %s for `itemgroup_postprocessors does not exist.", postprocess );
-                    return std::move( it );
-                }
-                auto params = state.lua.create_table();
-                params["item"] = &*it;
-                sol::protected_function_result res = func( params );
-
-                check_func_result( res );
-                return std::move( it );
-            } );
-        }
-        return true;
     }
     return result;
 }
@@ -3432,7 +3390,7 @@ void Item_factory::add_entry( Item_group &ig, const JsonObject &obj )
     use_modifier |= load_sub_ref( modifier.ammo, obj, "ammo", ig );
     use_modifier |= load_sub_ref( modifier.container, obj, "container", ig );
     use_modifier |= load_sub_ref( modifier.contents, obj, "contents", ig );
-    use_modifier |= load_postprocessors( modifier.postprocess_fns, obj );
+    use_modifier |= load_active( modifier.postprocess_fns, obj );
 
     std::vector<std::string> custom_flags;
     use_modifier |= load_string( custom_flags, obj, "custom-flags" );
@@ -3608,6 +3566,7 @@ void Item_factory::emplace_usage( std::map<std::string, use_function> &container
 std::pair<std::string, use_function> Item_factory::usage_from_object( const JsonObject &obj )
 {
     auto type = obj.get_string( "type" );
+    auto internal_name = obj.get_string( "internal_name", type );
 
     if( type == "repair_item" ) {
         type = obj.get_string( "item_action_type" );
@@ -3615,6 +3574,7 @@ std::pair<std::string, use_function> Item_factory::usage_from_object( const Json
             add_actor( std::make_unique<repair_item_actor>( type ) );
             repair_actions.insert( type );
         }
+        internal_name = type;
     }
 
     use_function method = usage_from_string( type );
@@ -3624,7 +3584,10 @@ std::pair<std::string, use_function> Item_factory::usage_from_object( const Json
     }
 
     method.get_actor_ptr()->load( obj );
-    return std::make_pair( type, method );
+    if( obj.has_string( "menu_text" ) ) {
+        method.get_actor_ptr()->set_name( obj.get_string( "menu_text" ) );
+    }
+    return std::make_pair( internal_name, method );
 }
 
 use_function Item_factory::usage_from_string( const std::string &type ) const

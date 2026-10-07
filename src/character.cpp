@@ -1,20 +1,4 @@
 #include "character.h"
-#include "calendar.h"
-#include "character_encumbrance.h"
-
-#include <algorithm>
-#include <cctype>
-#include <climits>
-#include <cmath>
-#include <cstdlib>
-#include <iterator>
-#include <memory>
-#include <numeric>
-#include <ostream>
-#include <ranges>
-#include <type_traits>
-#include <vector>
-#include <ranges>
 
 #include "action.h"
 #include "action_time_scale.h"
@@ -25,20 +9,23 @@
 #include "avatar_action.h"
 #include "bionics.h"
 #include "bodypart.h"
+#include "cached_options.h"
+#include "calendar.h"
 #include "cata_utility.h"
 #include "catacharset.h"
 #include "catalua_hooks.h"
 #include "catalua_icallback_actor.h"
 #include "catalua_sol.h"
+#include "character_encumbrance.h"
 #include "character_functions.h"
 #include "character_martial_arts.h"
 #include "character_stat.h"
 #include "clothing_utils.h"
 #include "clzones.h"
-#include "craft_command.h"
 #include "construction.h"
 #include "consumption.h"
 #include "coordinates.h"
+#include "craft_command.h"
 #include "creature.h"
 #include "damage.h"
 #include "debug.h"
@@ -48,8 +35,6 @@
 #include "enchantments/enchantment.h"
 #include "event.h"
 #include "event_bus.h"
-#include "field.h"
-#include "field_type.h"
 #include "fire.h"
 #include "flag.h"
 #include "fungal_effects.h"
@@ -61,14 +46,17 @@
 #include "itype.h"
 #include "iuse.h"
 #include "iuse_actor.h"
-#include "legacy_pathfinding.h"
-#include "lightmap.h"
 #include "line.h"
 #include "make_static.h"
-#include "map.h"
+#include "map/field.h"
+#include "map/field_type.h"
+#include "map/legacy_pathfinding.h"
+#include "map/lightmap.h"
+#include "map/map.h"
+#include "map/map_selector.h"
+#include "map/mapdata.h"
+#include "map/submap.h"
 #include "map_iterator.h"
-#include "map_selector.h"
-#include "mapdata.h"
 #include "martialarts.h"
 #include "material.h"
 #include "math_defines.h"
@@ -81,11 +69,11 @@
 #include "mtype.h"
 #include "mutation.h"
 #include "npc.h"
-#include "omdata.h"
 #include "options.h"
 #include "output.h"
 #include "overlay_ordering.h"
-#include "overmapbuffer.h"
+#include "overmap/omdata.h"
+#include "overmap/overmapbuffer.h"
 #include "player.h"
 #include "player_activity.h"
 #include "profession.h"
@@ -102,8 +90,8 @@
 #include "string_formatter.h"
 #include "string_id.h"
 #include "string_utils.h"
-#include "submap.h"
 #include "text_snippets.h"
+#include "thread_pool.h"
 #include "translations.h"
 #include "trap.h"
 #include "type_id.h"
@@ -112,16 +100,31 @@
 #include "units_temperature.h"
 #include "units_utility.h"
 #include "value_ptr.h"
-#include "veh_interact.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vehicle_selector.h"
+#include "vehicle/veh_interact.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vehicle_selector.h"
+#include "vehicle/vpart_position.h"
+#include "vehicle/vpart_range.h"
 #include "vitamin.h"
-#include "vpart_position.h"
-#include "vpart_range.h"
-#include "weather.h"
-#include "weather_gen.h"
+#include "weather/weather.h"
+#include "weather/weather_gen.h"
+
+#include <algorithm>
+#include <cctype>
+#include <climits>
+#include <cmath>
+#include <cstdlib>
+#include <iterator>
+#include <memory>
+#include <numeric>
+#include <ostream>
+#include <ranges>
+#include <type_traits>
+#include <vector>
+
+using character_funcs::base_comfort_value;
 
 struct dealt_projectile_attack;
 
@@ -132,6 +135,7 @@ static const activity_id ACT_TRY_SLEEP( "ACT_TRY_SLEEP" );
 static const activity_id ACT_WAIT_STAMINA( "ACT_WAIT_STAMINA" );
 
 static const bionic_id bio_eye_optic( "bio_eye_optic" );
+static const bionic_id bio_cqb( "bio_cqb" );
 
 static const matec_id WBLOCK_1( "WBLOCK_1" );
 static const matec_id WBLOCK_2( "WBLOCK_2" );
@@ -230,6 +234,7 @@ static const skill_id skill_throw( "throw" );
 
 static const species_id HUMAN( "HUMAN" );
 static const species_id ROBOT( "ROBOT" );
+static const species_id ROBOT_FLYING( "ROBOT_FLYING" );
 
 namespace
 {
@@ -320,9 +325,6 @@ static const trait_id trait_M_IMMUNE( "M_IMMUNE" );
 static const trait_id trait_M_SKIN2( "M_SKIN2" );
 static const trait_id trait_M_SKIN3( "M_SKIN3" );
 static const trait_id trait_MEMBRANE( "MEMBRANE" );
-static const trait_id trait_MOREPAIN( "MORE_PAIN" );
-static const trait_id trait_MOREPAIN2( "MORE_PAIN2" );
-static const trait_id trait_MOREPAIN3( "MORE_PAIN3" );
 static const trait_id trait_MYOPIC( "MYOPIC" );
 static const trait_id trait_NO_THIRST( "NO_THIRST" );
 static const trait_id trait_NOMAD( "NOMAD" );
@@ -331,8 +333,6 @@ static const trait_id trait_NOMAD3( "NOMAD3" );
 static const trait_id trait_NOPAIN( "NOPAIN" );
 static const trait_id trait_PACIFIST( "PACIFIST" );
 static const trait_id trait_PADDED_FEET( "PADDED_FEET" );
-static const trait_id trait_PAINRESIST_TROGLO( "PAINRESIST_TROGLO" );
-static const trait_id trait_PAINRESIST( "PAINRESIST" );
 static const trait_id trait_PAWS_LARGE( "PAWS_LARGE" );
 static const trait_id trait_PAWS( "PAWS" );
 static const trait_id trait_PER_SLIME_OK( "PER_SLIME_OK" );
@@ -392,6 +392,23 @@ static const enchantment_flag_id ench_flag_SONAR( "SONAR" );
 
 static const enchantment_value_id ench_val_GROUNDED_CREATURE_SIGHT( "GROUNDED_CREATURE_SIGHT" );
 
+static const enchantment_value_id ench_val_PAIN_MOD( "PAIN_MOD" );
+static const enchantment_value_id ench_val_PAIN_GAIN( "PAIN_GAIN" );
+static const enchantment_value_id ench_val_PAIN_LOSS( "PAIN_LOSS" );
+static const enchantment_value_id ench_val_CHRONIC_PAIN_MOD( "CHRONIC_PAIN_MOD" );
+static const enchantment_value_id ench_val_PERCEIVED_PAIN_MOD( "PERCEIVED_PAIN_MOD" );
+
+static const enchantment_value_id ench_val_WEIGHTMOD_WORN( "WEIGHTMOD_WORN" );
+static const enchantment_value_id ench_val_WEIGHTMOD_BODY( "WEIGHTMOD_BODY" );
+static const enchantment_value_id ench_val_WEIGHTMOD_INVENTORY( "WEIGHTMOD_INVENTORY" );
+static const enchantment_value_id ench_val_WEIGHTMOD_BIONICS( "WEIGHTMOD_BIONICS" );
+static const enchantment_value_id ench_val_WEIGHTMOD_WEAPON( "WEIGHTMOD_WEAPON" );
+
+static const enchantment_value_id ench_val_STRENGTH_PERMANENT( "STRENGTH_PERMANENT" );
+static const enchantment_value_id ench_val_DEXTERITY_PERMANENT( "DEXTERITY_PERMANENT" );
+static const enchantment_value_id ench_val_INTELLIGENCE_PERMANENT( "INTELLIGENCE_PERMANENT" );
+static const enchantment_value_id ench_val_PERCEPTION_PERMANENT( "PERCEPTION_PERMANENT" );
+
 namespace io
 {
 
@@ -414,8 +431,8 @@ std::string enum_to_string<character_movemode>( character_movemode data )
 
 } // namespace io
 
-static void temp_equalizer( Character &c, const bodypart_str_id &bp1_id,
-                            const bodypart_str_id &bp2_id )
+static auto temp_equalizer( Character &c, const bodypart_str_id &bp1_id,
+                            const bodypart_str_id &bp2_id ) -> void
 {
     auto iter_lhs = c.get_body().find( bp1_id );
     if( iter_lhs == c.get_body().end() ) {
@@ -430,7 +447,8 @@ static void temp_equalizer( Character &c, const bodypart_str_id &bp1_id,
     // If bp1 is warmer, it will lose heat
     bodypart &bp1 = iter_lhs->second;
     bodypart &bp2 = iter_rhs->second;
-    int diff = static_cast<int>( ( bp2.get_temp_cur() - bp1.get_temp_cur() ) * 0.001 );
+    const auto diff = units::from_legacy_bodypart_temp_delta( static_cast<int>(
+                          units::to_legacy_bodypart_temp_delta( bp2.get_temp_cur() - bp1.get_temp_cur() ) * 0.001 ) );
     bp1.set_temp_cur( bp1.get_temp_cur() + diff );
     bp2.set_temp_cur( bp2.get_temp_cur() - diff );
 }
@@ -898,6 +916,14 @@ int Character::sight_range( int light_level ) const
     return clamp( range, 1, sight_max );
 }
 
+// This is the range that players (and NPCs) can spot camouflaged enemies from
+auto Character::spotting_range() const -> int
+{
+    int spotting_range = get_per();
+    spotting_range += get_skill_level( skill_survival ) / 2;
+    return spotting_range;
+}
+
 auto Character::unimpaired_range() const -> int
 {
     // Cap at g_max_view_distance (runtime bubble radius) so castLight's
@@ -1037,26 +1063,14 @@ void Character::react_to_felt_pain( int intensity )
 void Character::mod_pain( int npain )
 {
     if( npain > 0 ) {
+        // Technically mult of -1 can still apply
+        // Maybe one day should add `min` for these cases
         if( has_trait( trait_NOPAIN ) || has_effect( effect_narcosis ) ) {
             return;
         }
-        // always increase pain gained by one from these bad mutations
-        if( has_trait( trait_MOREPAIN ) ) {
-            npain += std::max( 1, roll_remainder( npain * 0.25 ) );
-        } else if( has_trait( trait_MOREPAIN2 ) ) {
-            npain += std::max( 1, roll_remainder( npain * 0.5 ) );
-        } else if( has_trait( trait_MOREPAIN3 ) ) {
-            npain += std::max( 1, roll_remainder( npain * 1.0 ) );
-        }
-
-        if( npain > 1 ) {
-            // if it's 1 it'll just become 0, which is bad
-            if( has_trait( trait_PAINRESIST_TROGLO ) ) {
-                npain = roll_remainder( npain * 0.5 );
-            } else if( has_trait( trait_PAINRESIST ) ) {
-                npain = roll_remainder( npain * 0.67 );
-            }
-        }
+        npain += bonus_from_enchantments( npain, ench_val_PAIN_GAIN );
+    } else if( npain < 0 ) {
+        npain += bonus_from_enchantments( npain, ench_val_PAIN_LOSS );
     }
     Creature::mod_pain( npain );
 }
@@ -1122,10 +1136,14 @@ int min_pain( const Character &c )
 
 int Character::get_pain() const
 {
+    int pain = Creature::get_pain();
+    pain += bonus_from_enchantments( pain, ench_val_PAIN_MOD );
     if( get_option<bool>( "CHRONIC_PAIN" ) ) {
-        return std::max( Creature::get_pain(), min_pain( *this ) );
+        pain =  std::max( pain, min_pain( *this ) );
+        pain += bonus_from_enchantments( pain, ench_val_CHRONIC_PAIN_MOD );
     }
-    return Creature::get_pain();
+    pain = std::max( pain, 0 );
+    return pain;
 }
 
 int Character::get_perceived_pain() const
@@ -1134,7 +1152,9 @@ int Character::get_perceived_pain() const
         return 0;
     }
 
-    return std::max( get_pain() - get_painkiller(), 0 );
+    int percieved_pain = get_pain() - get_painkiller();
+    percieved_pain += bonus_from_enchantments( percieved_pain, ench_val_PERCEIVED_PAIN_MOD );
+    return std::max( percieved_pain, 0 );
 }
 
 int Character::swim_speed() const
@@ -1642,7 +1662,7 @@ bool Character::can_run()
     return ( get_stamina() > get_stamina_max() * 0.1f ) && get_working_leg_count() >= 2;
 }
 
-void static try_remove_downed( Character &c )
+void Character::try_remove_downed( Character &c )
 {
 
     /** @EFFECT_DEX increases chance to stand up when knocked down */
@@ -1937,6 +1957,17 @@ bool Character::movement_mode_is( const character_movemode mode ) const
     return move_mode == mode;
 }
 
+// Change movement mode without messages, normal movecost, or potential loops from calling Character::try_remove_downed
+void Character::force_movement_mode( character_movemode new_mode )
+{
+    if( move_mode == CMM_CROUCH || new_mode == CMM_CROUCH ||
+        move_mode == CMM_PRONE || new_mode == CMM_PRONE ) {
+        // crouching and prone affect visibility
+        get_map().set_seen_cache_dirty( bub_pos().z() );
+    }
+    move_mode = new_mode;
+}
+
 void Character::expose_to_disease( const diseasetype_id dis_type )
 {
     const std::optional<int> &healt_thresh = dis_type->health_threshold;
@@ -2023,6 +2054,7 @@ float Character::night_vision_sight_range() const
 // 'wears' vector is still allowed due to refactor exhaustion.
 void Character::recalc_sight_limits()
 {
+    ZoneScopedN( "recalc_sight_limits" );
     sight_max = 9999;
     vision_mode_cache.reset();
 
@@ -2240,6 +2272,16 @@ bool Character::has_active_bionic_with_fake( const itype_id &it ) const
         }
     }
     return false;
+}
+
+std::set<itype_id> Character::get_enchantment_fake_items() const
+{
+    return enchantment_cache->get_fake_items();
+}
+
+bool Character::has_enchantment_with_fake( const itype_id &it ) const
+{
+    return enchantment_cache->get_fake_items().contains( it );
 }
 
 int Character::count_bionic_of_type( const bionic_id &bio ) const
@@ -2537,6 +2579,7 @@ void Character::update_fuel_storage( const itype_id &fuel )
 
 int Character::get_mod_stat_from_bionic( const character_stat &Stat ) const
 {
+    ZoneScopedN( "bionics_stat_bonuses" );
     int ret = 0;
     for( const bionic &i : get_bionic_collection() ) {
         const bionic_id &bid = i.id;
@@ -3080,6 +3123,32 @@ units::mass Character::weight_carried() const
     return weight_carried_reduced_by( {} );
 }
 
+units::mass Character::cached_weight_carried()
+{
+    ZoneScoped;
+    units::mass ret = 0_gram;
+    {
+        ZoneScopedN( "worn_weight" );
+        if( worn_weight_cache_dirty ) {
+            worn_weight_cache = 0_gram;
+            for( auto &i : worn ) {
+                worn_weight_cache += i->weight();
+            }
+            worn_weight_cache_dirty = false;
+        }
+        ret += worn_weight_cache;
+    }
+    {
+        ZoneScopedN( "inv_weight" );
+        ret += inv.weight_cached();
+    }
+    {
+        ZoneScopedN( "weapon_weight" );
+        ret += primary_weapon().weight();
+    }
+    return ret;
+}
+
 units::volume Character::volume_carried() const
 {
     return inv.volume();
@@ -3108,57 +3177,67 @@ int Character::best_nearby_lifting_assist( const tripoint_bub_ms &world_pos ) co
 
 units::mass Character::weight_carried_reduced_by( const excluded_stacks &without ) const
 {
+    ZoneScoped;
     const std::map<const item *, int> empty;
 
     // Worn items
     units::mass ret = 0_gram;
-    for( auto &i : worn ) {
-        if( !without.contains( i ) ) {
-            ret += i->weight();
+    {
+        ZoneScopedN( "worn_weight" );
+        for( auto &i : worn ) {
+            if( !without.contains( i ) ) {
+                ret += i->weight();
+            }
         }
     }
 
     // Items in inventory
-    ret += inv.weight_without( without );
+    {
+        ZoneScopedN( "inv_weight" );
+        ret += inv.weight_without( without );
+    }
 
     // Wielded item
-    units::mass weaponweight = 0_gram;
-    int subtract_count = 0;
-    item &weapon = primary_weapon();
-    auto weapon_it = without.find( &weapon );
-    if( weapon_it == without.end() ) {
-        weaponweight = weapon.weight();
-    } else {
-        subtract_count = ( *weapon_it ).second;
-        if( weapon.count_by_charges() ) {
-            weapon.charges -= subtract_count;
-            if( weapon.charges < 0 ) {
-                debugmsg( "Trying to remove more charges than the wielded item has" );
-                //Set subtract_count to the original value of weapon->charges, so that it's set back correctly at the end
-                subtract_count += weapon.charges;
-                weapon.charges = 0;
-            }
+    {
+        ZoneScopedN( "weapon_weight" );
+        units::mass weaponweight = 0_gram;
+        int subtract_count = 0;
+        item &weapon = primary_weapon();
+        auto weapon_it = without.find( &weapon );
+        if( weapon_it == without.end() ) {
             weaponweight = weapon.weight();
-        } else if( subtract_count > 1 ) {
-            debugmsg( "Trying to remove more than one wielded item" );
         } else {
-            subtract_count = 0;
+            subtract_count = ( *weapon_it ).second;
+            if( weapon.count_by_charges() ) {
+                weapon.charges -= subtract_count;
+                if( weapon.charges < 0 ) {
+                    debugmsg( "Trying to remove more charges than the wielded item has" );
+                    //Set subtract_count to the original value of weapon->charges, so that it's set back correctly at the end
+                    subtract_count += weapon.charges;
+                    weapon.charges = 0;
+                }
+                weaponweight = weapon.weight();
+            } else if( subtract_count > 1 ) {
+                debugmsg( "Trying to remove more than one wielded item" );
+            } else {
+                subtract_count = 0;
+            }
         }
-    }
-    // Don't try to add weaponweight if it doesn't exist or is weightless
-    if( weaponweight > 0_gram ) {
-        // Exclude wielded item if using lifting tool
-        if( weaponweight + ret > weight_capacity() ) {
-            const float liftrequirement = std::ceil( units::to_gram<float>( weaponweight ) /
-                                          units::to_gram<float>( TOOL_LIFT_FACTOR ) );
-            if( g->new_game || best_nearby_lifting_assist() < liftrequirement ) {
+        // Don't try to add weaponweight if it doesn't exist or is weightless
+        if( weaponweight > 0_gram ) {
+            // Exclude wielded item if using lifting tool
+            if( weaponweight + ret > weight_capacity() ) {
+                const float liftrequirement = std::ceil( units::to_gram<float>( weaponweight ) /
+                                              units::to_gram<float>( TOOL_LIFT_FACTOR ) );
+                if( g->new_game || best_nearby_lifting_assist() < liftrequirement ) {
+                    ret += weaponweight;
+                }
+            } else {
                 ret += weaponweight;
             }
-        } else {
-            ret += weaponweight;
         }
+        weapon.charges += subtract_count;
     }
-    weapon.charges += subtract_count;
     return ret;
 }
 
@@ -3301,11 +3380,21 @@ ret_val<bool> Character::can_wear( const item &it, bool with_equip_change ) cons
         return ret_val<bool>::make_failure( _( "Putting on a %s would be tricky." ), it.tname() );
     }
 
-    if( has_trait( trait_WOOLALLERGY ) && ( it.made_of( material_id( "wool" ) ) ||
-                                            it.has_own_flag( flag_wooled ) ) ) {
-        return ret_val<bool>::make_failure( _( "Can't wear that, it's made of wool!" ) );
-    }
+    // During multithreaded mapgen this can be called on NPC gen
+    // If so it will cause random segfaults on NPC generation
+    if( !is_pool_worker_thread() ) {
+        const auto &hook_results = cata::run_hooks( "on_character_try_wear",
+        [&]( sol::table & params ) {
+            params["who"] = this;
+            params["item"] = &it;
+        }, {.exit_early = true} );
 
+        bool allowed = hook_results.get<bool>( "allowed" );
+        if( !allowed ) {
+            return ret_val<bool>::make_failure( hook_results.get_or( "message",
+                                                _( "Wearing that is blocked for an unknown reason. One of your lua mods isn't returning the hook right." ) ) );
+        }
+    }
 
     if( !it.has_flag( flag_SEMITANGIBLE ) ) {
         for( const trait_id &mut : get_mutations() ) {
@@ -3579,6 +3668,21 @@ ret_val<bool> Character::can_takeoff( const item &it, bool dropping ) const
                                             _( "<npcname> is not wearing that item." ) );
     }
 
+    // During multithreaded mapgen this can be called on NPC gen
+    // If so it will cause random segfaults on NPC generation
+    if( !is_pool_worker_thread() ) {
+        const auto &hook_results = cata::run_hooks( "on_character_try_takeoff",
+        [&]( sol::table & params ) {
+            params["who"] = this;
+            params["item"] = &it;
+        }, {.exit_early = true} );
+
+        bool allowed = hook_results.get<bool>( "allowed" );
+        if( !allowed ) {
+            return ret_val<bool>::make_failure( hook_results.get_or( "message",
+                                                _( "Taking that off is blocked for an unknown reason. One of your lua mods isn't returning the hook right." ) ) );
+        }
+    }
     if( dropping && !get_dependent_worn_items( it ).empty() ) {
         return ret_val<bool>::make_failure( !is_npc() ?
                                             _( "You can't take off power armor while wearing other power armor components." ) :
@@ -3703,10 +3807,14 @@ bool Character::unwield()
         return false;
     }
 
-    // Lua iwieldable can_unwield callback
-    if( const auto *iwield_cb = primary_weapon().type->iwieldable_callbacks ) {
-        if( !iwield_cb->call_can_unwield( *this, primary_weapon() ) ) {
-            return false;
+    // During multithreaded mapgen this can be called on NPC gen
+    // If so it will cause random segfaults on NPC generation
+    if( !is_pool_worker_thread() ) {
+        // Lua iwieldable can_unwield callback
+        if( const auto *iwield_cb = primary_weapon().type->iwieldable_callbacks ) {
+            if( !iwield_cb->call_can_unwield( *this, primary_weapon() ) ) {
+                return false;
+            }
         }
     }
 
@@ -3783,6 +3891,7 @@ std::vector<detached_ptr<item>> remove_randomly_by_weight( location_inventory &i
 
 void Character::drop_invalid_inventory()
 {
+    ZoneScoped;
     bool dropped_liquid = false;
 
     const auto p = bub_pos();
@@ -3807,7 +3916,7 @@ void Character::drop_invalid_inventory()
         return;
     }
     // Also drop excess weight IF an NPC
-    auto wt_carried = weight_carried();
+    auto wt_carried = cached_weight_carried();
     auto wt_capacity = weight_capacity();
     if( wt_carried > wt_capacity ) {
         auto items_to_drop = remove_randomly_by_weight( inv, wt_carried - wt_capacity );
@@ -4352,6 +4461,7 @@ void Character::die( Creature *nkiller )
 
 void Character::apply_skill_boost()
 {
+    ZoneScoped;
     for( const skill_boost &boost : skill_boost::get_all() ) {
         // For migration, reset previously applied bonus.
         // Remove after 0.E or so.
@@ -4533,15 +4643,26 @@ units::mass Character::get_weight() const
 {
     if( has_trait( trait_DEBUG_WEIGHTLESSNESS ) ) { return 0_gram; }
 
-    const auto worn_weight = std::ranges::fold_left( worn, 0_gram,
+    auto worn_weight = std::ranges::fold_left( worn, 0_gram,
     []( const auto sum, const auto * const itm ) { return sum + itm->weight(); } );
-
-    auto ret = bodyweight();                       // The base weight of the player's body
-    ret += inv.weight();                           // Weight of the stored inventory
-    ret += worn_weight;                            // Weight of worn items
-    ret += primary_weapon().weight();              // Weight of wielded item
-    ret += bionics_weight();                       // Weight of installed bionics
-    return ret;
+    worn_weight += bonus_from_enchantments( worn_weight / 1_gram,
+                                            ench_val_WEIGHTMOD_WORN ) * 1_gram; // Weight of worn items
+    worn_weight = std::max( 0_gram, worn_weight );
+    auto weight = bodyweight();
+    weight += bonus_from_enchantments( weight / 1_gram, ench_val_WEIGHTMOD_BODY ) * 1_gram;
+    weight = std::max( 0_gram, weight );
+    auto invweight = inv.weight();  // Weight of the stored inventory
+    invweight += bonus_from_enchantments( invweight / 1_gram, ench_val_WEIGHTMOD_INVENTORY ) * 1_gram;
+    invweight = std::max( 0_gram, invweight );
+    auto weaponweight = primary_weapon().weight();
+    weaponweight += bonus_from_enchantments( weaponweight / 1_gram,
+                    ench_val_WEIGHTMOD_WEAPON ) * 1_gram;
+    weaponweight = std::max( 0_gram, weaponweight );
+    auto bionicsweight = bionics_weight();
+    bionicsweight += bonus_from_enchantments( bionicsweight / 1_gram,
+                     ench_val_WEIGHTMOD_BIONICS ) * 1_gram;
+    bionicsweight = std::max( 0_gram, bionicsweight );
+    return weight + invweight + weaponweight + bionicsweight + worn_weight;
 }
 
 char_encumbrance_data Character::get_encumbrance() const
@@ -4963,19 +5084,23 @@ int Character::get_int() const
 
 int Character::get_str_base() const
 {
-    return str_max;
+    return std::max( 0, str_max + int( bonus_from_enchantments( str_max, ench_val_STRENGTH_PERMANENT,
+                                       true ) ) );
 }
 int Character::get_dex_base() const
 {
-    return dex_max;
+    return std::max( 0, dex_max + int( bonus_from_enchantments( dex_max, ench_val_DEXTERITY_PERMANENT,
+                                       true ) ) );
 }
 int Character::get_per_base() const
 {
-    return per_max;
+    return std::max( 0, per_max + int( bonus_from_enchantments( per_max, ench_val_PERCEPTION_PERMANENT,
+                                       true ) ) );
 }
 int Character::get_int_base() const
 {
-    return int_max;
+    return std::max( 0, int_max + int( bonus_from_enchantments( int_max,
+                                       ench_val_INTELLIGENCE_PERMANENT, true ) ) );
 }
 
 int Character::get_str_bonus() const
@@ -5075,6 +5200,39 @@ void Character::mod_int_bonus( int nint )
 {
     int_bonus += nint;
     int_cur = std::max( 0, int_max + int_bonus );
+}
+
+void Character::mod_str_bonus( int nstr, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_str_bonus( nstr );
+}
+void Character::mod_dex_bonus( int ndex, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_dex_bonus( ndex );
+}
+void Character::mod_per_bonus( int nper, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_per_bonus( nper );
+}
+void Character::mod_int_bonus( int nint, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_int_bonus( nint );
 }
 
 void Character::print_health() const
@@ -5409,6 +5567,7 @@ void Character::on_damage_of_type( int adjusted_damage, damage_type type, const 
 
 void Character::reset_bonuses()
 {
+    ZoneScopedN( "character_reset_bonuses" );
     // Reset all bonuses to 0 and multipliers to 1.0
     str_bonus = 0;
     dex_bonus = 0;
@@ -6094,99 +6253,193 @@ Hurricane : 100 mph (920 hPa)
 HURRICANE : 185 mph (880 hPa) [Ref: Hurricane Wilma]
 */
 
-void Character::update_bodytemp( const map &m, const weather_manager &weather )
-{
-    if( has_trait( trait_DEBUG_NOTEMP ) ) {
-        for( auto &pr : get_body() ) {
-            pr.second.set_temp_cur( BODYTEMP_NORM );
-            pr.second.set_temp_conv( BODYTEMP_NORM );
-        }
-        return;
-    }
-    /* Cache calls to g->get_temperature( player position ), used in several places in function */
-    const auto player_local_temp = weather.get_temperature( abs_pos() );
+struct BodyTemperatureModifiers {
     // NOTE : visit weather.h for some details on the numbers used
-    // In Celsius / 100
-    int Ctemperature = units::to_millidegree_celsius( player_local_temp ) / 10;
-    const w_point &weather_point = get_weather().get_precise();
-    int vehwindspeed = 0;
-    const optional_vpart_position vp = m.veh_at( bub_pos() );
-    if( vp ) {
-        vehwindspeed = std::lround( cmps_to_mps( std::abs( vp->vehicle().velocity ) ) * 2.23694 );
-    }
-    const oter_id &cur_om_ter = get_overmapbuffer( get_dimension() ).ter( abs_omt_pos() );
-    bool sheltered = weather::is_sheltered( m, bub_pos() );
-    double total_windpower = get_local_windpower( weather.windspeed + vehwindspeed, cur_om_ter,
-                             abs_pos(),
-                             weather.winddirection, sheltered );
-    int air_humidity = get_local_humidity( weather_point.humidity, weather.weather_id,
-                                           sheltered );
-    // Let's cache this not to check it num_bp times
-    const bool use_floor_warmth = can_use_floor_warmth();
-    // In bodytemp units
-    const int ambient_norm = 1900 - BODYTEMP_NORM;
+    units::temperature ambient_temperature;
+    units::temperature ambient_norm;
+    int air_humidity;
+    int best_fire;
+    bool has_pyromania; // This does not belong here
+    int heat_radiation; // Note: this is included in @ref weather::get_temperature(), so don't add to bodytemp!
+    units::temperature_delta lying_warmth;
+    bool sheltered;
+    bool submerged;
+    bool submerged_low;
+    units::temperature_delta sunlight_warmth;
+    bool is_in_sunlight;
+    units::temperature_delta mutation_heat_low; // Lower heat is applied always
+    units::temperature_delta mutation_heat_high;
+    units::temperature_delta
+    mutation_heat_bonus; // Difference between high and low is the "safe" heat - one we only apply if it's beneficial
+    int vehicle_wind_speed = 0;
+    units::temperature water_temperature;
+    double total_windpower;
 
-    /**
-     * Calculations that affect all body parts equally go here, not in the loop
-     */
-    const int sunlight_warmth = weather::is_in_sunlight( m, bub_pos(), weather.weather_id )
-                                ? ( weather.weather_id->sun_intensity == sun_intensity_type::high ? 1000 : 500 )
-                                : 0;
-    const int best_fire = get_heat_radiation( bub_pos(), true );
-    const bool pyromania = has_trait( trait_PYROMANIA );
-
-    const int lying_warmth = use_floor_warmth ? floor_warmth( bub_pos() ) : 0;
-    const int water_temperature_raw =
-        units::to_millidegree_celsius( weather.get_water_temperature( abs_pos() ) ) / 10;
-    // Rescale so that 0C is 0 (FREEZING) and 30C is 5k (NORM).
-    const int water_temperature = water_temperature_raw * 5 / 3;
-
-    // Correction of body temperature due to traits and mutations
-    // Lower heat is applied always
-    const int mutation_heat_low = bodytemp_modifier_traits( true );
-    const int mutation_heat_high = bodytemp_modifier_traits( false );
-    // Difference between high and low is the "safe" heat - one we only apply if it's beneficial
-    const int mutation_heat_bonus = mutation_heat_high - mutation_heat_low;
-
-    // Note: this is included in @ref weather::get_temperature(), so don't add to bodytemp!
-    const int h_radiation = get_heat_radiation( bub_pos(), false );
-
-    // If you're standing in water, air temperature is replaced by water temperature. No wind.
-    const ter_id ter_at_pos = m.ter( bub_pos() );
-    const bool submerged = !in_vehicle && ter_at_pos->has_flag( TFLAG_DEEP_WATER );
-    const bool submerged_low = !in_vehicle && ( submerged || ter_at_pos->has_flag( TFLAG_SWIMMABLE ) );
-
+    // Worn items are not split by bp, so using a map prevents having to iterate all worn items for each bp
+    std::map<bodypart_id, int> fire_armor_per_bp;
     std::map<bodypart_id, std::vector<const item *>> clothing_map;
-    std::map<bodypart_id, std::vector<const item *>> bonus_clothing_map;
-    for( auto &pr : get_body() ) {
-        const bodypart_id &bp_id = pr.first;
-        clothing_map.emplace( bp_id, std::vector<const item *>() );
-        bonus_clothing_map.emplace( bp_id, std::vector<const item *>() );
-        // HACK: we're using temp_conv here to temporarily save
-        //       temperature values from before equalization.
-        bodypart &bp = pr.second;
-        bp.set_temp_conv( bp.get_temp_cur() );
+    std::map<bodypart_id, std::vector<const item *>> clothing_map_bonus;
+    std::map<bodypart_id, int> warmth_per_bp;
+    std::map<bodypart_id, int> warmth_per_bp_bonus;
+    std::map<bodypart_id, int> wind_res_per_bp;
+};
+
+std::map<bodypart_id, int> get_wind_resistance( const Character &chr,
+        const std::map<bodypart_id, std::vector<const item *>> &clothing_map,
+        const std::map<bodypart_id, std::vector<const item *>> &bonus_clothing_map )
+{
+    std::map<bodypart_id, int> wind_res_per_bp = warmth::wind_resistance_from_clothing( clothing_map );
+    std::map<bodypart_id, int> wind_res_per_bp_bonus = warmth::wind_resistance_from_clothing(
+                bonus_clothing_map );
+    for( auto &pair : wind_res_per_bp ) {
+        const int exposed = std::max( 0, 100 - pair.second );
+        const auto exposed_it = wind_res_per_bp_bonus.find( pair.first );
+        int exposed_bonus = 0;
+        if( exposed_it != wind_res_per_bp_bonus.end() ) {
+            exposed_bonus = std::max( 0, 100 - exposed_it->second );
+        }
+        const int exposed_final = exposed * exposed_bonus / ( 100 * 100 );
+        pair.second = 100 - exposed_final;  // Modifies the actual map value
+    }
+    if( chr.has_active_mutation( trait_SHELL2 ) ) {
+        for( auto &val : wind_res_per_bp | std::views::values ) {
+            val = 100;
+        }
     }
 
+    return wind_res_per_bp;
+}
+
+
+void warn_temp_change( Character &chr, const bodypart_id &bp, units::temperature temp_before,
+                       units::temperature temp_after )
+{
+    // Warn the player if condition worsens
+    // HACK: we want overall temperature change, including equalization, and temp_conv
+    //       at this moment contains temperature values from before the equalization.
+    if( temp_before > BODYTEMP_FREEZING && temp_after <= BODYTEMP_FREEZING ) {
+        //~ %s is bodypart
+        add_msg( m_warning, _( "You feel your %s beginning to go numb from the cold!" ),
+                 body_part_name( bp->token ) );
+    } else if( temp_before > BODYTEMP_VERY_COLD && temp_after <= BODYTEMP_VERY_COLD ) {
+        //~ %s is bodypart
+        add_msg( m_warning, _( "You feel your %s getting very cold." ),
+                 body_part_name( bp->token ) );
+    } else if( temp_before > BODYTEMP_COLD && temp_after <= BODYTEMP_COLD ) {
+        //~ %s is bodypart
+        add_msg( m_warning, _( "You feel your %s getting chilly." ),
+                 body_part_name( bp->token ) );
+    } else if( temp_before < BODYTEMP_SCORCHING && temp_after >= BODYTEMP_SCORCHING ) {
+        //~ %s is bodypart
+        add_msg( m_bad, _( "You feel your %s getting red hot from the heat!" ),
+                 body_part_name( bp->token ) );
+    } else if( temp_before < BODYTEMP_VERY_HOT && temp_after >= BODYTEMP_VERY_HOT ) {
+        //~ %s is bodypart
+        add_msg( m_warning, _( "You feel your %s getting very hot." ),
+                 body_part_name( bp->token ) );
+    } else if( temp_before < BODYTEMP_HOT && temp_after >= BODYTEMP_HOT ) {
+        //~ %s is bodypart
+        add_msg( m_warning, _( "You feel your %s getting warm." ),
+                 body_part_name( bp->token ) );
+    }
+}
+
+void equalize_temperature( Character &chr )
+{
     // EQUALIZATION
     // We run it outside the loop because we can and so we should
     // Also, it makes bonus heat application more stable
     // TODO: Affect future convection temperature instead (might require adding back to loop)
-    temp_equalizer( *this, body_part_torso, body_part_arm_l );
-    temp_equalizer( *this, body_part_torso, body_part_arm_r );
-    temp_equalizer( *this, body_part_torso, body_part_leg_l );
-    temp_equalizer( *this, body_part_torso, body_part_leg_r );
-    temp_equalizer( *this, body_part_torso, body_part_head );
+    temp_equalizer( chr, body_part_torso, body_part_arm_l );
+    temp_equalizer( chr, body_part_torso, body_part_arm_r );
+    temp_equalizer( chr, body_part_torso, body_part_leg_l );
+    temp_equalizer( chr, body_part_torso, body_part_leg_r );
+    temp_equalizer( chr, body_part_torso, body_part_head );
 
-    temp_equalizer( *this, body_part_arm_l, body_part_hand_l );
-    temp_equalizer( *this, body_part_arm_r, body_part_hand_r );
+    temp_equalizer( chr, body_part_arm_l, body_part_hand_l );
+    temp_equalizer( chr, body_part_arm_r, body_part_hand_r );
 
-    temp_equalizer( *this, body_part_leg_l, body_part_foot_l );
-    temp_equalizer( *this, body_part_leg_r, body_part_foot_r );
+    temp_equalizer( chr, body_part_leg_l, body_part_foot_l );
+    temp_equalizer( chr, body_part_leg_r, body_part_foot_r );
 
-    const auto &all_bps = get_all_body_parts();
-    for( const item * const &it : worn ) {
-        // TODO: Port body part set id changes
+}
+
+void warn_wind_chill( const bodypart_id &bp, const units::temperature bp_conv,
+                      const int bp_wind_chill )
+{
+    // Warn the player that wind is going to be a problem.
+    // But only if it can be a problem, no need to spam player with "wind chills your scorching body"
+    if( bp_conv <= BODYTEMP_COLD && bp_wind_chill < -10 && one_in( 200 ) ) {
+        add_msg( m_bad, _( "The wind is making your %s feel quite cold." ),
+                 body_part_name( bp->token ) );
+    } else if( bp_conv <= BODYTEMP_COLD && bp_wind_chill < -20 && one_in( 100 ) ) {
+        add_msg( m_bad,
+                 _( "The wind is very strong, you should find some more wind-resistant clothing for your %s." ),
+                 body_part_name( bp->token ) );
+    } else if( bp_conv <= BODYTEMP_COLD && bp_wind_chill < -30 && one_in( 50 ) ) {
+        add_msg( m_bad, _( "Your clothing is not providing enough protection from the wind for your %s!" ),
+                 body_part_name( bp->token ) );
+    }
+}
+
+void wake_if_hypothermia( Character &chr, const bodypart_id &bp, bodypart &bp_stats )
+{
+
+    // Note: Numbers are based off of BODYTEMP at the top of weather.h
+    // If torso is BODYTEMP_COLD which is 34C, the early stages of hypothermia begin
+    // constant shivering will prevent the player from falling asleep.
+    // Otherwise, if any other body part is BODYTEMP_VERY_COLD, or 31C
+    // AND you have frostbite, then that also prevents you from sleeping
+    if( chr.in_sleep_state() ) {
+        const auto curr_temperature = bp_stats.get_temp_cur();
+        if( bp == body_part_torso && curr_temperature <= BODYTEMP_COLD &&
+            !chr.has_enchantment_flag( ench_flag_NO_THERMAL_WAKE ) ) {
+            add_msg( m_warning, _( "Your shivering prevents you from sleeping." ) );
+            chr.wake_up();
+        } else if( bp != body_part_torso && curr_temperature <= BODYTEMP_VERY_COLD &&
+                   chr.has_effect( effect_frostbite ) && !chr.has_enchantment_flag( ench_flag_NO_THERMAL_WAKE ) ) {
+            add_msg( m_warning, _( "You are too cold.  Your frostbite prevents you from sleeping." ) );
+            chr.wake_up();
+        }
+    }
+}
+
+void apply_comfort_morale( Character &chr, const bodypart_id &bp, const bodypart &bp_stats,
+                           const units::temperature_delta comfortable_warmth )
+{
+    // Morale bonus for comfiness - only if actually comfy (not too warm/cold)
+    // Spread the morale bonus in time.
+    if( comfortable_warmth > 0_c_delta &&
+        // TODO: make this simpler and use time_duration/time_point
+        to_turn<int>( calendar::turn ) % to_turns<int>( 1_minutes ) == to_turns<int>
+        ( 1_minutes * bp->token ) / to_turns<int>( 1_minutes * num_bp ) &&
+        chr.get_effect_int( effect_cold ) == 0 &&
+        chr.get_effect_int( effect_hot ) == 0 &&
+        bp_stats.get_temp_cur() > BODYTEMP_COLD && bp_stats.get_temp_cur() <= BODYTEMP_NORM ) {
+        chr.add_morale( MORALE_COMFY, 1, 10, 2_minutes, 1_minutes, true );
+    }
+}
+
+
+void set_clothing_map(
+    const Character &chr,
+    std::map<bodypart_id, std::vector<const item *>> &clothing_map,
+    std::map<bodypart_id, std::vector<const item *>> &bonus_clothing_map
+)
+{
+    for( auto &pr : chr.get_body() ) {
+        const bodypart_str_id &bp_id = pr.first;
+        clothing_map.emplace( bp_id, std::vector<const item *>() );
+        bonus_clothing_map.emplace( bp_id, std::vector<const item *>() );
+    }
+}
+
+void set_bonus_clothing_map( const Character &chr,
+                             std::map<bodypart_id, std::vector<const item *>> &clothing_map,
+                             std::map<bodypart_id, std::vector<const item *>> &bonus_clothing_map )
+{
+    const auto &all_bps = chr.get_all_body_parts();
+    for( const item *it : chr.worn ) {
         const body_part_set &covered = it->get_covered_body_parts();
         for( const bodypart_id &bp : all_bps ) {
             if( covered.test( bp.id() ) ) {
@@ -6205,184 +6458,355 @@ void Character::update_bodytemp( const map &m, const weather_manager &weather )
         }
     }
     // If player is wielding something large, pockets are not usable
-    if( primary_weapon().volume() >= 500_ml ) {
+    if( chr.primary_weapon().volume() >= 500_ml ) {
         bonus_clothing_map[body_part_hand_l].clear();
         bonus_clothing_map[body_part_hand_r].clear();
     }
     // If player's head is encumbered, hood can't be put up
-    if( encumb( body_part_head ) >= 10 ) {
+    if( chr.encumb( body_part_head ) >= 10 ) {
         bonus_clothing_map[body_part_head].clear();
     }
     // Similar for mouth
-    if( encumb( body_part_mouth ) >= 10 ) {
+    if( chr.encumb( body_part_mouth ) >= 10 ) {
         bonus_clothing_map[body_part_mouth].clear();
     }
+}
 
-    std::map<bodypart_id, int> warmth_per_bp = warmth::from_clothing( clothing_map );
-    std::map<bodypart_id, int> bonus_warmth_per_bp = warmth::bonus_from_clothing( bonus_clothing_map );
-    for( const auto &pr : warmth::from_effects( *this ) ) {
-        warmth_per_bp[pr.first] += pr.second;
-    }
+void apply_frostbite( Character &chr, const bodypart_id &bp, bodypart &bp_stats,
+                      const BodyTemperatureModifiers &body_mods )
+{
+    // FROSTBITE - only occurs to hands, feet, face
+    /**
 
-    std::map<bodypart_id, int> wind_res_per_bp = warmth::wind_resistance_from_clothing( clothing_map );
-    std::map<bodypart_id, int> wind_res_per_bp_bonus = warmth::wind_resistance_from_clothing(
-                bonus_clothing_map );
-    for( std::pair<const bodypart_id, int> &bp_wind_res : wind_res_per_bp ) {
-        int exposed = std::max( 0, 100 - bp_wind_res.second );
-        int exposed_bonus = std::max( 0, 100 - wind_res_per_bp_bonus.at( bp_wind_res.first ) );
-        int exposed_final = exposed * exposed_bonus / ( 100 * 100 );
-        bp_wind_res.second = 100 - exposed_final;
-    }
-    if( has_active_mutation( trait_SHELL2 ) ) {
-        for( std::pair<const bodypart_id, int> &bp_wind_res : wind_res_per_bp ) {
-            bp_wind_res.second = 100;
+    Source : http://www.atc.army.mil/weather/windchill.pdf
+
+    Temperature and wind chill are main factors, mitigated by clothing warmth. Each 10 warmth protects against 2C of cold.
+
+    1200 turns in low risk, + 3 tics
+    450 turns in moderate risk, + 8 tics
+    50 turns in high risk, +72 tics
+
+    Let's say frostnip @ 1800 tics, frostbite @ 3600 tics
+
+    >> Chunked into 8 parts (http://imgur.com/xlTPmJF)
+    -- 2 hour risk --
+    Between 30F and 10F
+    Between 10F and -5F, less than 20mph, -4x + 3y - 20 > 0, x : F, y : mph
+    -- 45 minute risk --
+    Between 10F and -5F, less than 20mph, -4x + 3y - 20 < 0, x : F, y : mph
+    Between 10F and -5F, greater than 20mph
+    Less than -5F, less than 10 mph
+    Less than -5F, more than 10 mph, -4x + 3y - 170 > 0, x : F, y : mph
+    -- 5 minute risk --
+    Less than -5F, more than 10 mph, -4x + 3y - 170 < 0, x : F, y : mph
+    Less than -35F, more than 10 mp
+    **/
+
+    if( bp == body_part_mouth || bp == body_part_foot_r ||
+        bp == body_part_foot_l || bp == body_part_hand_r || bp == body_part_hand_l ) {
+        // Handle the frostbite timer
+        // Need temps in F, windPower already in mph
+        int wetness_percentage = 100 * bp_stats.get_wetness() / bp_stats.get_drench_capacity(); // 0 - 100
+        // Warmth gives a slight buff to temperature resistance
+        // Wetness gives a heavy nerf to temperature resistance
+        const auto it = body_mods.warmth_per_bp.find( bp );
+        const int adjusted_warmth = ( it != body_mods.warmth_per_bp.end() ? it->second : 0 ) -
+                                    wetness_percentage;
+        int Ftemperature = static_cast<int>( units::to_fahrenheit( body_mods.ambient_temperature ) + 0.2 *
+                                             adjusted_warmth );
+        // Windchill reduced by your armor
+        const auto wind_it = body_mods.wind_res_per_bp.find( bp );
+        const int wind_res = ( wind_it != body_mods.wind_res_per_bp.end() ) ? wind_it->second : 0;
+        int FBwindPower = static_cast<int>(
+                              body_mods.total_windpower * ( 1 - wind_res / 100.0 ) );
+
+        int intense = chr.get_effect_int( effect_frostbite, bp.id() );
+
+        // This has been broken down into 8 zones
+        // Low risk zones (stops at frostnip)
+        if( bp_stats.get_temp_cur() < BODYTEMP_COLD &&
+            ( ( Ftemperature < 30 && Ftemperature >= 10 ) ||
+              ( Ftemperature < 10 && Ftemperature >= -5 &&
+                FBwindPower < 20 && -4 * Ftemperature + 3 * FBwindPower - 20 >= 0 ) ) ) {
+            if( bp_stats.get_frostbite_timer() < 2000 ) {
+                bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() + 3 );
+            }
+            if( one_in( 100 ) && !chr.has_effect( effect_frostbite, bp.id() ) ) {
+                add_msg( m_warning, _( "Your %s will be frostnipped in the next few hours." ),
+                         body_part_name( bp->token ) );
+            }
+            // Medium risk zones
+        } else if( bp_stats.get_temp_cur() < BODYTEMP_COLD &&
+                   ( ( Ftemperature < 10 && Ftemperature >= -5 && FBwindPower < 20 &&
+                       -4 * Ftemperature + 3 * FBwindPower - 20 < 0 ) ||
+                     ( Ftemperature < 10 && Ftemperature >= -5 && FBwindPower >= 20 ) ||
+                     ( Ftemperature < -5 && FBwindPower < 10 ) ||
+                     ( Ftemperature < -5 && FBwindPower >= 10 &&
+                       -4 * Ftemperature + 3 * FBwindPower - 170 >= 0 ) ) ) {
+            bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() + 8 );
+            if( one_in( 100 ) && intense < 2 ) {
+                add_msg( m_warning, _( "Your %s will be frostbitten within the hour!" ),
+                         body_part_name( bp->token ) );
+            }
+            // High risk zones
+        } else if( bp_stats.get_temp_cur() < BODYTEMP_COLD &&
+                   ( ( Ftemperature < -5 && FBwindPower >= 10 &&
+                       -4 * Ftemperature + 3 * FBwindPower - 170 < 0 ) ||
+                     ( Ftemperature < -35 && FBwindPower >= 10 ) ) ) {
+            bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() + 72 );
+            if( one_in( 100 ) && intense < 2 ) {
+                add_msg( m_warning, _( "Your %s will be frostbitten any minute now!" ),
+                         body_part_name( bp->token ) );
+            }
+            // Risk free, so reduce frostbite timer
+        } else {
+            bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() - 3 );
+        }
+
+        // Handle the bestowing of frostbite
+        if( bp_stats.get_frostbite_timer() < 0 ) {
+            bp_stats.set_frostbite_timer( 0 );
+        } else if( bp_stats.get_frostbite_timer() > 4200 ) {
+            // This ensures that the player will recover in at most 3 hours.
+            bp_stats.set_frostbite_timer( 4200 );
+        }
+        // Frostbite, no recovery possible
+        if( bp_stats.get_frostbite_timer() >= 3600 ) {
+            chr.add_effect( effect_frostbite, 1_turns, bp.id(), 2 );
+            chr.remove_effect( effect_frostbite_recovery, bp.id() );
+            // Else frostnip, add recovery if we were frostbitten
+        } else if( bp_stats.get_frostbite_timer() >= 1800 ) {
+            if( intense == 2 ) {
+                chr.add_effect( effect_frostbite_recovery, 1_turns, bp.id() );
+            }
+            chr.add_effect( effect_frostbite, 1_turns, bp.id(), 1 );
+            // Else fully recovered
+        } else if( bp_stats.get_frostbite_timer() == 0 ) {
+            chr.remove_effect( effect_frostbite, bp.id() );
+            chr.remove_effect( effect_frostbite_recovery, bp.id() );
         }
     }
-    // We might not use this at all, so leave it empty
-    // If we do need to use it, we'll initialize it (once) there
-    std::map<bodypart_id, int> fire_armor_per_bp;
+}
 
-    // Current temperature and converging temperature calculations
-    for( auto &pr : get_body() ) {
+void apply_temp_effects( Character &chr, const bodypart_id &bp, bodypart &bp_stats )
+{
+    // PENALTIES
+    if( bp_stats.get_temp_cur() < BODYTEMP_FREEZING ) {
+        chr.add_effect( effect_cold, 1_turns, bp.id(), 3 );
+    } else if( bp_stats.get_temp_cur() < BODYTEMP_VERY_COLD ) {
+        chr.add_effect( effect_cold, 1_turns, bp.id(), 2 );
+    } else if( bp_stats.get_temp_cur() < BODYTEMP_COLD ) {
+        chr.add_effect( effect_cold, 1_turns, bp.id(), 1 );
+    } else if( bp_stats.get_temp_cur() > BODYTEMP_SCORCHING ) {
+        chr.add_effect( effect_hot, 1_turns, bp.id(), 3 );
+        if( bp->main_part.id() == bp ) {
+            chr.add_effect( effect_hot_speed, 1_turns, bp.id(), 3 );
+        }
+    } else if( bp_stats.get_temp_cur() > BODYTEMP_VERY_HOT ) {
+        chr.add_effect( effect_hot, 1_turns, bp.id(), 2 );
+        if( bp->main_part.id() == bp ) {
+            chr.add_effect( effect_hot_speed, 1_turns, bp.id(), 2 );
+        }
+    } else if( bp_stats.get_temp_cur() > BODYTEMP_HOT ) {
+        chr.add_effect( effect_hot, 1_turns, bp.id(), 1 );
+        if( bp->main_part.id() == bp ) {
+            chr.add_effect( effect_hot_speed, 1_turns, bp.id(), 1 );
+        }
+    } else {
+        if( bp_stats.get_temp_cur() >= BODYTEMP_COLD ) {
+            chr.remove_effect( effect_cold, bp.id() );
+        }
+        if( bp_stats.get_temp_cur() <= BODYTEMP_HOT ) {
+            chr.remove_effect( effect_hot, bp.id() );
+            chr.remove_effect( effect_hot_speed, bp.id() );
+        }
+    }
+}
+
+bool is_bodypart_submerged( const bodypart_id &bp, const BodyTemperatureModifiers &body_mods )
+{
+    if( body_mods.submerged ) {
+        return true;
+    }
+    if( body_mods.submerged_low ) {
+        if( bp == body_part_foot_l ||
+            bp == body_part_foot_r ||
+            bp == body_part_leg_l ||
+            bp == body_part_leg_r ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+auto adjust_bp_conv_for_bonus_warmth(
+    Character &chr, const bodypart_id &bp,
+    const bodypart &bp_stats, units::temperature bp_conv,
+    const BodyTemperatureModifiers &body_mods,
+    const units::temperature_delta clothing_warmth_adjusted_bonus
+) -> units::temperature
+{
+    const auto bonus_fire_warmth = units::from_legacy_bodypart_temp_delta( body_mods.best_fire * 500 );
+    const auto comfortable_warmth = bonus_fire_warmth + body_mods.lying_warmth;
+    const auto bonus_warmth = comfortable_warmth + body_mods.mutation_heat_bonus +
+                              clothing_warmth_adjusted_bonus;
+    if( bonus_warmth <= 0_c_delta ) {
+        return bp_conv;
+    }
+    // Approximate bp_conv needed to reach comfortable temperature in this very turn
+    // Basically inverted formula for temp_cur below
+    auto desired = units::from_legacy_bodypart_temp(
+                       501 * units::to_legacy_bodypart_temp( BODYTEMP_NORM ) -
+                       499 * units::to_legacy_bodypart_temp( bp_stats.get_temp_cur() ) );
+    if( units::abs( BODYTEMP_NORM - desired ) < 2_c_delta ) {
+        desired = BODYTEMP_NORM; // Ensure that it converges
+    } else if( desired > BODYTEMP_HOT ) {
+        desired = BODYTEMP_HOT; // Cap excess at sane temperature
+    }
+
+    if( desired < bp_conv ) {
+        // Too hot, can't help here
+    } else if( desired < bp_conv + bonus_warmth ) {
+        // Use some heat, but not all of it
+        bp_conv = desired;
+    } else {
+        // Use all the heat
+        bp_conv = bp_conv + bonus_warmth;
+    }
+
+    apply_comfort_morale( chr, bp, bp_stats, comfortable_warmth );
+    return bp_conv;
+}
+
+auto adjust_bp_conv_for_insulation( units::temperature bp_conv,
+                                    const units::temperature_delta clothing_warmth_adjustment ) -> units::temperature
+{
+    // Because we don't actually model insulation very well at the moment, clothes are oppressive in Summer
+    // So we make them half as effective at making you uncomfortably hot as they are at making you not-cold
+    if( bp_conv >= BODYTEMP_NORM ) {
+        const auto bp_without_clothes = bp_conv - clothing_warmth_adjustment;
+        if( bp_without_clothes >= BODYTEMP_NORM ) {
+            // If the heat is above normal, clothes start to contribute less
+            bp_conv = bp_conv - clothing_warmth_adjustment / 2;
+        } else {
+            // Do the same to any clothing that contributes to above normal
+            const auto clothes_to_norm = BODYTEMP_NORM - bp_without_clothes;
+            bp_conv = bp_conv - ( clothing_warmth_adjustment - clothes_to_norm ) / 2;
+        }
+    }
+    return bp_conv;
+}
+
+void apply_blisters( Character &chr, const bodypart_id &bp, BodyTemperatureModifiers &body_mods )
+{
+    int blister_count = body_mods.heat_radiation - 111 > 0 ?
+                        std::max( static_cast<int>( std::sqrt( body_mods.heat_radiation - 111 ) ), 0 ) : 0;
+
+    blister_count += chr.bonus_from_enchantments( blister_count,
+                     enchantment_value_id( "BLISTER_COUNT" ),
+                     true );
+
+    if( body_mods.fire_armor_per_bp.empty() && blister_count > 0 ) {
+        body_mods.fire_armor_per_bp = chr.get_armor_fire( body_mods.clothing_map );
+    }
+    // BLISTERS : Skin gets blisters from intense heat exposure.
+    // Fire protection protects from blisters.
+    // Heatsinks give near-immunity.
+    const auto fire_it = body_mods.fire_armor_per_bp.find( bp );
+    const int fire_armor = ( fire_it != body_mods.fire_armor_per_bp.end() ) ? fire_it->second : 0;
+
+    if( blister_count - fire_armor > 0 ) {
+        chr.add_effect( effect_blisters, 1_turns, bp.id() );
+        if( body_mods.has_pyromania ) {
+            chr.add_morale( MORALE_PYROMANIA_NEARFIRE, 10, 10, 1_hours,
+                            30_minutes ); // Proximity that's close enough to harm us gives us a bit of a thrill
+            chr.rem_morale( MORALE_PYROMANIA_NOFIRE );
+        }
+    } else if( body_mods.has_pyromania &&
+               body_mods.best_fire >= 1 ) { // Only give us fire bonus if there's actually fire
+        chr.add_morale( MORALE_PYROMANIA_NEARFIRE, 5, 5, 30_minutes,
+                        15_minutes ); // Gain a much smaller mood boost even if it doesn't hurt us
+        chr.rem_morale( MORALE_PYROMANIA_NOFIRE );
+    }
+
+}
+
+void update_bodytemp_bps( Character &chr, BodyTemperatureModifiers &body_mods )
+{
+    for( auto &pr : chr.get_body() ) {
         const bodypart_id &bp = pr.first;
-        // Skip eyes
-        if( bp == bodypart_id( "eyes" ) ) {
+        bodypart &bp_stats = pr.second;
+        if( !bp_stats.is_affected_by_temperature() ) {
             continue;
         }
 
-        bodypart &bp_stats = pr.second;
-
-        const bool submerged_bp = submerged ||
-                                  ( submerged_low &&
-                                    ( bp == body_part_foot_l ||
-                                      bp == body_part_foot_r ||
-                                      bp == body_part_leg_l ||
-                                      bp == body_part_leg_r ) );
-        // This adjusts the temperature scale to match the bodytemp scale
-        const int adjusted_temp = submerged_bp ?
-                                  water_temperature :
-                                  ( Ctemperature - ambient_norm );
+        const bool submerged_bp = is_bodypart_submerged( bp, body_mods );
+        // Change the ambient temperature into a delta based on comfortable air temperature.
+        const auto adjusted_temp = submerged_bp
+                                   ? units::temperature( body_mods.water_temperature )
+                                   : units::temperature( BODYTEMP_NORM + ( body_mods.ambient_temperature - body_mods.ambient_norm ) /
+                                           5.0 );
 
         // Represents the fact that the body generates heat when it is cold.
-        double scaled_temperature = logarithmic_range( BODYTEMP_VERY_COLD, BODYTEMP_VERY_HOT,
-                                    bp_stats.get_temp_cur() );
+        const auto scaled_temperature = logarithmic_range(
+                                            units::to_legacy_bodypart_temp( BODYTEMP_VERY_COLD ),
+                                            units::to_legacy_bodypart_temp( BODYTEMP_VERY_HOT ),
+                                            units::to_legacy_bodypart_temp( bp_stats.get_temp_cur() ) );
+
         // Produces a smooth curve between 30.0 and 60.0.
-        double homeostasis_adjustment = 30.0 * ( 1.0 + scaled_temperature );
-        int clothing_warmth_adjustment = static_cast<int>( homeostasis_adjustment * warmth_per_bp[bp] );
-        int clothing_warmth_adjusted_bonus = static_cast<int>( homeostasis_adjustment *
-                                             bonus_warmth_per_bp[bp] );
-        // WINDCHILL
-        double bp_windpower = total_windpower * ( 1 - wind_res_per_bp[bp] / 100.0 );
-        // Calculate windchill
-        int windchill = submerged_bp
-                        ? 0
-                        : get_local_windchill( units::to_fahrenheit( player_local_temp ),
-                                               air_humidity,
-                                               bp_windpower );
+        const auto homeostasis_adjustment = 30.0 * ( 1.0 + scaled_temperature );
+        const auto warmth_it = body_mods.warmth_per_bp.find( bp );
+        const auto clothing_warmth_adjustment = units::from_legacy_bodypart_temp_delta(
+                static_cast<int>( homeostasis_adjustment *
+                                  ( warmth_it != body_mods.warmth_per_bp.end() ? warmth_it->second : 0 ) ) );
+        const auto warmth_bonus_it = body_mods.warmth_per_bp_bonus.find( bp );
+        const auto clothing_warmth_adjusted_bonus = units::from_legacy_bodypart_temp_delta(
+                    static_cast<int>( homeostasis_adjustment *
+                                      ( warmth_bonus_it != body_mods.warmth_per_bp_bonus.end() ? warmth_bonus_it->second : 0 ) ) );
+
+        const auto wind_res_it = body_mods.wind_res_per_bp.find( bp );
+        const int wind_res = ( wind_res_it != body_mods.wind_res_per_bp.end() ) ? wind_res_it->second : 0;
+        double bp_windpower = body_mods.total_windpower * ( 1 - wind_res / 100.0 );
+        const int bp_wind_chill = submerged_bp ? 0 : get_local_windchill( units::to_fahrenheit(
+                                      body_mods.ambient_temperature ),
+                                  body_mods.air_humidity,
+                                  bp_windpower );
+        const auto bugged_windchill = units::from_celsius_delta( bp_wind_chill * 100.0 / 500.0 );
 
         // Convergent temperature is affected by ambient temperature,
         // clothing warmth, and body wetness.
-        int bp_conv = adjusted_temp
-                      + windchill * 100
-                      + clothing_warmth_adjustment
-                      + mutation_heat_low
-                      + sunlight_warmth;
+        auto bp_conv = adjusted_temp
+                       + bugged_windchill
+                       + clothing_warmth_adjustment
+                       + body_mods.mutation_heat_low
+                       + body_mods.sunlight_warmth;
 
         if( bp_stats.get_frostbite_timer() > 0 ) {
-            bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() - std::min( 5, h_radiation ) );
+            bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() - std::min( 5,
+                                          body_mods.heat_radiation ) );
         }
-        int blister_count = h_radiation - 111 > 0 ?
-                            std::max( static_cast<int>( std::sqrt( h_radiation - 111 ) ), 0 ) : 0;
-
-        blister_count += bonus_from_enchantments( blister_count, enchantment_value_id( "BLISTER_COUNT" ),
-                         true );
-
-        if( fire_armor_per_bp.empty() && blister_count > 0 ) {
-            fire_armor_per_bp = get_armor_fire( clothing_map );
-        }
-        // BLISTERS : Skin gets blisters from intense heat exposure.
-        // Fire protection protects from blisters.
-        // Heatsinks give near-immunity.
-        if( blister_count - fire_armor_per_bp[bp] > 0 ) {
-            add_effect( effect_blisters, 1_turns, bp.id() );
-            if( pyromania ) {
-                add_morale( MORALE_PYROMANIA_NEARFIRE, 10, 10, 1_hours,
-                            30_minutes ); // Proximity that's close enough to harm us gives us a bit of a thrill
-                rem_morale( MORALE_PYROMANIA_NOFIRE );
-            }
-        } else if( pyromania && best_fire >= 1 ) { // Only give us fire bonus if there's actually fire
-            add_morale( MORALE_PYROMANIA_NEARFIRE, 5, 5, 30_minutes,
-                        15_minutes ); // Gain a much smaller mood boost even if it doesn't hurt us
-            rem_morale( MORALE_PYROMANIA_NOFIRE );
-        }
-
-        // Climate Control eases the effects of high and low ambient temps
-        bp_conv = temp_corrected_by_climate_control( bp_conv );
-
-        int bonus_fire_warmth = best_fire * 500;
-
-        const int comfortable_warmth = bonus_fire_warmth + lying_warmth;
-        const int bonus_warmth = comfortable_warmth + mutation_heat_bonus + clothing_warmth_adjusted_bonus;
-        if( bonus_warmth > 0 ) {
-            // Approximate bp_conv needed to reach comfortable temperature in this very turn
-            // Basically inverted formula for temp_cur below
-            int desired = 501 * BODYTEMP_NORM - 499 * bp_stats.get_temp_cur();
-            if( std::abs( BODYTEMP_NORM - desired ) < 1000 ) {
-                desired = BODYTEMP_NORM; // Ensure that it converges
-            } else if( desired > BODYTEMP_HOT ) {
-                desired = BODYTEMP_HOT; // Cap excess at sane temperature
-            }
-
-            if( desired < bp_conv ) {
-                // Too hot, can't help here
-            } else if( desired < bp_conv + bonus_warmth ) {
-                // Use some heat, but not all of it
-                bp_conv = desired;
-            } else {
-                // Use all the heat
-                bp_conv += bonus_warmth;
-            }
-
-            // Morale bonus for comfiness - only if actually comfy (not too warm/cold)
-            // Spread the morale bonus in time.
-            if( comfortable_warmth > 0 &&
-                // TODO: make this simpler and use time_duration/time_point
-                to_turn<int>( calendar::turn ) % to_turns<int>( 1_minutes ) == to_turns<int>
-                ( 1_minutes * bp->token ) / to_turns<int>( 1_minutes * num_bp ) &&
-                get_effect_int( effect_cold ) == 0 &&
-                get_effect_int( effect_hot ) == 0 &&
-                bp_stats.get_temp_cur() > BODYTEMP_COLD && bp_stats.get_temp_cur() <= BODYTEMP_NORM ) {
-                add_morale( MORALE_COMFY, 1, 10, 2_minutes, 1_minutes, true );
-            }
-        }
+        apply_blisters( chr, bp, body_mods );
+        bp_conv = chr.temp_corrected_by_climate_control( bp_conv, bp );
+        bp_conv = adjust_bp_conv_for_bonus_warmth( chr, bp, bp_stats, bp_conv, body_mods,
+                  clothing_warmth_adjusted_bonus );
 
         // The current temperature model can't account for water temperature conduction well
         // Hack: cut non-water effects by 80% when in water
         if( submerged_bp ) {
-            bp_conv = ( ( bp_conv - adjusted_temp ) / 5 ) + adjusted_temp;
+            const auto legacy_adjusted_temp = units::to_legacy_bodypart_temp( adjusted_temp );
+            bp_conv = units::from_legacy_bodypart_temp( ( units::to_legacy_bodypart_temp( bp_conv ) -
+                      legacy_adjusted_temp ) / 5 + legacy_adjusted_temp );
         }
 
-        // Because we don't actually model insulation very well at the moment, clothes are oppressive in Summer
-        // So we make them half as effective at making you uncomfortably hot as they are at making you not-cold
-        if( bp_conv >= BODYTEMP_NORM ) {
-            int bp_without_clothes = bp_conv - clothing_warmth_adjustment;
-            if( bp_without_clothes >= BODYTEMP_NORM ) {
-                // If the heat is above normal, clothes start to contribute less
-                bp_conv -= clothing_warmth_adjustment / 2;
-            } else {
-                // Do the same to any clothing that contributes to above normal
-                int clothes_to_norm = BODYTEMP_NORM - bp_without_clothes;
-                bp_conv -= ( clothing_warmth_adjustment - clothes_to_norm ) / 2;
-
-            }
-        }
-
+        bp_conv = adjust_bp_conv_for_insulation( bp_conv, clothing_warmth_adjustment );
         // FINAL CALCULATION : Increments current body temperature towards convergent.
-        int temp_before = bp_stats.get_temp_cur();
-        int temp_difference = temp_before - bp_conv; // Negative if the player is warming up.
-        int rounding_error = 0;
+        const auto temp_before = bp_stats.get_temp_cur();
+        const auto legacy_bp_conv = units::to_legacy_bodypart_temp( bp_conv );
+        const auto legacy_temp_difference = units::to_legacy_bodypart_temp( temp_before ) -
+                                            legacy_bp_conv; // Negative if the player is warming up.
+        auto rounding_error = 0;
         // If temp_diff is small, the player cannot warm up due to rounding errors. This fixes that.
-        if( temp_difference < 0 && temp_difference > -600 ) {
+        if( legacy_temp_difference < 0 && legacy_temp_difference > -600 ) {
             rounding_error = 1;
         }
         // exp(-0.001) : half life of 60 minutes, exp(-0.002) : half life of 30 minutes,
@@ -6391,230 +6815,105 @@ void Character::update_bodytemp( const map &m, const weather_manager &weather )
         static const double change_mult_water = std::exp( -0.008 );
         const double change_mult = submerged_bp ? change_mult_water : change_mult_air;
         if( bp_stats.get_temp_cur() != bp_conv ) {
-            bp_stats.set_temp_cur( static_cast<int>( temp_difference * change_mult ) + bp_conv +
-                                   rounding_error );
+            bp_stats.set_temp_cur( units::from_legacy_bodypart_temp(
+                                       static_cast<int>( legacy_temp_difference * change_mult ) + legacy_bp_conv + rounding_error ) );
         }
-        int temp_after = bp_stats.get_temp_cur();
-        // PENALTIES
-        if( bp_stats.get_temp_cur() < BODYTEMP_FREEZING ) {
-            add_effect( effect_cold, 1_turns, bp.id(), 3 );
-        } else if( bp_stats.get_temp_cur() < BODYTEMP_VERY_COLD ) {
-            add_effect( effect_cold, 1_turns, bp.id(), 2 );
-        } else if( bp_stats.get_temp_cur() < BODYTEMP_COLD ) {
-            add_effect( effect_cold, 1_turns, bp.id(), 1 );
-        } else if( bp_stats.get_temp_cur() > BODYTEMP_SCORCHING ) {
-            add_effect( effect_hot, 1_turns, bp.id(), 3 );
-            if( bp->main_part.id() == bp ) {
-                add_effect( effect_hot_speed, 1_turns, bp.id(), 3 );
-            }
-        } else if( bp_stats.get_temp_cur() > BODYTEMP_VERY_HOT ) {
-            add_effect( effect_hot, 1_turns, bp.id(), 2 );
-            if( bp->main_part.id() == bp ) {
-                add_effect( effect_hot_speed, 1_turns, bp.id(), 2 );
-            }
-        } else if( bp_stats.get_temp_cur() > BODYTEMP_HOT ) {
-            add_effect( effect_hot, 1_turns, bp.id(), 1 );
-            if( bp->main_part.id() == bp ) {
-                add_effect( effect_hot_speed, 1_turns, bp.id(), 1 );
-            }
-        } else {
-            if( bp_stats.get_temp_cur() >= BODYTEMP_COLD ) {
-                remove_effect( effect_cold, bp.id() );
-            }
-            if( bp_stats.get_temp_cur() <= BODYTEMP_HOT ) {
-                remove_effect( effect_hot, bp.id() );
-                remove_effect( effect_hot_speed, bp.id() );
-            }
-        }
+        const auto temp_after = bp_stats.get_temp_cur();
 
-        // FROSTBITE - only occurs to hands, feet, face
-        /**
+        apply_temp_effects( chr, bp, bp_stats );
+        apply_frostbite( chr, bp, bp_stats, body_mods );
+        warn_temp_change( chr, bp, temp_before, temp_after );
+        wake_if_hypothermia( chr, bp, bp_stats );
+        warn_wind_chill( bp, bp_conv, bp_wind_chill );
 
-        Source : http://www.atc.army.mil/weather/windchill.pdf
-
-        Temperature and wind chill are main factors, mitigated by clothing warmth. Each 10 warmth protects against 2C of cold.
-
-        1200 turns in low risk, + 3 tics
-        450 turns in moderate risk, + 8 tics
-        50 turns in high risk, +72 tics
-
-        Let's say frostnip @ 1800 tics, frostbite @ 3600 tics
-
-        >> Chunked into 8 parts (http://imgur.com/xlTPmJF)
-        -- 2 hour risk --
-        Between 30F and 10F
-        Between 10F and -5F, less than 20mph, -4x + 3y - 20 > 0, x : F, y : mph
-        -- 45 minute risk --
-        Between 10F and -5F, less than 20mph, -4x + 3y - 20 < 0, x : F, y : mph
-        Between 10F and -5F, greater than 20mph
-        Less than -5F, less than 10 mph
-        Less than -5F, more than 10 mph, -4x + 3y - 170 > 0, x : F, y : mph
-        -- 5 minute risk --
-        Less than -5F, more than 10 mph, -4x + 3y - 170 < 0, x : F, y : mph
-        Less than -35F, more than 10 mp
-        **/
-
-        if( bp == body_part_mouth || bp == body_part_foot_r ||
-            bp == body_part_foot_l || bp == body_part_hand_r || bp == body_part_hand_l ) {
-            // Handle the frostbite timer
-            // Need temps in F, windPower already in mph
-            int wetness_percentage = 100 * bp_stats.get_wetness() / bp_stats.get_drench_capacity(); // 0 - 100
-            // Warmth gives a slight buff to temperature resistance
-            // Wetness gives a heavy nerf to temperature resistance
-            double adjusted_warmth = warmth_per_bp.at( bp ) - wetness_percentage;
-            int Ftemperature = static_cast<int>( units::to_fahrenheit( player_local_temp ) + 0.2 *
-                                                 adjusted_warmth );
-            // Windchill reduced by your armor
-            int FBwindPower = static_cast<int>(
-                                  total_windpower * ( 1 - wind_res_per_bp[ bp ] / 100.0 ) );
-
-            int intense = get_effect_int( effect_frostbite, bp.id() );
-
-            // This has been broken down into 8 zones
-            // Low risk zones (stops at frostnip)
-            if( bp_stats.get_temp_cur() < BODYTEMP_COLD &&
-                ( ( Ftemperature < 30 && Ftemperature >= 10 ) ||
-                  ( Ftemperature < 10 && Ftemperature >= -5 &&
-                    FBwindPower < 20 && -4 * Ftemperature + 3 * FBwindPower - 20 >= 0 ) ) ) {
-                if( bp_stats.get_frostbite_timer() < 2000 ) {
-                    bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() + 3 );
-                }
-                if( one_in( 100 ) && !has_effect( effect_frostbite, bp.id() ) ) {
-                    add_msg( m_warning, _( "Your %s will be frostnipped in the next few hours." ),
-                             body_part_name( bp->token ) );
-                }
-                // Medium risk zones
-            } else if( bp_stats.get_temp_cur() < BODYTEMP_COLD &&
-                       ( ( Ftemperature < 10 && Ftemperature >= -5 && FBwindPower < 20 &&
-                           -4 * Ftemperature + 3 * FBwindPower - 20 < 0 ) ||
-                         ( Ftemperature < 10 && Ftemperature >= -5 && FBwindPower >= 20 ) ||
-                         ( Ftemperature < -5 && FBwindPower < 10 ) ||
-                         ( Ftemperature < -5 && FBwindPower >= 10 &&
-                           -4 * Ftemperature + 3 * FBwindPower - 170 >= 0 ) ) ) {
-                bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() + 8 );
-                if( one_in( 100 ) && intense < 2 ) {
-                    add_msg( m_warning, _( "Your %s will be frostbitten within the hour!" ),
-                             body_part_name( bp->token ) );
-                }
-                // High risk zones
-            } else if( bp_stats.get_temp_cur() < BODYTEMP_COLD &&
-                       ( ( Ftemperature < -5 && FBwindPower >= 10 &&
-                           -4 * Ftemperature + 3 * FBwindPower - 170 < 0 ) ||
-                         ( Ftemperature < -35 && FBwindPower >= 10 ) ) ) {
-                bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() + 72 );
-                if( one_in( 100 ) && intense < 2 ) {
-                    add_msg( m_warning, _( "Your %s will be frostbitten any minute now!" ),
-                             body_part_name( bp->token ) );
-                }
-                // Risk free, so reduce frostbite timer
-            } else {
-                bp_stats.set_frostbite_timer( bp_stats.get_frostbite_timer() - 3 );
-            }
-
-            // Handle the bestowing of frostbite
-            if( bp_stats.get_frostbite_timer() < 0 ) {
-                bp_stats.set_frostbite_timer( 0 );
-            } else if( bp_stats.get_frostbite_timer() > 4200 ) {
-                // This ensures that the player will recover in at most 3 hours.
-                bp_stats.set_frostbite_timer( 4200 );
-            }
-            // Frostbite, no recovery possible
-            if( bp_stats.get_frostbite_timer() >= 3600 ) {
-                add_effect( effect_frostbite, 1_turns, bp.id(), 2 );
-                remove_effect( effect_frostbite_recovery, bp.id() );
-                // Else frostnip, add recovery if we were frostbitten
-            } else if( bp_stats.get_frostbite_timer() >= 1800 ) {
-                if( intense == 2 ) {
-                    add_effect( effect_frostbite_recovery, 1_turns, bp.id() );
-                }
-                add_effect( effect_frostbite, 1_turns, bp.id(), 1 );
-                // Else fully recovered
-            } else if( bp_stats.get_frostbite_timer() == 0 ) {
-                remove_effect( effect_frostbite, bp.id() );
-                remove_effect( effect_frostbite_recovery, bp.id() );
-            }
-        }
-        // Warn the player if condition worsens
-        // HACK: we want overall temperature change, including equalization, and temp_conv
-        //       at this moment contains temperature values from before the equalization.
-        temp_before = bp_stats.get_temp_conv();
-        if( temp_before > BODYTEMP_FREEZING && temp_after <= BODYTEMP_FREEZING ) {
-            //~ %s is bodypart
-            add_msg( m_warning, _( "You feel your %s beginning to go numb from the cold!" ),
-                     body_part_name( bp->token ) );
-        } else if( temp_before > BODYTEMP_VERY_COLD && temp_after <= BODYTEMP_VERY_COLD ) {
-            //~ %s is bodypart
-            add_msg( m_warning, _( "You feel your %s getting very cold." ),
-                     body_part_name( bp->token ) );
-        } else if( temp_before > BODYTEMP_COLD && temp_after <= BODYTEMP_COLD ) {
-            //~ %s is bodypart
-            add_msg( m_warning, _( "You feel your %s getting chilly." ),
-                     body_part_name( bp->token ) );
-        } else if( temp_before < BODYTEMP_SCORCHING && temp_after >= BODYTEMP_SCORCHING ) {
-            //~ %s is bodypart
-            add_msg( m_bad, _( "You feel your %s getting red hot from the heat!" ),
-                     body_part_name( bp->token ) );
-        } else if( temp_before < BODYTEMP_VERY_HOT && temp_after >= BODYTEMP_VERY_HOT ) {
-            //~ %s is bodypart
-            add_msg( m_warning, _( "You feel your %s getting very hot." ),
-                     body_part_name( bp->token ) );
-        } else if( temp_before < BODYTEMP_HOT && temp_after >= BODYTEMP_HOT ) {
-            //~ %s is bodypart
-            add_msg( m_warning, _( "You feel your %s getting warm." ),
-                     body_part_name( bp->token ) );
-        }
-
-        // Note: Numbers are based off of BODYTEMP at the top of weather.h
-        // If torso is BODYTEMP_COLD which is 34C, the early stages of hypothermia begin
-        // constant shivering will prevent the player from falling asleep.
-        // Otherwise, if any other body part is BODYTEMP_VERY_COLD, or 31C
-        // AND you have frostbite, then that also prevents you from sleeping
-        if( in_sleep_state() ) {
-            int curr_temperature = bp_stats.get_temp_cur();
-            if( bp == body_part_torso && curr_temperature <= BODYTEMP_COLD &&
-                !has_enchantment_flag( ench_flag_NO_THERMAL_WAKE ) ) {
-                add_msg( m_warning, _( "Your shivering prevents you from sleeping." ) );
-                wake_up();
-            } else if( bp != body_part_torso && curr_temperature <= BODYTEMP_VERY_COLD &&
-                       has_effect( effect_frostbite ) && !has_enchantment_flag( ench_flag_NO_THERMAL_WAKE ) ) {
-                add_msg( m_warning, _( "You are too cold.  Your frostbite prevents you from sleeping." ) );
-                wake_up();
-            }
-        }
-
-        // Warn the player that wind is going to be a problem.
-        // But only if it can be a problem, no need to spam player with "wind chills your scorching body"
-        if( bp_conv <= BODYTEMP_COLD && windchill < -10 && one_in( 200 ) ) {
-            add_msg( m_bad, _( "The wind is making your %s feel quite cold." ),
-                     body_part_name( bp->token ) );
-        } else if( bp_conv <= BODYTEMP_COLD && windchill < -20 && one_in( 100 ) ) {
-            add_msg( m_bad,
-                     _( "The wind is very strong, you should find some more wind-resistant clothing for your %s." ),
-                     body_part_name( bp->token ) );
-        } else if( bp_conv <= BODYTEMP_COLD && windchill < -30 && one_in( 50 ) ) {
-            add_msg( m_bad, _( "Your clothing is not providing enough protection from the wind for your %s!" ),
-                     body_part_name( bp->token ) );
-        }
-
-        // Set temp_conv just once per bp for readability
         // TODO: Remove temp_conv, it's only really for display, so should not be in Character
         bp_stats.set_temp_conv( bp_conv );
     }
 }
 
-int Character::get_part_temp_cur( const bodypart_id &id ) const
+
+void Character::update_bodytemp( const map &m, const weather_manager &weather )
+{
+    if( has_trait( trait_DEBUG_NOTEMP ) ) {
+        for( auto &pr : get_body() ) {
+            pr.second.set_temp_cur( BODYTEMP_NORM );
+            pr.second.set_temp_conv( BODYTEMP_NORM );
+        }
+        return;
+    }
+    const auto _bub_pos = bub_pos();
+    const w_point &weather_point = get_weather().get_precise();
+    auto body_mods = BodyTemperatureModifiers();
+    body_mods.ambient_temperature = weather.get_temperature( abs_pos() );
+    body_mods.ambient_norm = 19_c;
+    body_mods.sheltered = weather::is_sheltered( m, _bub_pos );
+    body_mods.air_humidity = get_local_humidity( weather_point.humidity, weather.weather_id,
+                             body_mods.sheltered );
+
+    body_mods.best_fire = get_heat_radiation( _bub_pos, true );
+    body_mods.has_pyromania = has_trait( trait_PYROMANIA );
+    body_mods.heat_radiation = get_heat_radiation( _bub_pos, false );
+    body_mods.lying_warmth = can_use_floor_warmth() ? floor_warmth( _bub_pos ) : 0_c_delta;
+
+    body_mods.is_in_sunlight = weather::is_in_sunlight( m, _bub_pos, weather.weather_id );
+    body_mods.sunlight_warmth = body_mods.is_in_sunlight
+                                ? ( weather.weather_id->sun_intensity == sun_intensity_type::high ? 2_c_delta : 1_c_delta )
+                                : 0_c_delta;
+
+    body_mods.mutation_heat_low = bodytemp_modifier_traits( true );
+    body_mods.mutation_heat_high = bodytemp_modifier_traits( false );
+    body_mods.mutation_heat_bonus = body_mods.mutation_heat_high - body_mods.mutation_heat_low;
+
+    const ter_id ter_at_pos = m.ter( bub_pos() );
+    body_mods.submerged = !in_vehicle && ter_at_pos->has_flag( TFLAG_DEEP_WATER );
+    body_mods.submerged_low = !in_vehicle && ( body_mods.submerged ||
+                              ter_at_pos->has_flag( TFLAG_SWIMMABLE ) );
+    const auto water_temperature_raw = units::to_millidegree_celsius(
+                                           weather.get_water_temperature( abs_pos() ) ) / 10;
+    // Rescale so that 0C is BODYTEMP legacy 0 and 30C is BODYTEMP_NORM.
+    body_mods.water_temperature = units::from_legacy_bodypart_temp( water_temperature_raw * 5 / 3 );
+
+    const optional_vpart_position vp = m.veh_at( _bub_pos );
+    if( vp ) {
+        body_mods.vehicle_wind_speed = std::lround( cmps_to_mps( std::abs( vp->vehicle().velocity ) ) *
+                                       2.23694 );
+    }
+    const oter_id &cur_om_ter = get_overmapbuffer( get_dimension() ).ter( abs_omt_pos() );
+    body_mods.total_windpower = get_local_windpower( weather.windspeed + body_mods.vehicle_wind_speed,
+                                cur_om_ter,
+                                abs_pos(),
+                                weather.winddirection, body_mods.sheltered );
+
+    equalize_temperature( *this );
+    set_clothing_map( *this, body_mods.clothing_map, body_mods.clothing_map_bonus );
+    set_bonus_clothing_map( *this, body_mods.clothing_map, body_mods.clothing_map_bonus );
+    body_mods.warmth_per_bp = warmth::from_clothing( body_mods.clothing_map );
+    body_mods.warmth_per_bp_bonus = warmth::bonus_from_clothing( body_mods.clothing_map_bonus );
+    for( const auto &pr : warmth::from_effects( *this ) ) {
+        body_mods.warmth_per_bp_bonus[pr.first] += pr.second;
+    }
+    body_mods.wind_res_per_bp = get_wind_resistance(
+                                    *this,
+                                    body_mods.clothing_map,
+                                    body_mods.clothing_map_bonus
+                                );
+
+    update_bodytemp_bps( *this, body_mods );
+}
+
+auto Character::get_part_temp_cur( const bodypart_id &id ) const -> units::temperature
 {
     return get_part( id ).get_temp_cur();
 }
 
-void Character::set_part_temp_cur( const bodypart_id &id, int temp )
+auto Character::set_part_temp_cur( const bodypart_id &id, units::temperature temp ) -> void
 {
     get_part( id ).set_temp_cur( temp );
 }
 
-std::map<bodypart_id, int> Character::get_temp_cur()
+auto Character::get_temp_cur() -> std::map<bodypart_id, units::temperature>
 {
-    std::map<bodypart_id, int> temps;
+    auto temps = std::map<bodypart_id, units::temperature> {};
 
     for( auto &pr : get_body() ) {
         bodypart &bp = pr.second;
@@ -6623,7 +6922,7 @@ std::map<bodypart_id, int> Character::get_temp_cur()
     return temps;
 }
 
-void Character::set_temp_cur( int temp )
+auto Character::set_temp_cur( units::temperature temp ) -> void
 {
     for( auto &pr : get_body() ) {
         bodypart &bp = pr.second;
@@ -6654,7 +6953,9 @@ float Character::get_dodge_base() const
 {
     /** @EFFECT_DEX increases dodge base */
     /** @EFFECT_DODGE increases dodge_base */
-    return get_dex() / 4.0f + get_skill_level( skill_dodge );
+    return get_dex() / 4.0f + ( has_active_bionic( bionic_id( bio_cqb ) ) ? std::max( get_skill_level(
+                                    skill_dodge ), BIO_CQB_LEVEL ) : get_skill_level(
+                                    skill_dodge ) );
 }
 float Character::get_hit_base() const
 {
@@ -7029,7 +7330,7 @@ nc_color Character::basic_symbol_color() const
     if( move_mode == CMM_RUN ) {
         return c_yellow;
     }
-    if( move_mode == CMM_CROUCH ) {
+    if( move_mode == CMM_CROUCH || move_mode == CMM_PRONE ) {
         return c_light_gray;
     }
     return c_white;
@@ -7116,6 +7417,20 @@ bool Character::is_immune_field( const field_type_id &fid ) const
                get_armor_type( DT_ACID, bodypart_id( "foot_r" ) ) >= 5 &&
                get_armor_type( DT_ACID, bodypart_id( "leg_l" ) ) >= 5 &&
                get_armor_type( DT_ACID, bodypart_id( "leg_r" ) ) >= 5;
+    }
+    // Check for if field has downed effect which means slipping
+    static const auto flag_NOSLIP = flag_id( "NOSLIP" );
+    static const auto ench_flag_NOSLIP = enchantment_flag_id( "NOSLIP" );
+    for( const field_intensity_level &lvl : ft.intensity_levels ) {
+        for( const field_effect &fe : lvl.field_effects ) {
+            if( fe.id == effect_downed ) {
+                if( has_enchantment_flag( ench_flag_NOSLIP )
+                    || worn_with_flag( flag_NOSLIP, body_part_foot_l )
+                    || worn_with_flag( flag_NOSLIP, body_part_foot_r ) ) {
+                    return true;
+                }
+            }
+        }
     }
     // If we haven't found immunity yet fall up to the next level
     return Creature::is_immune_field( fid );
@@ -7381,17 +7696,27 @@ float Character::active_light() const
     return lumination;
 }
 
-bool Character::sees_with_specials( const Creature &critter ) const
+enchantment_vision_id Character::sees_with_specials( const Creature &critter,
+        const bool force_path ) const
 {
-    // Prevent seeing through floors across z-levels
-    if( bub_pos().z() != critter.bub_pos().z() ) {
-        return false;
+    bool sees_position = false;
+    if( force_path ) {
+        if( is_player() || critter.is_player() ) {
+            // Players should not use map::sees
+            // Likewise, players should not be "looked at" with map::sees, not to break symmetry
+            sees_position = get_map().pl_line_of_sight( critter.bub_pos(),
+                            sight_range( current_daylight_level( calendar::turn ) ) );
+        } else {
+            sees_position = get_map().sees( bub_pos(), critter.bub_pos(),
+                                            sight_range( current_daylight_level( calendar::turn ) ) );
+        }
+        if( !sees_position ) { return enchantment_vision_id::NULL_ID(); }
     }
-
     // electroreceptors grants vision of robots and electric monsters through walls
     if( has_enchantment_flag( ench_flag_ELECTROSENSE ) &&
-        ( critter.in_species( ROBOT ) || critter.has_flag( MF_ELECTRIC ) ) ) {
-        return true;
+        ( critter.in_species( ROBOT ) || critter.in_species( ROBOT_FLYING ) ||
+          critter.has_flag( MF_ELECTRIC ) || critter.has_flag( MF_ELECTRONIC ) ) ) {
+        return enchantment_vision_id( "ELECTROSENSE" );
     }
 
     if( critter.digging() && has_enchantment_flag( ench_flag_SONAR ) ) {
@@ -7399,12 +7724,12 @@ bool Character::sees_with_specials( const Creature &critter ) const
         // walls don't block sonar which is transmitted in the ground, not the air.
         // TODO: this might need checks whether the player is in the air, or otherwise not connected
         // to the ground. It also might need a range check.
-        return true;
+        return enchantment_vision_id( "SONAR" );
     }
     // Friendly eyebots can designate targets for the player
     if( critter.has_effect( effect_drone_marker ) && ( has_item_with_flag( flag_DRONE_CAM ) ||
             has_enchantment_flag( ench_flag_VIEW_DRONE_CAM ) ) ) {
-        return true;
+        return enchantment_vision_id( "DRONE_CAM" );
     }
 
     const int dist = rl_dist( bub_pos(), critter.bub_pos() );
@@ -7412,11 +7737,29 @@ bool Character::sees_with_specials( const Creature &critter ) const
     // Distance cannot be 0, so this is always safe
     if( dist <= bonus_from_enchantments( 0, ench_val_GROUNDED_CREATURE_SIGHT ) &&
         !critter.has_flag( MF_FLIES ) ) {
-        return true;
+        return enchantment_vision_id( "GROUNDED_SONAR" );
     }
 
-    // TODO: Add more range based enchantments here ( I.E. Limited Electrosense ranges )
-    return false;
+    // Dont recalc if unneeded
+    if( !force_path ) {
+        if( is_player() || critter.is_player() ) {
+            // Players should not use map::sees
+            // Likewise, players should not be "looked at" with map::sees, not to break symmetry
+            sees_position = get_map().pl_line_of_sight( critter.bub_pos(),
+                            sight_range( current_daylight_level( calendar::turn ) ) );
+        } else {
+            sees_position = get_map().sees( bub_pos(), critter.bub_pos(),
+                                            sight_range( current_daylight_level( calendar::turn ) ) );
+        }
+    }
+    enchantment_vision_id sees_with = enchantment_cache->mon_passes_special_vision(
+                                          critter, dist, critter.bub_pos().z() == bub_pos().z(), sees_position
+                                      );
+    if( sees_with != enchantment_vision_id::NULL_ID() ) {
+        return sees_with;
+    }
+
+    return enchantment_vision_id::NULL_ID();
 }
 
 detached_ptr<item> Character::pour_into( item &container, detached_ptr<item> &&liquid, int limit )
@@ -7494,9 +7837,43 @@ float Character::mutation_armor( bodypart_id bp, const damage_unit &du ) const
 
 float Character::rest_quality() const
 {
-    // Just a placeholder for now.
-    // TODO: Waiting/reading/being unconscious on bed/sofa/grass
-    return has_effect( effect_sleep ) ? 1.0f : 0.0f;
+    float rest_rate = 0.0f;
+    const float activity_rest = activity->get_rest_amount();
+
+    if( activity_rest > 0.0f ) { rest_rate += activity_rest; }
+
+    if( has_effect( effect_sleep ) ) {
+        rest_rate += 0.85f;
+    }
+
+    // Only add rest quality from and give feedback for comfort if the player is actually resting
+    if( rest_rate > 0.0f ) {
+
+        const character_funcs::comfort_level comfort = base_comfort_value( *this, bub_pos() ).level;
+
+        if( comfort >= character_funcs::comfort_level::very_comfortable ) {
+            rest_rate += 0.15f;
+        } else if( comfort >= character_funcs::comfort_level::comfortable ) {
+            rest_rate += 0.1f;
+        } else if( comfort >= character_funcs::comfort_level::slightly_comfortable ) {
+            rest_rate += 0.05f;
+        }
+
+        // rest_quality() theoretically gets called every 5 minutes, so these messages should display once every 90 minutes on average
+        if( !activity->get_suppress_comfort() && !has_effect( effect_sleep ) && one_in( 18 ) ) {
+            if( comfort >= character_funcs::comfort_level::very_comfortable ) {
+                add_msg_if_player( _( "Resting here is very comfortable." ) );
+            } else if( comfort >= character_funcs::comfort_level::comfortable ) {
+                add_msg_if_player( _( "Resting here is comfortable." ) );
+            } else if( comfort >= character_funcs::comfort_level::slightly_comfortable ) {
+                add_msg_if_player( _( "Resting here is slightly comfortable." ) );
+            } else {
+                add_msg_if_player( _( "Resting here isn't comfortable." ) );
+            }
+        }
+    }
+
+    return clamp( rest_rate, 0.0f, 1.0f );
 }
 
 bodypart_str_id Character::bp_to_hp( const bodypart_str_id &bp )
@@ -8170,9 +8547,11 @@ void Character::set_stamina( int new_stamina )
 
 void Character::mod_stamina( int mod, bool skill )
 {
+    int lost_stamina = ( stamina + mod >= 0 ) ? mod : -stamina;
     // If we're burning stamina then train athletics, unless we're losing stamina due to status effects or other non-standard causes.
-    if( skill && mod < 0 ) {
-        as_player()->practice( skill_swimming, roll_remainder( std::abs( mod ) / 500.0 ), 10, true );
+    if( skill && lost_stamina < 0 ) {
+        as_player()->practice( skill_swimming, roll_remainder( std::abs( lost_stamina ) / 500.0 ), 10,
+                               true );
         // Athletics skill also reduces stamina drain for relevant activities.
         const int skill = get_skill_level( skill_swimming );
         const float skill_cost = std::max( 0.667f, ( ( 30.0f - skill ) / 30.0f ) );
@@ -8693,6 +9072,9 @@ void Character::wake_up()
         remove_effect( effect_sleep );
         // Wake up might be called more than once per turn, but we only need to recalc after removing sleep
         recalc_sight_limits();
+        cata::run_hooks( "on_character_wake_up", [ &, this]( auto & params ) {
+            params["char"] = this;
+        } );
     }
 }
 
@@ -9065,6 +9447,9 @@ void Character::recalculate_enchantment_cache()
 
     // Enchantments can also give encumbrance
     reset_encumbrance();
+
+    // Enchantments can also give tools so...
+    invalidate_crafting_inventory();
 }
 
 void Character::rebuild_mutation_cache()
@@ -9166,7 +9551,19 @@ void Character::absorb_hit( const bodypart_id &bp, damage_instance &dam )
     std::vector<detached_ptr<item>> worn_remains;
     bool armor_destroyed = false;
 
+    bool forcefield_message = false;
     for( damage_unit &elem : dam.damage_units ) {
+        float prot = bonus_from_enchantments( 0.0,
+                                              enchantment_value_id( "FORCEFIELD_" + elem.get_internal_name() ) ) * 100;
+        if( prot != 0 && prot > rng_float( 0.0, 100.0 ) ) {
+            elem.amount = 0;
+            if( !forcefield_message ) {
+                forcefield_message = true;
+                add_msg_if_player( _( "The incoming attack was deflected" ) );
+            }
+            continue;
+        }
+
         if( elem.amount < 0 ) {
             // Prevents 0 damage hits (like from hallucinations) from ripping armor
             elem.amount = 0;
@@ -9462,7 +9859,10 @@ void Character::on_dodge( Creature *source, int difficulty )
 
     // Even if we are not to train still call practice to prevent skill rust
     difficulty = std::max( difficulty, 0 );
-    as_player()->practice( skill_dodge, difficulty * 2, difficulty );
+    // Practice dodge skill except when using CQB bionic
+    if( !has_active_bionic( bio_cqb ) ) {
+        as_player()->practice( skill_dodge, difficulty * 2, difficulty );
+    }
 
     martial_arts_data->ma_ondodge_effects( *this );
 
@@ -10741,35 +11141,35 @@ bool Character::can_use_floor_warmth() const
     return in_sleep_state() || has_activity( allowed_activities );
 }
 
-int Character::floor_bedding_warmth( const tripoint_bub_ms &pos )
+auto Character::floor_bedding_warmth( const tripoint_bub_ms &pos ) -> units::temperature_delta
 {
     map &here = get_map();
     const trap &trap_at_pos = here.tr_at( pos );
     const ter_id ter_at_pos = here.ter( pos );
     const furn_id furn_at_pos = here.furn( pos );
-    int floor_bedding_warmth = 0;
+    auto floor_bedding_warmth = 0_c_delta;
 
     const optional_vpart_position vp = here.veh_at( pos );
     const std::optional<vpart_reference> boardable = vp.part_with_feature( "BOARDABLE", true );
     // Search the floor for bedding
     if( furn_at_pos != f_null ) {
-        floor_bedding_warmth += furn_at_pos.obj().floor_bedding_warmth;
+        floor_bedding_warmth = floor_bedding_warmth + furn_at_pos.obj().floor_bedding_warmth;
     } else if( !trap_at_pos.is_null() ) {
-        floor_bedding_warmth += trap_at_pos.floor_bedding_warmth;
+        floor_bedding_warmth = floor_bedding_warmth + trap_at_pos.floor_bedding_warmth;
     } else if( boardable ) {
-        floor_bedding_warmth += boardable->info().floor_bedding_warmth;
+        floor_bedding_warmth = floor_bedding_warmth + boardable->info().floor_bedding_warmth;
     } else if( ter_at_pos == t_improvised_shelter ) {
-        floor_bedding_warmth -= 500;
+        floor_bedding_warmth = floor_bedding_warmth - 1_c_delta;
     } else {
-        floor_bedding_warmth -= 2000;
+        floor_bedding_warmth = floor_bedding_warmth - 4_c_delta;
     }
 
     return floor_bedding_warmth;
 }
 
-int Character::floor_item_warmth( const tripoint_bub_ms &pos )
+auto Character::floor_item_warmth( const tripoint_bub_ms &pos ) -> units::temperature_delta
 {
-    int item_warmth = 0;
+    auto item_warmth = 0_c_delta;
 
     const auto warm = [&item_warmth]( const auto & stack ) {
         for( const item * const &elem : stack ) {
@@ -10781,7 +11181,8 @@ int Character::floor_item_warmth( const tripoint_bub_ms &pos )
             if( elem->volume() > 250_ml &&
                 ( elem->covers( bodypart_id( "torso" ) ) || elem->covers( bodypart_id( "leg_l" ) ) ||
                   elem->covers( bodypart_id( "leg_r" ) ) ) ) {
-                item_warmth += 60 * elem->get_warmth() * elem->volume() / 2500_ml;
+                item_warmth += units::from_legacy_bodypart_temp_delta(
+                                   60 * elem->get_warmth() * elem->volume() / 2500_ml );
             }
         }
     };
@@ -10802,57 +11203,75 @@ int Character::floor_item_warmth( const tripoint_bub_ms &pos )
     return item_warmth;
 }
 
-int Character::floor_warmth( const tripoint_bub_ms &pos ) const
+auto Character::floor_warmth( const tripoint_bub_ms &pos ) const -> units::temperature_delta
 {
-    const int item_warmth = floor_item_warmth( pos );
-    int bedding_warmth = floor_bedding_warmth( pos );
+    const auto item_warmth = floor_item_warmth( pos );
+    auto bedding_warmth = floor_bedding_warmth( pos );
 
     // If the PC has fur, etc, that will apply too
-    int floor_mut_warmth = bodytemp_modifier_traits_floor();
+    const auto floor_mut_warmth = bodytemp_modifier_traits_floor();
     // DOWN does not provide floor insulation, though.
     // Better-than-light fur or being in one's shell does.
-    if( ( !( has_trait( trait_DOWN ) ) ) && ( floor_mut_warmth >= 200 ) ) {
-        bedding_warmth = std::max( 0, bedding_warmth );
+    if( ( !( has_trait( trait_DOWN ) ) ) && ( floor_mut_warmth >= 0.4_c_delta ) ) {
+        bedding_warmth = std::max( 0_c_delta, bedding_warmth );
     }
     return ( item_warmth + bedding_warmth + floor_mut_warmth );
 }
 
-int Character::bodytemp_modifier_traits( bool overheated ) const
+auto Character::bodytemp_modifier_traits( bool overheated ) const -> units::temperature_delta
 {
-    int mod = 0;
+    auto mod = 0_c_delta;
     for( const trait_id &iter : get_mutations() ) {
-        mod += overheated ? iter->bodytemp_min : iter->bodytemp_max;
+        mod = mod + ( overheated ? iter->bodytemp_min : iter->bodytemp_max );
     }
-    mod += overheated ? bonus_from_enchantments( mod, enchantment_value_id( "BODYTEMP_MIN" ) ) :
-           bonus_from_enchantments( mod, enchantment_value_id( "BODYTEMP_MAX" ) );
+    const auto enchantment_bonus = [this]( const units::temperature_delta base,
+    const enchantment_value_id & value ) -> units::temperature_delta {
+        return units::from_legacy_bodypart_temp_delta(
+            bonus_from_enchantments( units::to_legacy_bodypart_temp_delta( base ), value ) );
+    };
+    mod += overheated ? enchantment_bonus( mod, enchantment_value_id( "BODYTEMP_MIN" ) ) :
+           enchantment_bonus( mod, enchantment_value_id( "BODYTEMP_MAX" ) );
     return mod;
 }
 
-int Character::bodytemp_modifier_traits_floor() const
+auto Character::bodytemp_modifier_traits_floor() const -> units::temperature_delta
 {
-    int mod = 0;
+    auto mod = 0_c_delta;
     for( const trait_id &iter : get_mutations() ) {
-        mod += iter->bodytemp_sleep;
+        mod = mod + iter->bodytemp_sleep;
     }
-    mod += bonus_from_enchantments( mod, enchantment_value_id( "BODYTEMP_SLEEP" ) );
+    const auto enchantment_bonus = [this]( const units::temperature_delta base,
+    const enchantment_value_id & value ) -> units::temperature_delta {
+        return units::from_legacy_bodypart_temp_delta(
+            bonus_from_enchantments( units::to_legacy_bodypart_temp_delta( base ), value ) );
+    };
+    mod += enchantment_bonus( mod, enchantment_value_id( "BODYTEMP_SLEEP" ) );
     return mod;
 }
 
-int Character::temp_corrected_by_climate_control( int temperature )
+auto Character::temp_corrected_by_climate_control( units::temperature temperature,
+        bodypart_id id ) ->
+units::temperature
 {
+    // Climate Control eases the effects of high and low ambient temps
+    const auto enchantment_bonus = [this]( const units::temperature base,
+    const enchantment_value_id & value ) -> units::temperature_delta {
+        return units::from_legacy_bodypart_temp_delta(
+            bonus_from_enchantments( units::to_legacy_bodypart_temp( base ), value ) );
+    };
     if( temperature > BODYTEMP_NORM ) {
-        temperature -= bonus_from_enchantments( temperature,
-                                                enchantment_value_id( "CLIMATE_CONTROL_COOLING" ) );
+        temperature = temperature - enchantment_bonus( temperature,
+                      enchantment_value_id( "CLIMATE_CONTROL_COOLING_" + to_upper_case( id.id().str() ) ) );
         if( in_climate_control() ) {
-            temperature -= 1250;
+            temperature = temperature - units::from_legacy_bodypart_temp_delta( 1250 );
         }
         return std::max( BODYTEMP_NORM, temperature );
     } else {
         if( in_climate_control() ) {
-            temperature += 1250;
+            temperature = temperature + units::from_legacy_bodypart_temp_delta( 1250 );
         }
-        temperature += bonus_from_enchantments( temperature,
-                                                enchantment_value_id( "CLIMATE_CONTROL_HEATING" ) );
+        temperature = temperature + enchantment_bonus( temperature,
+                      enchantment_value_id( "CLIMATE_CONTROL_HEATING_" + to_upper_case( id.id().str() ) ) );
         return std::min( BODYTEMP_NORM, temperature );
     }
     return temperature;
@@ -11224,6 +11643,7 @@ void Character::use_fire( const int quantity )
 
 void Character::on_item_wear( item &it )
 {
+    worn_weight_cache_dirty = true;
     recalculate_enchantment_cache();
     for( const trait_id &mut : it.mutations_from_wearing( *this ) ) {
         mutation_effect( mut );
@@ -11236,13 +11656,20 @@ void Character::on_item_wear( item &it )
         }
     }
     morale->on_item_wear( it );
-    if( it.type->iwearable_callbacks ) {
-        it.type->iwearable_callbacks->call_on_wear( *this, it );
+    if( !is_pool_worker_thread() ) {
+        if( it.type->iwearable_callbacks ) {
+            it.type->iwearable_callbacks->call_on_wear( *this, it );
+        }
+        cata::run_hooks( "on_character_item_wear", [&]( auto & params ) {
+            params["who"] = this;
+            params["item"] = &it;
+        } );
     }
 }
 
 void Character::on_item_takeoff( item &it )
 {
+    worn_weight_cache_dirty = true;
     recalculate_enchantment_cache();
     for( const trait_id &mut : it.mutations_from_wearing( *this ) ) {
         mutation_loss_effect( mut );
@@ -11253,8 +11680,14 @@ void Character::on_item_takeoff( item &it )
         }
     }
     morale->on_item_takeoff( it );
-    if( it.type->iwearable_callbacks ) {
-        it.type->iwearable_callbacks->call_on_takeoff( *this, it );
+    if( !is_pool_worker_thread() ) {
+        if( it.type->iwearable_callbacks ) {
+            it.type->iwearable_callbacks->call_on_takeoff( *this, it );
+        }
+        cata::run_hooks( "on_character_item_takeoff", [&]( auto & params ) {
+            params["who"] = this;
+            params["item"] = &it;
+        } );
     }
 }
 
@@ -11469,7 +11902,7 @@ int Character::run_cost( int base_cost, bool diag ) const
             movecost *= mutation_value( "movecost_flatground_modifier" );
             movecost += bonus_from_enchantments( movecost, enchantment_value_id( "FLAT_MOVE_COST" ) );
         }
-        if( has_trait( trait_PADDED_FEET ) && !footwear_factor() ) {
+        if( has_trait( trait_PADDED_FEET ) && !is_wearing_shoes() ) {
             movecost *= .9f;
         }
         if( has_active_bionic( bio_jointservo ) ) {
@@ -11887,7 +12320,7 @@ Attitude Character::attitude_to( const Creature &other ) const
     return Attitude::A_NEUTRAL;
 }
 
-bool Character::sees( const tripoint_bub_ms &t, bool, int ) const
+bool Character::sees( const tripoint_bub_ms &t, bool, int, double ) const
 {
     if( t == bub_pos() ) {
         return true;
@@ -11912,6 +12345,7 @@ bool Character::sees( const Creature &critter ) const
 {
     // This handles only the player/npc specific stuff (monsters don't have traits or bionics).
     const int dist = rl_dist( bub_pos(), critter.bub_pos() );
+    if( dist < clairvoyance() ) { return true; }
     if( bub_pos().z() == critter.bub_pos().z() &&
         dist <= bonus_from_enchantments( 0, ench_val_GROUNDED_CREATURE_SIGHT ) &&
         !critter.has_flag( MF_FLIES ) ) {
@@ -12093,8 +12527,8 @@ float Character::stability_roll() const
 
     /** @EFFECT_DEX slightly improves player stability roll */
 
-    /** @EFFECT_DODGE improves player stability roll */
-    return get_dodge() + get_str() + ( get_per() / 3.0f ) + ( get_dex() / 4.0f );
+    /** @EFFECT_MELEE improves player stability roll */
+    return get_melee() + get_str() + ( get_per() / 3.0f ) + ( get_dex() / 4.0f );
 }
 
 bool Character::uncanny_dodge()

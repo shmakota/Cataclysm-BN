@@ -1,20 +1,10 @@
 #pragma once
 
-#include <climits>
-#include <cstdint>
-#include <functional>
-#include <map>
-#include <optional>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "calendar.h"
 #include "catalua_icallback_actor.h"
 #include "coordinates.h"
 #include "damage.h"
+#include "data_vars.h"
 #include "detached_ptr.h"
 #include "dimension_info.h"
 #include "enums.h"
@@ -25,14 +15,24 @@
 #include "item_contents.h"
 #include "kill_tracker.h"
 #include "location_vector.h"
-#include "overmapbuffer.h"
+#include "overmap/overmapbuffer.h"
 #include "pimpl.h"
 #include "string_id.h"
 #include "type_id.h"
 #include "units.h"
 #include "value_ptr.h"
 #include "visitable.h"
-#include "data_vars.h"
+
+#include <climits>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 class Character;
 class JsonIn;
@@ -212,37 +212,6 @@ inline iteminfo::flags &operator|=( iteminfo::flags &l, iteminfo::flags r )
     return l = l | r;
 }
 
-class item_reload_option
-{
-    public:
-        item_reload_option() = default;
-
-        item_reload_option( const item_reload_option & );
-        item_reload_option &operator=( const item_reload_option & );
-
-        item_reload_option( const player *who, item *target, const item *parent,
-                            item &ammo );
-
-        const player *who = nullptr;
-        item *target = nullptr;
-        item *ammo;
-
-        int qty() const {
-            return qty_;
-        }
-        void qty( int val );
-
-        int moves() const;
-
-        explicit operator bool() const {
-            return who && target && ammo && qty_ > 0;
-        }
-
-    private:
-        int qty_ = 0;
-        int max_qty = INT_MAX;
-        const item *parent = nullptr;
-};
 
 inline bool is_crafting_component( const item &component );
 
@@ -1304,12 +1273,12 @@ class item : public location_visitable<item>, public game_object<item>
         /*@{*/
         static detached_ptr<item> process( detached_ptr<item> &&self, player *carrier,
                                            const tripoint_bub_ms &pos,
-                                           bool activate,
+                                           bool activate, const int ticks,
                                            temperature_flag flag = temperature_flag::TEMP_NORMAL );
         static detached_ptr<item> process( detached_ptr<item> &&self, player *carrier,
                                            const tripoint_bub_ms &pos,
                                            bool activate,
-                                           temperature_flag flag, const weather_manager &weather_generator );
+                                           temperature_flag flag, const weather_manager &weather_generator, const int ticks );
         /*@}*/
         /**
          * Helper to bring a cable back to its initial state.
@@ -1329,9 +1298,8 @@ class item : public location_visitable<item>, public game_object<item>
          * Process and apply artifact effects. This should be called exactly once each turn, it may
          * modify character stats (like speed, strength, ...), so call it after those have been reset.
          * @param carrier The character carrying the artifact, can be null.
-         * @param pos The location of the artifact (should be the player location if carried).
          */
-        void process_artifact( player *carrier, const tripoint_bub_ms &pos );
+        void process_artifact( player *carrier );
         void process_relic( Character *carrier );
 
         bool destroyed_at_zero_charges() const;
@@ -1554,11 +1522,10 @@ class item : public location_visitable<item>, public game_object<item>
         void on_damage( int qty, damage_type dt );
 
         /**
-         * Callback after an item is placed on the map, for any reason
-         * @param m The Map
-         * @param p Where in the map
+         * Callback after an item is placed, for any reason, including lazy load
+         * @param p Where was it placed
          */
-        void on_map_placement( const map &m, const tripoint_bub_ms &p );
+        void on_map_placement( const tripoint_abs_ms &abs_pos );
 
         std::vector<trait_id> mutations_from_wearing( const Character &guy ) const;
 
@@ -2422,6 +2389,7 @@ class item : public location_visitable<item>, public game_object<item>
         std::optional<dimension_info> pocket_dim;
 
         bool add_enchantment( const enchantment_id &ench );
+        bool add_enchantment( const enchantment &ench );
 
         const std::vector<enchantment> &get_enchantments( bool dynamic ) const;
 
@@ -2469,7 +2437,7 @@ class item : public location_visitable<item>, public game_object<item>
         const use_function *get_use_internal( const std::string &use_name ) const;
         static detached_ptr<item> process_internal( detached_ptr<item> &&self, player *carrier,
                 const tripoint_bub_ms &pos, bool activate,
-                bool seals, temperature_flag flag, const weather_manager &weather_generator );
+                bool seals, temperature_flag flag, const weather_manager &weather_generator, const int ticks );
         static auto actualize_rot( detached_ptr<item> &&self, const tripoint_bub_ms &pnt,
                                    temperature_flag temperature,
                                    const weather_manager &weather, bool seals ) -> detached_ptr<item>;
@@ -2524,7 +2492,7 @@ class item : public location_visitable<item>, public game_object<item>
         static detached_ptr<item> process_litcig( detached_ptr<item> &&self, player *carrier,
                 const tripoint_bub_ms &pos );
         static detached_ptr<item> process_extinguish( detached_ptr<item> &&self, player *carrier,
-                const tripoint_bub_ms &pos );
+                const tripoint_bub_ms &posi, const int ticks );
         // Place conditions that should remove fake smoke item in this sub-function
         static detached_ptr<item> process_fake_smoke( detached_ptr<item> &&self, player *carrier,
                 const tripoint_bub_ms &pos );
@@ -2536,9 +2504,10 @@ class item : public location_visitable<item>, public game_object<item>
                 const tripoint_bub_ms &pos );
         static detached_ptr<item> process_UPS( detached_ptr<item> &&self, player *carrier,
                                                const tripoint_bub_ms &pos );
-        static detached_ptr<item> process_blackpowder_fouling( detached_ptr<item> &&self, player *carrier );
+        static detached_ptr<item> process_blackpowder_fouling( detached_ptr<item> &&self, player *carrier,
+                const int ticks );
         static detached_ptr<item> process_tool( detached_ptr<item> &&self, player *carrier,
-                                                const tripoint_bub_ms &pos );
+                                                const tripoint_bub_ms &pos, const int ticks );
 
         //Process wet is built different because sigh
         bool process_wet( player *carrier, const tripoint_bub_ms &pos );

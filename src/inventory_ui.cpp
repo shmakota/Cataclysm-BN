@@ -8,16 +8,17 @@
 #include "detached_ptr.h"
 #include "flag.h"
 #include "game.h"
+#include "game_inventory.h"
 #include "ime.h"
 #include "inventory.h"
-#include "itype.h"
 #include "item.h"
 #include "item_category.h"
 #include "item_search.h"
 #include "item_stack.h"
+#include "itype.h"
 #include "line.h"
-#include "map.h"
-#include "map_selector.h"
+#include "map/map.h"
+#include "map/map_selector.h"
 #include "options.h"
 #include "output.h"
 #include "player.h"
@@ -29,12 +30,11 @@
 #include "type_id.h"
 #include "ui_manager.h"
 #include "units_utility.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vehicle_selector.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vehicle_selector.h"
+#include "vehicle/vpart_position.h"
 #include "visitable.h"
-#include "vpart_position.h"
-#include "game_inventory.h"
 
 #if defined(__ANDROID__)
 #include <SDL3/SDL.h>
@@ -1033,6 +1033,9 @@ void inventory_column::draw( const catacurses::window &win, point pos ) const
             int xx = pos.x;
             if( entry.get_invlet() != '\0' ) {
                 mvwputch( win, point( pos.x, yy ), entry.get_invlet_color(), entry.get_invlet() );
+            } else if( entry.invlet_hint ) {
+                mvwputch( win, point( pos.x, yy ), entry.invlet_hint->color,
+                          entry.invlet_hint->invlet );
             }
             xx += 2;
             if( get_option<bool>( "ITEM_SYMBOLS" ) ) {
@@ -1365,15 +1368,20 @@ void inventory_selector::add_nearby_items( int radius )
     }
 }
 
-void inventory_selector::add_bionics_items( Character &character )
+void inventory_selector::add_fake_items( Character &character )
 {
     for( bionic bio : character.get_bionic_collection() ) {
         const itype_id fake = bio.info().fake_item;
         if( bio.info().has_flag( flag_BIONIC_TOOLS ) && !fake.is_null() && fake.str() != "" ) {
             item *fakeitem = g->add_fake_item( item::spawn( fake ) );
             add_entry( own_gear_column, std::vector<item *>( 1, fakeitem ),
-                       &item_category_id( "BIONICS" ).obj() );
+                       &item_category_id( "MISC_USABLES" ).obj() );
         }
+    }
+    for( const itype_id &fake : character.get_enchantment_fake_items() ) {
+        item *fakeitem = g->add_fake_item( item::spawn( fake ) );
+        add_entry( own_gear_column, std::vector<item *>( 1, fakeitem ),
+                   &item_category_id( "MISC_USABLES" ).obj() );
     }
 }
 
@@ -1527,6 +1535,7 @@ void inventory_selector::prepare_layout( size_t client_width, size_t client_heig
         elem->prepare_paging();
         custom_invlet = elem->reassign_custom_invlets( u, custom_invlet, '9' );
     }
+    assign_invlet_hints();
 
     refresh_active_column();
 }
@@ -2004,9 +2013,11 @@ void inventory_selector::on_input( const inventory_input &input )
     } else if( input.action == "WIELD" ) {
         auto &entry = const_cast<inventory_entry &>( get_selected() );
         wield( entry );
+        assign_invlet_hints();
     } else if( input.action == "WEAR" ) {
         auto &entry = const_cast<inventory_entry &>( get_selected() );
         wear( entry );
+        assign_invlet_hints();
     } else {
         if( has_available_choices() ) {
             for( inventory_column *elem : columns ) {
@@ -2176,6 +2187,15 @@ item *inventory_pick_selector::execute()
         } else if( handle_action( input.action ) ) {
             return nullptr;
         } else {
+            auto *const picked = input.action == "ANY_INPUT"
+                                 ? pick_by_unbound_key( input.ch )
+                                 : nullptr;
+            if( picked != nullptr ) {
+                if( select( picked ) ) {
+                    ui_manager::redraw();
+                }
+                return picked;
+            }
             on_input( input );
         }
 

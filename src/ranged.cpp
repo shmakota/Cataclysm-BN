@@ -1,25 +1,11 @@
 #include "ranged.h"
 
-#include <algorithm>
-#include <numeric>
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <iterator>
-#include <map>
-#include <memory>
-#include <optional>
-#include <set>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include "activity_actor_definitions.h"
 #include "animation.h"
 #include "avatar.h"
 #include "ballistics.h"
 #include "bodypart.h"
+#include "cached_options.h"
 #include "calendar.h"
 #include "cata_utility.h"
 #include "catacharset.h"
@@ -27,7 +13,6 @@
 #include "catalua_hooks.h"
 #include "catalua_icallback_actor.h"
 #include "catalua_sol.h"
-#include "cached_options.h"
 #include "character.h"
 #include "character_functions.h"
 #include "color.h"
@@ -38,6 +23,7 @@
 #include "debug.h"
 #include "dispersion.h"
 #include "enchantments/enchantment.h"
+#include "enchantments/enchantment_vision.h"
 #include "enums.h"
 #include "event.h"
 #include "event_bus.h"
@@ -51,7 +37,7 @@
 #include "itype.h"
 #include "line.h"
 #include "magic/magic.h"
-#include "map.h"
+#include "map/map.h"
 #include "material.h"
 #include "math_defines.h"
 #include "messages.h"
@@ -64,12 +50,14 @@
 #include "panels.h"
 #include "player.h"
 #include "player_activity.h"
+#include "reload/reload.h"
+#include "reload/reload_ui.h"
 #include "point.h"
 #include "projectile.h"
 #include "rng.h"
+#include "shape_impl.h"
 #include "skill.h"
 #include "sounds.h"
-#include "shape_impl.h"
 #include "string_formatter.h"
 #include "string_id.h"
 #include "translations.h"
@@ -80,10 +68,25 @@
 #include "units_angle.h"
 #include "units_utility.h"
 #include "value_ptr.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vpart_position.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <numeric>
+#include <optional>
+#include <set>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 struct ammo_effect;
 
@@ -159,6 +162,8 @@ static const bionic_id bio_ups( "bio_ups" );
 static const trait_id trait_LASER_GUIDED( "LASER_GUIDED" );
 static const trait_id trait_PYROMANIA( "PYROMANIA" );
 static const trait_id trait_NORANGEDCRIT( "NO_RANGED_CRIT" );
+
+static const enchantment_value_id ench_val_REACH_RANGE_UNARMED( "REACH_RANGE_UNARMED" );
 
 // not to confuse with item flags (json_flag)
 static const std::string flag_SHOOT_ME( "SHOOT_ME" );
@@ -724,6 +729,18 @@ target_handler::trajectory target_handler::mode_reach( avatar &you, item &weapon
     return ui.run();
 }
 
+target_handler::trajectory target_handler::mode_unarmed_reach( avatar &you )
+{
+    target_ui ui = target_ui();
+    ui.you = &you;
+    ui.mode = target_ui::TargetMode::Reach;
+    ui.relevant = item::spawn_temporary( itype_id( "fake_hands" ) );
+    ui.range = 1 + you.bonus_from_enchantments( 1, ench_val_REACH_RANGE_UNARMED );
+
+    restore_on_out_of_scope<tripoint_rel_ms> view_offset_prev( you.view_offset );
+    return ui.run();
+}
+
 target_handler::trajectory target_handler::mode_turret_manual( avatar &you, turret_data &turret )
 {
     target_ui ui = target_ui();
@@ -1242,7 +1259,7 @@ static int calc_gun_volume( const item &gun )
     int speed = parent.gun_speed( am_dat );
     bool suppressed = false;
     if( am_dat ) {
-        noise = parent.ammo_data()->ammo->loudness;
+        noise = gun.ammo_data()->ammo->loudness;
         // Speed of sound at sea level is around 343 meters per second.
         // While it would be ideal to be based on speed of sound
         // EVERYTHING flies faster then the speed of sound so using that to force loud sounds makes little sense in the current state of affairs
@@ -2224,7 +2241,8 @@ static int print_ranged_chance( const catacurses::window &w, int line_number,
 static bool pl_sees( const Creature &cr )
 {
     Character &u = get_player_character();
-    return u.sees( cr ) || u.sees_with_infrared( cr ) || u.sees_with_specials( cr );
+    return u.sees( cr ) || u.sees_with_infrared( cr ) ||
+           u.sees_with_specials( cr ) != enchantment_vision_id::NULL_ID();
 }
 
 // Handle capping aim level when the player cannot see the target tile or there is nothing to aim at.
@@ -2702,6 +2720,12 @@ dispersion_sources ranged::get_weapon_dispersion( const Character &who, const it
     if( who.has_trait( trait_LASER_GUIDED ) ) {
         dispersion.add_multiplier( 0.25 );
     }
+
+    // Having no skill at all makes dispersion much worse
+    if( ranged::is_amateur( who, obj ) ) {
+        dispersion.add_multiplier( 2 );
+    }
+
     // If using a bow you lack the strength for, increase based on how much weaker shooter is.
     dispersion.add_multiplier( 1 / ranged::str_draw_dispersion_modifier( obj, who ) );
 
@@ -2888,7 +2912,8 @@ std::vector<Creature *> targetable_creatures( const Character &c, const int rang
             return false;
         }
 
-        if( !c.sees( critter ) && !c.sees_with_infrared( critter ) )
+        if( !c.sees( critter ) && !c.sees_with_infrared( critter ) &&
+            c.sees_with_specials( critter, true ).is_null() )
         {
             return false;
         }
@@ -2971,7 +2996,7 @@ target_handler::trajectory target_ui::run()
     map &here = get_map();
     // Target lists and saved-target reacquisition use Character::sees before
     // the targeting UI gets its first redraw.
-    g->refresh_player_visibility_cache_if_needed();
+    g->refresh_player_visibility_cache_if_needed( true );
     // Load settings
     snap_to_target = get_option<bool>( "SNAP_TO_TARGET" );
     if( mode == TargetMode::Turrets ) {
@@ -4417,10 +4442,18 @@ void target_ui::panel_target_info( int &text_y, bool fill_with_blank_if_no_targe
             text_y += max_lines;
         } else {
             std::vector<std::string> buf;
-            if( you->sees_with_infrared( *dst_critter ) ) {
+            enchantment_vision_id special = you->sees_with_specials( *dst_critter );
+            if( special != enchantment_vision_id::NULL_ID() ) {
+                if( special->use_normal_mon_tile() ) {
+                    int fix_for_print_info = max_lines - 2;
+                    dst_critter->print_info( w_target, text_y, fix_for_print_info, 1 );
+                    text_y += max_lines;
+                } else {
+                    buf.emplace_back( special->get_mon_desc( *dst_critter ) );
+                }
+
+            } else if( you->sees_with_infrared( *dst_critter ) ) {
                 dst_critter->describe_infrared( buf );
-            } else if( you->sees_with_specials( *dst_critter ) ) {
-                dst_critter->describe_specials( buf );
             }
             for( size_t i = 0; i < static_cast<size_t>( max_lines ); i++, text_y++ ) {
                 if( i >= buf.size() ) {
@@ -4625,7 +4658,13 @@ auto ranged::gunmode_checks_weapon( avatar &you, const map &m, std::vector<std::
 
 void ranged::prompt_select_default_ammo_for( avatar &u, item &w )
 {
-    item_reload_option opt = character_funcs::select_ammo( u, w, false, true, true );
+    auto opt = reload_ui::select_ammo( u, w, {
+        .prompt = false,
+        .discovery = {
+            .include_empty_mags = true,
+            .include_potential = true
+        }
+    } );
     if( opt ) {
         if( u.ammo_location && opt.ammo == &*u.ammo_location ) {
             u.add_msg_if_player( _( "Cleared ammo preferences for %s." ), w.tname() );
@@ -4770,8 +4809,15 @@ double ranged::aim_per_move( const Character &who, const item &gun, double recoi
     // Just a raw scaling factor.
     aim_speed *= 6.5;
 
-    // Scale rate logistically as recoil goes from MAX_RECOIL to 0.
-    aim_speed *= 1.0 - logarithmic_range( 0, MAX_RECOIL, recoil );
+    // If the player can point shoot give them an extremely high multiplier while recoil is above half of max.
+    if( get_point_shoot_modifier( who, gun ) > 0 && recoil > ( MAX_RECOIL / 2 ) ) {
+        aim_speed *= get_point_shoot_modifier( who, gun );
+        // Make sure the aim speed can't exceed 75% of max recoil.
+        aim_speed = std::min( aim_speed, MAX_RECOIL * 0.75 );
+    } else {
+        // Scale rate logistically as recoil goes from MAX_RECOIL to 0.
+        aim_speed *= 1.0 - logarithmic_range( 0, MAX_RECOIL, recoil );
+    }
 
     // Minimum improvement is 5MoA.  This mostly puts a cap on how long aiming for sniping takes.
     aim_speed = std::max( aim_speed, 5.0 );
@@ -4783,8 +4829,50 @@ double ranged::aim_per_move( const Character &who, const item &gun, double recoi
     // To prevent a bug where aiming does not proceed at all because the aiming speed drops below the game's minimum limit (5.0) due to debuffs (such as Cursed Artifacts),
     // so applying the max value once more.
     aim_speed = std::max( 5.0, aim_speed + ench_aim_bonus );
+    // Bypass the sight limit if the player can point shoot.
+    if( get_point_shoot_modifier( who, gun ) > 0 ) {
+        return aim_speed;
+    }
     // Never improve by more than the currently used sights permit.
     return std::min( aim_speed, recoil - limit );
+}
+
+bool ranged::is_amateur( const Character &who, const item &gun )
+{
+    if( !gun.is_gun() ) {
+        return false;
+    }
+
+    skill_id gun_skill = gun.gun_skill();
+    bool amateur = true;
+    // If you have 1 or above for the specific gun skill you don't get the penalty
+    if( who.get_skill_level( gun_skill ) >= 1 ) {
+        amateur = false;
+    }
+    // If you have 4 or above for marksmanship skill in general you don't get the penalty
+    if( who.get_skill_level( skill_gun ) >= 4 ) {
+        amateur = false;
+    }
+    return amateur;
+}
+
+double ranged::get_point_shoot_modifier( const Character &who, const item &gun )
+{
+    if( !gun.is_gun() ) {
+        return 0;
+    }
+
+    skill_id gun_skill = gun.gun_skill();
+    double point_shoot_modifier = 0;
+    // If you have 6 or above for the specific gun skill
+    if( who.get_skill_level( gun_skill ) >= 6 ) {
+        point_shoot_modifier += ( who.get_skill_level( gun_skill ) - 4 );
+    }
+    // If you have 8 or above for marksmanship skill in general
+    if( who.get_skill_level( skill_gun ) >= 8 ) {
+        point_shoot_modifier += ( who.get_skill_level( skill_gun ) - 6 );
+    }
+    return point_shoot_modifier;
 }
 
 std::optional<shape_factory> ranged::get_shape_factory( const item &gun )

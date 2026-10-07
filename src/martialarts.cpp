@@ -1,14 +1,5 @@
 #include "martialarts.h"
 
-#include <algorithm>
-#include <cstdlib>
-#include <iterator>
-#include <map>
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <utility>
-
 #include "avatar.h"
 #include "character.h"
 #include "character_martial_arts.h"
@@ -25,13 +16,14 @@
 #include "item_factory.h"
 #include "itype.h"
 #include "json.h"
-#include "map.h"
+#include "map/map.h"
 #include "messages.h"
 #include "mutation.h"
 #include "output.h"
 #include "pimpl.h"
 #include "player.h"
 #include "pldata.h"
+#include "profile.h"
 #include "point.h"
 #include "skill.h"
 #include "string_formatter.h"
@@ -41,6 +33,15 @@
 #include "type_id_implement.h"
 #include "ui_manager.h"
 #include "value_ptr.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <utility>
 
 static const skill_id skill_unarmed( "unarmed" );
 
@@ -483,7 +484,8 @@ bool ma_requirements::is_valid_character( const Character &u ) const
     }
 
     for( const auto &pr : min_skill ) {
-        if( ( cqb ? 5 : u.get_skill_level( pr.first ) ) < pr.second ) {
+        if( ( cqb ? std::max( u.get_skill_level(
+                                  pr.first ), BIO_CQB_LEVEL ) : u.get_skill_level( pr.first ) ) < pr.second ) {
             return false;
         }
     }
@@ -545,7 +547,7 @@ std::string ma_requirements::get_description( bool buff ) const
         min_skill.end(), []( const std::pair<skill_id, int>  &pr ) {
             int player_skill = get_player_character().get_skill_level( skill_id( pr.first ) );
             if( get_player_character().has_active_bionic( bio_cqb ) ) {
-                player_skill = BIO_CQB_LEVEL;
+                player_skill = std::max( player_skill, BIO_CQB_LEVEL );;
             }
             return string_format( "%s: <stat>%d</stat>/<stat>%d</stat>", pr.first->name(), player_skill,
                                   pr.second );
@@ -1024,7 +1026,8 @@ bool character_martial_arts::can_leg_block( const Character &owner ) const
 {
     const martialart &ma = style_selected.obj();
     ///\EFFECT_UNARMED increases ability to perform leg block
-    int unarmed_skill = owner.has_active_bionic( bio_cqb ) ? 5 : owner.get_skill_level(
+    int unarmed_skill = owner.has_active_bionic( bio_cqb ) ? std::max( owner.get_skill_level(
+                            skill_unarmed ), BIO_CQB_LEVEL ) : owner.get_skill_level(
                             skill_unarmed );
 
     // Success conditions.
@@ -1043,7 +1046,8 @@ bool character_martial_arts::can_arm_block( const Character &owner ) const
 {
     const martialart &ma = style_selected.obj();
     ///\EFFECT_UNARMED increases ability to perform arm block
-    int unarmed_skill = owner.has_active_bionic( bio_cqb ) ? 5 : owner.get_skill_level(
+    int unarmed_skill = owner.has_active_bionic( bio_cqb ) ? std::max( owner.get_skill_level(
+                            skill_unarmed ), BIO_CQB_LEVEL ) : owner.get_skill_level(
                             skill_unarmed );
 
     // Success conditions.
@@ -1072,6 +1076,7 @@ bool character_martial_arts::is_force_unarmed() const
 // event handlers
 void character_martial_arts::ma_static_effects( Character &owner )
 {
+    ZoneScoped;
     style_selected->apply_static_buffs( owner );
 }
 void character_martial_arts::ma_onmove_effects( Character &owner )
@@ -1177,6 +1182,7 @@ int Character::mabuff_block_bonus() const
 }
 int Character::mabuff_speed_bonus() const
 {
+    ZoneScoped;
     int ret = 0;
     accumulate_ma_buff_effects( *effects, [&ret, this]( const ma_buff & b, const effect & d ) {
         ret += d.get_intensity() * b.speed_bonus( *this );
@@ -1522,7 +1528,7 @@ bool ma_style_callback::key( const input_context &ctxt, const input_event &event
             ma.leg_block_with_bio_armor_legs || ma.leg_block != 99 ) {
             int unarmed_skill =  get_player_character().get_skill_level( skill_unarmed );
             if( get_player_character().has_active_bionic( bio_cqb ) ) {
-                unarmed_skill = BIO_CQB_LEVEL;
+                unarmed_skill = std::max( unarmed_skill, BIO_CQB_LEVEL );
             }
             if( ma.arm_block_with_bio_armor_arms ) {
                 buffer += _( "You can <info>arm block</info> by installing the <info>Arms Alloy Plating CBM</info>" );
