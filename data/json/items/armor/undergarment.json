@@ -176,6 +176,7 @@
     "type": "ARMOR",
     "name": { "str": "bra" },
     "description": "A simple bra.  For protecting those bits you don't want zombies to look at.",
+    "storage": "150 ml",
     "weight": "32 g",
     "volume": "250 ml",
     "price": "10 USD",
