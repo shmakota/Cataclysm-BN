@@ -1673,7 +1673,7 @@
     ],
     "items": {
       "both": {
-        "items": [ "tshirt", "pants", "socks", "gloves_leather", "boots", "hat_ball", "shoe_covers_noslip", "smart_phone", "mag_porn" ],
+        "items": [ "tank_top", "jeans", "socks", "gloves_work", "boots", "hat_ball", "shoe_covers_noslip", "smart_phone", "mag_porn" ],
         "entries": [
           { "item": "plumber_toolkit" },
           { "item": "pipe", "count": 4 },
