@@ -658,23 +658,23 @@ class wish_item_callback: public uilist_callback
         }
 
         auto choose_container( uilist *menu ) -> void {
+            using namespace std::views;
+            namespace ranges = std::ranges;
+
             if( menu->selected < 0 ) {
                 return;
             }
             const auto *selected_type = standard_itype_ids[menu->selected];
             const auto selected_item = item::spawn_temporary( selected_type, calendar::turn );
-            std::vector<const itype *> containers;
-            for( const auto *type : item_controller->all() ) {
-                if( !type->container ) {
-                    continue;
-                }
+            auto containers = item_controller->all()
+            | filter( []( const auto * type ) { return type->container != nullptr; } )
+            | filter( [&]( const auto * type ) {
                 const auto candidate = item::spawn_temporary( type, calendar::turn );
-                if( candidate->can_contain( *selected_item ) && selected_item->volume() > 0_ml &&
-                    selected_item->charges_per_volume( candidate->get_container_capacity() ) > 0 ) {
-                    containers.push_back( type );
-                }
-            }
-            std::ranges::sort( containers, []( const auto * lhs, const auto * rhs ) {
+                return candidate->can_contain( *selected_item ) && selected_item->volume() > 0_ml &&
+                       selected_item->charges_per_volume( candidate->get_container_capacity() ) > 0;
+            } )
+            | ranges::to<std::vector>();
+            ranges::sort( containers, []( const auto * lhs, const auto * rhs ) {
                 return localized_compare( lhs->get_id().str(), rhs->get_id().str() );
             } );
             uilist container_menu;
