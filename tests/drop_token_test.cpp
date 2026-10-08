@@ -3,6 +3,7 @@
 #include "avatar.h"
 #include "calendar.h"
 #include "catch/catch.hpp"
+#include "clothing_link.h"
 #include "drop_token.h"
 #include "item.h"
 #include "locations.h"
@@ -419,6 +420,33 @@ TEST_CASE("drop overflow prefers non-favorites", "[activity][drop_token][favorit
 
     CHECK(dropped_favorites > 0);
     CHECK(dropped_non_favorites == non_favorite_count);
+}
+
+TEST_CASE("clothing links require available storage", "[activity][drop_token]") {
+    clear_all_state();
+    auto dummy = avatar{};
+    auto& pack = *item::spawn_temporary("test_pants_fur");
+    auto& other_pack = *item::spawn_temporary("test_pants_fur");
+    auto& exact_fit = *item::spawn_temporary("test_amputator");
+    auto& small = *item::spawn_temporary("test_1kg_cube");
+    REQUIRE(pack.get_storage() == exact_fit.volume());
+    pack.set_var("DROP_WITH_CLOTHING_ID", 1);
+    other_pack.set_var("DROP_WITH_CLOTHING_ID", 2);
+
+    CHECK(can_link_to_clothing(dummy, exact_fit, pack));
+    CHECK_FALSE(can_link_to_clothing(dummy, pack, pack));
+    CHECK_FALSE(can_link_to_clothing(dummy, pack, other_pack));
+    CHECK_FALSE(can_link_to_clothing(dummy, small, exact_fit));
+
+    auto linked = item::spawn("test_amputator");
+    linked->set_var("DROP_WITH_CLOTHING_TARGET", 1);
+    auto* linked_ptr = linked.get();
+    dummy.i_add(std::move(linked));
+
+    CHECK_FALSE(can_link_to_clothing(dummy, small, pack));
+    CHECK(can_link_to_clothing(dummy, small, other_pack));
+    CHECK(can_link_to_clothing(dummy, *linked_ptr, pack));
+    CHECK(can_link_to_clothing(dummy, *linked_ptr, other_pack));
 }
 
 TEST_CASE("clothing-linked items drop with their assigned clothing", "[activity][drop_token]") {

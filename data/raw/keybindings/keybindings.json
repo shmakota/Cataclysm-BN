@@ -3709,7 +3709,7 @@
     "id": "DROP_WITH_CLOTHING",
     "type": "keybinding",
     "category": "INVENTORY_ITEM",
-    "name": "Drop with clothing",
+    "name": "Link to clothing",
     "bindings": [ { "input_method": "keyboard", "key": "L" } ]
   },
   {

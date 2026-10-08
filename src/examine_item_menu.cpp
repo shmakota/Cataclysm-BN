@@ -4,6 +4,7 @@
 #include "avatar.h"
 #include "avatar_action.h"
 #include "avatar_functions.h"
+#include "clothing_link.h"
 #include "crafting.h"
 #include "game_inventory.h"
 #include "input.h"
@@ -238,8 +239,8 @@ bool run(
         } );
     }
 
-    const auto can_drop_with_clothing = std::ranges::any_of( you.worn, [&itm]( const auto * worn ) {
-        return worn != &itm;
+    const auto can_drop_with_clothing = std::ranges::any_of( you.worn, [&]( const auto * worn ) {
+        return can_link_to_clothing( you, itm, *worn );
     } );
     if( can_drop_with_clothing || itm.has_var( "DROP_WITH_CLOTHING_TARGET" ) ) {
         add_entry( "DROP_WITH_CLOTHING", hint_rating::good, [&]() {
@@ -250,11 +251,14 @@ bool run(
                 }
             }
 
-            uilist menu;
-            menu.text = _( "Always drop this item with which clothing?" );
+            auto menu = uilist{};
+            menu.text = _( "Link this item to which clothing?" );
             menu.addentry( 0, true, 0, _( "No clothing item" ) );
-            for( size_t index = 0; index < clothing.size(); ++index ) {
-                menu.addentry( static_cast<int>( index + 1 ), true, 0, clothing[index]->tname() );
+            for( auto index = size_t{ 0 }; index < clothing.size(); ++index ) {
+                const auto fits = can_link_to_clothing( you, itm, *clothing[index] );
+                menu.addentry( static_cast<int>( index + 1 ), fits, 0,
+                               fits ? clothing[index]->tname() :
+                               string_format( _( "%s (not enough storage)" ), clothing[index]->tname() ) );
             }
             menu.query();
             if( menu.ret < 0 ) {

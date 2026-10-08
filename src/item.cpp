@@ -5434,7 +5434,7 @@ std::string item::tname( unsigned int quantity, bool with_prefix, unsigned int t
         tagtext += _( " *" ); // Display asterisk for favorite items
     }
     if( has_var( "DROP_WITH_CLOTHING_NAME" ) ) {
-        tagtext += string_format( _( " (drop with %s)" ), get_var( "DROP_WITH_CLOTHING_NAME" ) );
+        tagtext += _( " &" ); // Display ampersand for clothing-linked items
     }
 
     //~ This is a string to construct the item name as it is displayed. This format string has been added for maximum flexibility. The strings are: %1$s: Damage text (e.g. "bruised"). %2$s: burn adjectives (e.g. "burnt"). %3$s: tool modifier text (e.g. "atomic"). %4$s: vehicle part text (e.g. "3.8-Liter"). $5$s: main item text (e.g. "apple"). %6s: tags (e.g. "(wet) (poor fit)").
