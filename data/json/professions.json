@@ -1670,14 +1670,25 @@
     "skills": [ { "level": 3, "name": "fabrication" }, { "level": 2, "name": "mechanics" } ],
     "items": {
       "both": {
-        "items": [ "tank_top", "jeans", "socks", "gloves_work", "boots", "hat_ball", "shoe_covers_noslip", "smart_phone", "mag_porn" ],
+        "items": [
+          "tank_top",
+          "jeans",
+          "socks",
+          "gloves_work",
+          "boots",
+          "hat_ball",
+          "shoe_covers_noslip",
+          "mbag",
+          "smart_phone",
+          "mag_porn"
+        ],
         "entries": [
           { "item": "plumber_toolkit" },
           { "item": "pipe", "count": 4 },
           { "item": "cu_pipe", "count": 2 },
           { "item": "hose", "count": 3 },
           { "item": "duct_tape" },
-          { "item": "tool_belt" }
+          { "item": "tool_belt", "contents-item": "plumber_toolkit" }
         ]
       },
       "male": [ "boxer_shorts" ],
