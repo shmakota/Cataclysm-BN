@@ -993,9 +993,9 @@ class fluid_storage_grid
                 .capacity_by_type = {}
             };
             const auto grid = fluid_grid::grid_at( anchor_abs );
-            std::ranges::for_each( stats.stored_by_type, [&]( const auto &entry ) {
+            std::ranges::for_each( stats.stored_by_type, [&]( const auto & entry ) {
                 stats.capacity_by_type[entry.first] = calculate_liquid_capacity_for_grid(
-                                                          grid, mb, entry.first );
+                        grid, mb, entry.first );
             } );
 
             cached_stats = stats;

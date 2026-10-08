@@ -4023,9 +4023,9 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                         const auto liquid = item( entry.first, calendar::turn );
                         const auto maximum = fluid_stats.capacity_by_type.at( entry.first );
                         add_msg( m_info, colorize( string_format( _( "%1$s: %2$s %3$s." ),
-                                           item::nname( entry.first ), format_volume( entry.second ) +
-                                           " / " + format_volume( maximum ), volume_units_abbr() ),
-                                           liquid.color() ) );
+                                                   item::nname( entry.first ), format_volume( entry.second ) +
+                                                   " / " + format_volume( maximum ), volume_units_abbr() ),
+                                                   liquid.color() ) );
                     } );
                 }
                 add_msg( m_info, _( "Liquids stored in the fluid grid:" ) );
@@ -4040,9 +4040,9 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                         const auto liquid = item( entry.first, calendar::turn );
                         const auto maximum = fluid_stats.capacity_by_type.at( entry.first );
                         add_msg( m_info, colorize( string_format( _( "%1$s: %2$s %3$s." ),
-                                           item::nname( entry.first ), format_volume( entry.second ) +
-                                           " / " + format_volume( maximum ), volume_units_abbr() ),
-                                           liquid.color() ) );
+                                                   item::nname( entry.first ), format_volume( entry.second ) +
+                                                   " / " + format_volume( maximum ), volume_units_abbr() ),
+                                                   liquid.color() ) );
                     } );
                 }
                 return;
