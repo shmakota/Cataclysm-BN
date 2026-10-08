@@ -6,6 +6,7 @@
 #include "character.h"
 #include "debug.h"
 #include "detached_ptr.h"
+#include "drop_preview.h"
 #include "flag.h"
 #include "game.h"
 #include "game_inventory.h"
@@ -100,20 +101,26 @@ class selection_column_preset : public inventory_selector_preset
         std::string get_caption( const inventory_entry &entry ) const override {
             std::string res;
             const size_t available_count = entry.get_available_count();
+            const auto dropping_count = entry.chosen_count + entry.automatic_drop_count;
             const item *item = entry.any_item();
 
-            if( entry.chosen_count > 0 && entry.chosen_count < available_count ) {
+            if( entry.automatic_drop_count > 0 ) {
+                res += colorize( "\\", c_light_gray ) + " ";
+            }
+            if( dropping_count > 0 && dropping_count < available_count ) {
                 //~ %1$d: chosen count, %2$d: available count
-                res += string_format( pgettext( "count", "%1$d of %2$d" ), entry.chosen_count,
+                res += string_format( pgettext( "count", "%1$d of %2$d" ), dropping_count,
                                       available_count ) + " ";
             } else if( available_count != 1 ) {
                 res += string_format( "%d ", available_count );
             }
             if( item->is_money() ) {
                 assert( available_count == entry.get_stack_size() );
-                if( entry.chosen_count > 0 && entry.chosen_count < available_count ) {
+                if( dropping_count > 0 && dropping_count < available_count ) {
+                    auto selected_entry = entry;
+                    selected_entry.chosen_count = dropping_count;
                     res += item->display_money( available_count, entry.get_total_charges(),
-                                                entry.get_selected_charges() );
+                                                selected_entry.get_selected_charges() );
                 } else {
                     res += item->display_money( available_count, entry.get_total_charges() );
                 }
@@ -1044,7 +1051,9 @@ void inventory_column::draw( const catacurses::window &win, point pos ) const
                 xx += 2;
             }
             if( allows_selecting() && activatable() && multiselect ) {
-                if( entry.chosen_count == 0 ) {
+                if( entry.automatic_drop_count > 0 ) {
+                    mvwputch( win, point( xx, yy ), c_light_gray, '\\' );
+                } else if( entry.chosen_count == 0 ) {
                     mvwputch( win, point( xx, yy ), c_dark_gray, '-' );
                 } else if( entry.chosen_count >= entry.get_available_count() ) {
                     mvwputch( win, point( xx, yy ), c_light_green, '+' );
@@ -1117,14 +1126,16 @@ void selection_column::on_change( const inventory_entry &entry )
     auto iter = std::find( entries.begin(), entries.end(), my_entry );
 
     if( iter == entries.end() ) {
-        if( my_entry.chosen_count == 0 ) {
+        if( my_entry.chosen_count == 0 && my_entry.automatic_drop_count == 0 ) {
             return; // Not interested.
         }
         add_entry( my_entry );
         last_changed = my_entry;
-    } else if( iter->chosen_count != my_entry.chosen_count ) {
-        if( my_entry.chosen_count > 0 ) {
+    } else if( iter->chosen_count != my_entry.chosen_count ||
+               iter->automatic_drop_count != my_entry.automatic_drop_count ) {
+        if( my_entry.chosen_count > 0 || my_entry.automatic_drop_count > 0 ) {
             iter->chosen_count = my_entry.chosen_count;
+            iter->automatic_drop_count = my_entry.automatic_drop_count;
             expand_to_fit( my_entry );
         } else {
             iter = entries.erase( iter );
@@ -1134,6 +1145,7 @@ void selection_column::on_change( const inventory_entry &entry )
         if( iter != entries.end() ) {
             last_changed = *iter;
         }
+        refresh_entry_cell_caches();
     }
 }
 
@@ -2493,6 +2505,7 @@ drop_locations inventory_drop_selector::execute()
 {
     shared_ptr_fast<ui_adaptor> ui = create_or_get_ui_adaptor();
     this->keep_open = false;
+    preview_dirty = true;
 
     // if we favorited an item, we exited this function and entered it again
     // the selected items are in "dropping", so we fetch and display them in the UI
@@ -2520,6 +2533,7 @@ drop_locations inventory_drop_selector::execute()
     // main multidrop selection loop
     int count = 0;
     while( true ) {
+        update_drop_preview();
         ui_manager::redraw();
 
         const inventory_input input = get_input();
@@ -2597,23 +2611,47 @@ drop_locations inventory_drop_selector::execute()
             return drop_locations();
         } else {
             on_input( input );
+            if( input.action == "TOGGLE_FAVORITE" || input.action == "WEAR" || input.action == "WIELD" ) {
+                preview_dirty = true;
+            }
             count = 0;
         }
     }
 
-    drop_locations dropped_pos_and_qty;
+    return predicted_drops;
+}
 
-    for( const std::pair<item *, int> drop_pair : dropping ) {
-        // Note: drop_location here contains location of first item in stack,
-        // and amount of items to be dropped from the stack.
-        dropped_pos_and_qty.emplace_back( *drop_pair.first, drop_pair.second );
+auto inventory_drop_selector::update_drop_preview() -> void
+{
+    if( !preview_dirty ) {
+        return;
     }
+    auto selected = drop_locations{};
+    for( const auto &[target, count] : dropping ) {
+        selected.emplace_back( *target, count );
+    }
+    auto preview = make_drop_preview( u, selected );
+    predicted_drops = std::move( preview.items );
+    predicted_counts = std::move( preview.counts );
+    preview_dirty = false;
 
-    return dropped_pos_and_qty;
+    for( auto *column : get_all_columns() ) {
+        if( column == selection_col.get() ) {
+            continue;
+        }
+        for( auto *entry : column->get_all_entries( []( const auto & candidate ) { return candidate.is_item(); } ) ) {
+            const auto found = predicted_counts.find( entry->item_stack_on_character() );
+            const auto total = found == predicted_counts.end() ? size_t{ 0 } :
+                               static_cast<size_t>( found->second );
+            entry->automatic_drop_count = total > entry->chosen_count ? total - entry->chosen_count : 0;
+            on_change( *entry );
+        }
+    }
 }
 
 void inventory_drop_selector::set_chosen_count( inventory_entry &entry, size_t count )
 {
+    preview_dirty = true;
     item *it = entry.item_stack_on_character();
 
     if( count == 0 ) {
@@ -2634,10 +2672,10 @@ void inventory_drop_selector::set_chosen_count( inventory_entry &entry, size_t c
 inventory_selector::stats inventory_drop_selector::get_raw_stats() const
 {
     return get_weight_and_volume_stats(
-               u.weight_carried_reduced_by( dropping ),
+               u.weight_carried_reduced_by( predicted_counts ),
                u.weight_capacity(),
-               u.volume_carried_reduced_by( dropping ),
-               u.volume_capacity_reduced_by( 0_ml, dropping ) );
+               u.volume_carried_reduced_by( predicted_counts ),
+               u.volume_capacity_reduced_by( 0_ml, predicted_counts ) );
 }
 
 inventory_pickup_selector::inventory_pickup_selector( player &p,
