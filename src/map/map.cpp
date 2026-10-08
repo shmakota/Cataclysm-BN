@@ -3955,7 +3955,10 @@ auto map::bash_furn_success(const tripoint_bub_ms& p, const bash_params& params)
         }
         release_avatar_grabbed_furniture_if_destroyed(p, furnid, bash.furn_set);
         furn_set(p, bash.furn_set);
-        for (item* const& it : i_at(p)) { it->on_drop(p, *this); }
+        i_at(p).remove_top_items_with([&](auto&& it) -> detached_ptr<item> {
+            if (it->on_drop(p, *this)) { return detached_ptr<item>{}; }
+            return std::move(it);
+        });
         // HACK: Hack alert.
         // Signs have cosmetics associated with them on the submap since
         // furniture can't store dynamic data to disk. To prevent writing
