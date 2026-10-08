@@ -4019,9 +4019,13 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                              _( "No liquid is assigned to this tank." ) :
                              _( "No dispensable liquid is stored in the fluid grid." ) );
                 } else {
-                    std::ranges::for_each( dispensable_liquids, []( const auto & entry ) {
-                        add_msg( m_info, _( "%1$s: %2$s %3$s." ), item::nname( entry.first ),
-                                 format_volume( entry.second ), volume_units_abbr() );
+                    std::ranges::for_each( dispensable_liquids, [&fluid_stats]( const auto & entry ) {
+                        const auto liquid = item( entry.first, calendar::turn );
+                        const auto maximum = fluid_stats.capacity_by_type.at( entry.first );
+                        add_msg( m_info, colorize( string_format( _( "%1$s: %2$s %3$s." ),
+                                           item::nname( entry.first ), format_volume( entry.second ) +
+                                           " / " + format_volume( maximum ), volume_units_abbr() ),
+                                           liquid.color() ) );
                     } );
                 }
                 add_msg( m_info, _( "Liquids stored in the fluid grid:" ) );
@@ -4032,9 +4036,13 @@ void iexamine::keg( player &p, const tripoint_bub_ms &examp )
                 if( std::ranges::empty( grid_liquids ) ) {
                     add_msg( m_info, _( "The fluid grid is empty." ) );
                 } else {
-                    std::ranges::for_each( grid_liquids, []( const auto & entry ) {
-                        add_msg( m_info, _( "%1$s: %2$s %3$s." ), item::nname( entry.first ),
-                                 format_volume( entry.second ), volume_units_abbr() );
+                    std::ranges::for_each( grid_liquids, [&fluid_stats]( const auto & entry ) {
+                        const auto liquid = item( entry.first, calendar::turn );
+                        const auto maximum = fluid_stats.capacity_by_type.at( entry.first );
+                        add_msg( m_info, colorize( string_format( _( "%1$s: %2$s %3$s." ),
+                                           item::nname( entry.first ), format_volume( entry.second ) +
+                                           " / " + format_volume( maximum ), volume_units_abbr() ),
+                                           liquid.color() ) );
                     } );
                 }
                 return;

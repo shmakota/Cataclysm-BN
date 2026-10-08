@@ -28,6 +28,7 @@ struct liquid_storage_stats {
     units::volume stored = 0_ml;
     units::volume capacity = 0_ml;
     std::map<itype_id, units::volume> stored_by_type;
+    std::map<itype_id, units::volume> capacity_by_type;
 
     auto stored_for( const itype_id &liquid_type ) const -> units::volume {
         const auto iter = stored_by_type.find( liquid_type );

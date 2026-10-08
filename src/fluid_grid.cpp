@@ -989,8 +989,14 @@ class fluid_storage_grid
             auto stats = fluid_grid::liquid_storage_stats{
                 .stored = std::min( state.stored_total(), state.capacity ),
                 .capacity = state.capacity,
-                .stored_by_type = state.stored_by_type
+                .stored_by_type = state.stored_by_type,
+                .capacity_by_type = {}
             };
+            const auto grid = fluid_grid::grid_at( anchor_abs );
+            std::ranges::for_each( stats.stored_by_type, [&]( const auto &entry ) {
+                stats.capacity_by_type[entry.first] = calculate_liquid_capacity_for_grid(
+                                                          grid, mb, entry.first );
+            } );
 
             cached_stats = stats;
             return stats;
