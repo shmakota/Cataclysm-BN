@@ -5024,7 +5024,7 @@ void game::draw_ter( const tripoint_bub_ms &center, const bool looking, const bo
                       POSY - u.bub_pos().y() ), c_white, 'X' );
     }
 
-    if( u.controlling_vehicle && !looking ) {
+    if( ( u.controlling_vehicle || remoteveh() ) && !looking ) {
         draw_veh_dir_indicator( false );
         draw_veh_dir_indicator( true );
     }
@@ -5032,10 +5032,16 @@ void game::draw_ter( const tripoint_bub_ms &center, const bool looking, const bo
     wmove( w_terrain, -center.xy().raw() + g->u.bub_pos().xy().raw() + point( POSX, POSY ) );
 }
 
-std::optional<tripoint_rel_ms> game::get_veh_dir_indicator_location( bool next ) const
+std::optional<tripoint_rel_ms> game::get_veh_dir_indicator_location( bool next )
 {
     if( !get_option<bool>( "VEHICLE_DIR_INDICATOR" ) ) {
         return std::nullopt;
+    }
+    if( vehicle *veh = remoteveh() ) {
+        rl_vec2d face = next ? veh->dir_vec() : veh->face_vec();
+        float r = 10.0;
+        return tripoint_rel_ms( static_cast<int>( r * face.x ), static_cast<int>( r * face.y ),
+                                veh->bub_ms_location().z() );
     }
     const optional_vpart_position vp = m.veh_at( u.bub_pos() );
     if( !vp ) {
@@ -9172,7 +9178,9 @@ void game::print_terrain_info( const tripoint_bub_ms &lp, const catacurses::wind
     std::string signage = m.get_signage( lp );
     if( !signage.empty() ) {
         std::string sign_string = u.has_trait( trait_ILLITERATE ) ? "???" : signage;
-        mvwprintz( w_look, point( column, ++line ), c_light_gray, _( "Sign: %s" ), sign_string );
+        auto col = c_light_gray;
+        print_colored_text( w_look, point( column, ++line ), col, col, string_format( _( "Sign: %s" ),
+                            sign_string ) );
     }
 
     if( lp.z() > -OVERMAP_DEPTH && !m.has_floor( lp ) ) {
@@ -16293,22 +16301,22 @@ void game::process_artifact( item &it, Character &who )
     for( const art_effect_passive &i : effects ) {
         switch( i ) {
             case AEP_STR_UP:
-                who.mod_str_bonus( +4 );
+                who.mod_str_bonus( +4, true );
                 break;
             case AEP_DEX_UP:
-                who.mod_dex_bonus( +4 );
+                who.mod_dex_bonus( +4, true );
                 break;
             case AEP_PER_UP:
-                who.mod_per_bonus( +4 );
+                who.mod_per_bonus( +4, true );
                 break;
             case AEP_INT_UP:
-                who.mod_int_bonus( +4 );
+                who.mod_int_bonus( +4, true );
                 break;
             case AEP_ALL_UP:
-                who.mod_str_bonus( +2 );
-                who.mod_dex_bonus( +2 );
-                who.mod_per_bonus( +2 );
-                who.mod_int_bonus( +2 );
+                who.mod_str_bonus( +2, true );
+                who.mod_dex_bonus( +2, true );
+                who.mod_per_bonus( +2, true );
+                who.mod_int_bonus( +2, true );
                 break;
             case AEP_SPEED_UP:
                 // Handled in player::current_speed()
@@ -16380,26 +16388,26 @@ void game::process_artifact( item &it, Character &who )
                 break;
 
             case AEP_STR_DOWN:
-                who.mod_str_bonus( -3 );
+                who.mod_str_bonus( -3, true );
                 break;
 
             case AEP_DEX_DOWN:
-                who.mod_dex_bonus( -3 );
+                who.mod_dex_bonus( -3, true );
                 break;
 
             case AEP_PER_DOWN:
-                who.mod_per_bonus( -3 );
+                who.mod_per_bonus( -3, true );
                 break;
 
             case AEP_INT_DOWN:
-                who.mod_int_bonus( -3 );
+                who.mod_int_bonus( -3, true );
                 break;
 
             case AEP_ALL_DOWN:
-                who.mod_str_bonus( -2 );
-                who.mod_dex_bonus( -2 );
-                who.mod_per_bonus( -2 );
-                who.mod_int_bonus( -2 );
+                who.mod_str_bonus( -2, true );
+                who.mod_dex_bonus( -2, true );
+                who.mod_per_bonus( -2, true );
+                who.mod_int_bonus( -2, true );
                 break;
 
             case AEP_SPEED_DOWN:
