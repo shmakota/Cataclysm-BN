@@ -6,13 +6,14 @@ This guide explains how to format and lint code in Cataclysm: Bright Nights.
 
 ## Quick Reference
 
-| File Type       | Tool           | Command                                            |
-| --------------- | -------------- | -------------------------------------------------- |
-| C++ (`.cpp/.h`) | astyle         | `cmake --build build --target astyle`              |
-| JSON            | json_formatter | `cmake --build build --target style-json-parallel` |
-| Markdown        | deno fmt       | `deno fmt`                                         |
-| TypeScript      | deno fmt       | `deno fmt`                                         |
-| Lua             | dprint         | `deno task dprint fmt`                             |
+| Scope           | Tool                | Command          |
+| --------------- | ------------------- | ---------------- |
+| Staged files    | all formatters      | `just fmt`       |
+| All files       | all formatters      | `just fmt --all` |
+| C++ (`.cpp/.h`) | astyle/clang-format | `just fmt-cpp`   |
+| JSON            | json_formatter      | `just fmt-json`  |
+| Markdown/TS     | deno fmt            | `just fmt-docs`  |
+| Lua             | dprint              | `just fmt-lua`   |
 
 ## Automated Formatting
 
@@ -27,47 +28,44 @@ style violations, a commit will be pushed to fix them.
 
 ## C++ Formatting
 
-C++ files are formatted with [astyle](http://astyle.sourceforge.net/).
+Top-level `src/*.cpp` and `src/*.h` files use [astyle](http://astyle.sourceforge.net/). Most other C++ files use [clang-format](https://clang.llvm.org/docs/ClangFormat.html). Formatter-sensitive fixtures such as `tools/clang-tidy-plugin/test/` are left unchanged.
 
 ```sh
-# Install astyle (Ubuntu/Debian)
-sudo apt install astyle
+# Install formatters (Ubuntu/Debian)
+sudo apt install astyle clang-format
 
-# Install astyle (Fedora)
-sudo dnf install astyle
+# Install formatters (Fedora)
+sudo dnf install astyle clang-tools-extra
 
-# Install astyle (macOS)
-brew install astyle
+# Install formatters (macOS)
+brew install astyle clang-format
 ```
 
-### Using CMake
+### Using the helper
 
 ```sh
-# Configure (only needed once, or use an existing build)
-cmake --preset lint
-
-# Format all C++ files
-cmake --build build --target astyle
+just fmt-cpp
+# or, for all staged file types
+just fmt
 ```
 
-The style configuration is in `.astylerc` at the repository root.
+If you already have a CMake build tree with `bash` available, `cmake --build <build-dir> --target format` calls the same C++ helper. The style configurations are in `.astylerc` and `.clang-format` at the repository root.
 
 ## JSON Formatting
 
 JSON files are formatted with `json_formatter`, a custom tool built from the project source.
 
-### Using CMake
+### Using the script
 
 ```sh
-# Configure (only needed once, or use an existing build)
-cmake --preset lint
-
-# Format all JSON files in parallel
-cmake --build build --target style-json-parallel
-
-# Format all JSON files sequentially (slower, but useful for debugging)
-cmake --build build --target style-json
+just fmt-json
+# or
+build-scripts/format-json.sh
 ```
+
+The script builds `json_formatter` in `out/build/json-format` and formats JSON files. It does not
+require a configured game build or a CMake preset. Override the helper build directory with
+`CATA_JSON_FORMAT_BUILD_DIR` if needed.
 
 > [!NOTE]
 > The `data/names/` directory is excluded from formatting because name files have special formatting
@@ -114,17 +112,32 @@ tools/dialogue_validator.py data/json/npcs/* data/json/npcs/*/* data/json/npcs/*
 
 ## Pre-commit Workflow
 
-Before committing, run these checks:
+Install the optional pre-commit hook with [`prek`](https://github.com/j178/prek):
 
 ```sh
-# Configure once (creates build directory with formatting tools)
-cmake --preset lint
+prek install
+# or
+just hooks-setup
+```
 
-# Format all code
-cmake --build build --target astyle           # C++
-cmake --build build --target style-json-parallel  # JSON
-deno fmt                                       # Markdown/TypeScript
-deno task dprint fmt                           # Lua
+When you commit, the hook runs `just fmt`: Deno and dprint run normally, while C++ and JSON formatters
+run only on staged created/updated files. Formatted staged files are re-added so the commit includes
+the formatted result.
+
+To run the same formatting manually against staged files:
+
+```sh
+just fmt
+```
+
+Before committing without the hook, run these checks:
+
+```sh
+# Format staged files
+just fmt
+
+# Format all formattable files
+just fmt --all
 ```
 
 ## CI Integration
@@ -132,7 +145,7 @@ deno task dprint fmt                           # Lua
 The CI pipeline runs these checks automatically:
 
 1. **JSON syntax validation** - `build-scripts/lint-json.sh`
-2. **JSON formatting** - `cmake --build build --target style-json-parallel`
+2. **JSON formatting** - `build-scripts/format-json.sh`
 3. **Dialogue validation** - `tools/dialogue_validator.py`
 
 If any check fails, the build will fail. Use the commands above to fix issues locally before
@@ -142,58 +155,80 @@ pushing.
 
 ### VS Code
 
-Install these extensions for automatic formatting:
+Use the repository helper for C++ and the Deno extension for Markdown/TypeScript:
 
-- **C++**: [C/C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools) with
-  astyle integration
-- **Deno**: [Deno](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno) for
-  Markdown/TypeScript
+- **C++**: run `just fmt-cpp`
+- **Deno**: [Deno](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno)
+
+### Visual Studio
+
+Install the formatters once from PowerShell. LLVM provides `clang-format` and `clang-tidy`.
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+irm get.scoop.sh | iex
+scoop install llvm astyle
+clang-format --version
+clang-tidy --version
+astyle --version
+```
+
+If Scoop is already installed, run only `scoop install llvm astyle`. If any version command is not
+found, close and reopen PowerShell and Visual Studio so they reload `PATH`.
+
+After installing the tools:
+
+1. Open the repository folder in Visual Studio as a CMake project.
+2. Configure CMake. If Visual Studio already configured the project before installing the formatters,
+   reconfigure the CMake cache.
+3. Open **View > Other Windows > CMake Targets View**.
+4. Build the `format` target before committing.
+
+Visual Studio's normal **Format Document** command does not run repository style. Run `just fmt-cpp`
+in a terminal; the CMake `format` target is a wrapper for environments with `bash` available.
 
 ### Vim/Neovim
 
-Add to your config:
+Use the helper instead of calling astyle or clang-format directly:
 
 ```vim
-" Format C++ with astyle on save
-autocmd BufWritePre *.cpp,*.h !astyle --options=.astylerc %
-
-" Format with deno
+autocmd BufWritePre *.cpp,*.h !just fmt-cpp %
 autocmd BufWritePre *.md,*.ts !deno fmt %
 ```
 
 ## Troubleshooting
 
-### "json_formatter not found" or "style-json-parallel target not found"
+### "json_formatter not found"
 
-Make sure you configured CMake with the `lint` preset or with `-DJSON_FORMAT=ON`:
+Run the JSON formatter script. It configures and builds the formatter helper automatically:
 
 ```sh
-cmake --preset lint
-cmake --build build --target json_formatter
+build-scripts/format-json.sh
 ```
 
-### "astyle target not found"
+### C++ formatter not found
 
-Make sure `astyle` is installed and in your PATH:
+Make sure `astyle` and `clang-format` are installed and in your PATH:
 
 ```sh
-# Check if astyle is available
+# Check if formatters are available
 which astyle
+which clang-format
 
 # Install if missing (Ubuntu/Debian)
-sudo apt install astyle
+sudo apt install astyle clang-format
 ```
 
-Then reconfigure CMake:
+Then rerun:
 
 ```sh
-cmake --preset lint
+build-scripts/format-cpp.sh
 ```
 
-### astyle produces different results
+### C++ formatters produce different results
 
-Make sure you're using the `.astylerc` from the repository root:
+Use the repository helper from the repository root so each file goes through the right formatter:
 
 ```sh
-astyle --options=.astylerc src/*.cpp
+just fmt-cpp
 ```

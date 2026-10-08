@@ -1,14 +1,10 @@
 #include "character_display.h" // IWYU pragma: associated
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdlib>
-#include <memory>
-
 #include "addiction.h"
 #include "avatar.h"
 #include "bionics.h"
+#include "catalua_hooks.h"
+#include "catalua_sol.h"
 #include "cata_utility.h"
 #include "catacharset.h"
 #include "character_effects.h"
@@ -18,8 +14,8 @@
 #include "game.h"
 #include "input.h"
 #include "melee.h"
-#include "mutation.h"
 #include "messages.h"
+#include "mutation.h"
 #include "options.h"
 #include "output.h"
 #include "pldata.h"
@@ -30,10 +26,17 @@
 #include "string_id.h"
 #include "string_input_popup.h"
 #include "translations.h"
+#include "type_id.h"
 #include "ui_manager.h"
 #include "units.h"
 #include "units_utility.h"
-#include "weather.h"
+#include "weather/weather.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdlib>
+#include <memory>
 
 static const skill_id skill_swimming( "swimming" );
 static const skill_id skill_unarmed( "unarmed" );
@@ -69,7 +72,7 @@ static nc_color encumb_color( int level )
     return c_red;
 }
 
-static int get_temp_conv( const Character &c, const bodypart_str_id &bp )
+static auto get_temp_conv( const Character &c, const bodypart_str_id &bp ) -> units::temperature
 {
     auto iter = c.get_body().find( bp );
     if( iter == c.get_body().end() ) {
@@ -86,7 +89,7 @@ nc_color warmth::bodytemp_color( const Character &c, const bodypart_str_id &bp )
         return c_light_gray;    // Eyes don't count towards warmth
     }
 
-    int temp_conv = get_temp_conv( c, bp );
+    const auto temp_conv = get_temp_conv( c, bp );
     if( temp_conv > BODYTEMP_SCORCHING ) {
         return c_red;
     } else if( temp_conv > BODYTEMP_VERY_HOT ) {
@@ -106,9 +109,10 @@ nc_color warmth::bodytemp_color( const Character &c, const bodypart_str_id &bp )
 }
 
 // Rescale temperature value to one that the player sees
-static int temperature_print_rescaling( int temp )
+static auto temperature_print_rescaling( units::temperature temp ) -> int
 {
-    return ( temp / 100.0 ) * 2 - 100;
+    const auto legacy_temp = units::to_legacy_bodypart_temp( temp );
+    return ( legacy_temp / 100.0 ) * 2 - 100;
 }
 
 static bool should_combine_bps( const Character &ch,
@@ -355,12 +359,12 @@ static bool is_cqb_skill( const skill_id &id )
     // TODO: this skill list here is used in other places as well. Useless redundancy and
     // dependency. Maybe change it into a flag of the skill that indicates it's a skill used
     // by the bionic?
-    static const std::array<skill_id, 5> cqb_skills = { {
+    static const std::array<skill_id, 6> cqb_skills = { {
             skill_id( "melee" ), skill_id( "unarmed" ), skill_id( "cutting" ),
-            skill_id( "bashing" ), skill_id( "stabbing" ),
+            skill_id( "bashing" ), skill_id( "stabbing" ), skill_id( "dodge" ),
         }
     };
-    return std::ranges::find( cqb_skills, id ) != cqb_skills.end();
+    return std::ranges::contains( cqb_skills, id );
 }
 
 namespace
@@ -516,7 +520,7 @@ static void draw_stats_info( const catacurses::window &w_info, const Character &
         // NOLINTNEXTLINE(cata-use-named-point-constants)
         fold_and_print( w_info, point( 1, 0 ), FULL_SCREEN_WIDTH - 2, c_magenta,
                         _( "Perception is the most important stat for ranged combat.  It's also used for "
-                           "detecting traps and other things of interest." ) );
+                           "detecting traps, camouflaged creatures, and other things of interest." ) );
         print_colored_text( w_info, point( 1, 3 ), col_temp, c_light_gray,
                             string_format( _( "Base night vision range: <color_white>%.1f</color>" ),
                                            vision::nv_range_from_per( you.get_per() ) ) );
@@ -741,7 +745,10 @@ struct HeaderSkill {
 
 int character_display::display_empty_handed_base_damage( const Character &you )
 {
-    int empty_hand_base_damage = you.get_skill_level( skill_unarmed );
+    int empty_hand_base_damage = you.has_active_bionic( bionic_id( "bio_cqb" ) ) ? std::max(
+                                     you.get_skill_level(
+                                         skill_unarmed ), BIO_CQB_LEVEL ) : you.get_skill_level(
+                                     skill_unarmed );
     const bool left_empty = !you.natural_attack_restricted_on( bodypart_id( "hand_l" ) );
     const bool right_empty = !you.natural_attack_restricted_on( bodypart_id( "hand_r" ) );
 
@@ -838,10 +845,10 @@ static void draw_skills_tab( ui_adaptor &ui, const catacurses::window &w_skills,
             const bool training = level.isTraining();
             const bool rusting = level.isRusting();
             int exercise = level.exercise();
-            int level_num = level.level();
+            int level_num = you.get_skill_level( aSkill->ident() );
             bool locked = false;
             if( you.has_active_bionic( bionic_id( "bio_cqb" ) ) && is_cqb_skill( aSkill->ident() ) ) {
-                level_num = 5;
+                level_num = std::max( level_num, BIO_CQB_LEVEL );
                 exercise = 0;
                 locked = true;
             }
@@ -896,7 +903,8 @@ static void draw_skills_tab( ui_adaptor &ui, const catacurses::window &w_skills,
     wnoutrefresh( w_skills );
 }
 
-static void draw_skills_info( const catacurses::window &w_info, unsigned int line,
+static void draw_skills_info( const catacurses::window &w_info, const Character &you,
+                              unsigned int line,
                               const std::vector<HeaderSkill> &skillslist )
 {
     werase( w_info );
@@ -911,9 +919,19 @@ static void draw_skills_info( const catacurses::window &w_info, unsigned int lin
     werase( w_info );
 
     if( selectedSkill ) {
+        auto description = selectedSkill->description();
+        const auto hook_results = cata::run_hooks( "on_character_display_skill_info",
+        [&]( sol::table & params ) {
+            params["character"] = &you;
+            params["skill"] = selectedSkill->ident();
+        } );
+        const auto extra_text = hook_results.get_or( "text", std::string() );
+        if( !extra_text.empty() ) {
+            description += "\n\n" + extra_text;
+        }
         // NOLINTNEXTLINE(cata-use-named-point-constants)
         fold_and_print( w_info, point( 1, 0 ), FULL_SCREEN_WIDTH - 2, c_light_gray,
-                        selectedSkill->description() );
+                        description );
     }
     wnoutrefresh( w_info );
 }
@@ -959,19 +977,23 @@ static void draw_speed_tab( const catacurses::window &w_speed,
                    left_justify( _( "Starving" ), 20 ), pen );
         ++line;
     }
-    if( you.has_trait( trait_id( "SUNLIGHT_DEPENDENT" ) ) && !g->is_in_sunlight( you.pos() ) ) {
-        pen = ( g->light_level( you.posz() ) >= 12 ? 5 : 10 );
+    if( you.has_trait( trait_id( "SUNLIGHT_DEPENDENT" ) ) && !g->is_in_sunlight( you.bub_pos() ) ) {
+        pen = ( g->light_level( you.bub_pos().z() ) >= 12 ? 5 : 10 );
         //~ %s: Out of Sunlight (already left-justified), %2d%%: speed penalty
         mvwprintz( w_speed, point( 1, line ), c_red, pgettext( "speed penalty", "%s-%2d%%" ),
                    left_justify( _( "Out of Sunlight" ), 20 ), pen );
         ++line;
     }
 
-    const float temperature_speed_modifier = you.mutation_value( "temperature_speed_modifier" );
+    float temperature_speed_modifier = you.mutation_value( "temperature_speed_modifier" );
+    temperature_speed_modifier += you.bonus_from_enchantments( temperature_speed_modifier,
+                                  enchantment_value_id( "BODYTEMP_SPEED" ) );
+
     if( temperature_speed_modifier != 0 ) {
         nc_color pen_color;
         std::string pen_sign;
-        const auto player_local_temp = units::to_fahrenheit( get_weather().get_temperature( you.pos() ) );
+        const auto player_local_temp = units::to_fahrenheit( get_weather().get_temperature(
+                                           you.abs_pos() ) );
         if( you.has_trait( trait_id( "COLDBLOOD4" ) ) && player_local_temp > 65 ) {
             pen_color = c_green;
             pen_sign = "+";
@@ -990,7 +1012,6 @@ static void draw_speed_tab( const catacurses::window &w_speed,
 
     int quick_bonus = static_cast<int>( std::round( ( you.mutation_value( "speed_modifier" ) - 1 ) *
                                         100 ) );
-    int bio_speed_bonus = 10;
     if( quick_bonus != 0 ) {
         std::string pen_sign = quick_bonus >= 0 ? "+" : "-";
         nc_color pen_color = quick_bonus >= 0 ? c_green : c_red;
@@ -999,9 +1020,15 @@ static void draw_speed_tab( const catacurses::window &w_speed,
                    left_justify( _( "Mutations" ), 20 ), pen_sign, std::abs( quick_bonus ) );
         ++line;
     }
-    if( you.has_bionic( bionic_id( "bio_speed" ) ) ) {
+    const auto ench_speed = int( ceil( you.bonus_from_enchantments( 100,
+                                       enchantment_value_id( "SPEED" ) ) ) );
+    if( ench_speed > 0 ) {
         mvwprintz( w_speed, point( 1, line ), c_green,
-                   pgettext( "speed bonus", "Bionic Speed        +%2d%%" ), bio_speed_bonus );
+                   pgettext( "speed bonus", "Misc Speed        +%2d%%" ), ench_speed );
+        ++line;
+    } else if( ench_speed < 0 ) {
+        mvwprintz( w_speed, point( 1, line ), c_red,
+                   pgettext( "speed bonus", "Misc Speed        -%2d%%" ), abs( ench_speed ) );
         ++line;
     }
 
@@ -1039,7 +1066,7 @@ static void draw_info_window( const catacurses::window &w_info, const Character 
             draw_encumbrance_info( w_info, you, line );
             break;
         case player_display_tab::skills:
-            draw_skills_info( w_info, line, skillslist );
+            draw_skills_info( w_info, you, line, skillslist );
             break;
         case player_display_tab::traits:
             draw_traits_info( w_info, line, traitslist );
@@ -1207,7 +1234,14 @@ static bool handle_player_display_action( Character &you, unsigned int &line,
                     selectedSkill = skillslist[line].skill;
                 }
                 if( selectedSkill ) {
-                    you.get_skill_level_object( selectedSkill->ident() ).toggleTraining();
+                    const auto hook_results = cata::run_hooks( "on_character_display_skill_action",
+                    [&]( sol::table & params ) {
+                        params["character"] = &you;
+                        params["skill"] = selectedSkill->ident();
+                    } );
+                    if( !hook_results.get_or( "handled", false ) ) {
+                        you.get_skill_level_object( selectedSkill->ident() ).toggleTraining();
+                    }
                 }
                 invalidate_tab( curtab );
                 break;
@@ -1320,21 +1354,21 @@ void character_display::disp_info( Character &ch )
         effect_name_and_text.emplace_back( starvation_name, starvation_text );
     }
 
-    if( ( ch.has_trait( trait_id( "TROGLO" ) ) && g->is_in_sunlight( ch.pos() ) &&
+    if( ( ch.has_trait( trait_id( "TROGLO" ) ) && g->is_in_sunlight( ch.bub_pos() ) &&
           get_weather().weather_id->sun_intensity >= sun_intensity_type::high ) ||
-        ( ch.has_trait( trait_id( "TROGLO2" ) ) && g->is_in_sunlight( ch.pos() ) &&
+        ( ch.has_trait( trait_id( "TROGLO2" ) ) && g->is_in_sunlight( ch.bub_pos() ) &&
           get_weather().weather_id->sun_intensity < sun_intensity_type::high )
       ) {
         effect_name_and_text.emplace_back( _( "In Sunlight" ),
                                            _( "The sunlight irritates you.\n"
                                               "Strength - 1;    Dexterity - 1;    Intelligence - 1;    Perception - 1" )
                                          );
-    } else if( ch.has_trait( trait_id( "TROGLO2" ) ) && g->is_in_sunlight( ch.pos() ) ) {
+    } else if( ch.has_trait( trait_id( "TROGLO2" ) ) && g->is_in_sunlight( ch.bub_pos() ) ) {
         effect_name_and_text.emplace_back( _( "In Sunlight" ),
                                            _( "The sunlight irritates you badly.\n"
                                               "Strength - 2;    Dexterity - 2;    Intelligence - 2;    Perception - 2" )
                                          );
-    } else if( ch.has_trait( trait_id( "TROGLO3" ) ) && g->is_in_sunlight( ch.pos() ) ) {
+    } else if( ch.has_trait( trait_id( "TROGLO3" ) ) && g->is_in_sunlight( ch.bub_pos() ) ) {
         effect_name_and_text.emplace_back( _( "In Sunlight" ),
                                            _( "The sunlight irritates you terribly.\n"
                                               "Strength - 4;    Dexterity - 4;    Intelligence - 4;    Perception - 4" )

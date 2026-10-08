@@ -5,6 +5,7 @@
 #include "debug.h"
 #include "json.h"
 #include "type_id.h"
+#include "type_id_implement.h"
 #include "generic_factory.h"
 
 const flag_id flag_NULL = flag_id( "null" ); // intentionally invalid flag
@@ -41,6 +42,7 @@ const flag_id flag_BIPOD( "BIPOD" );
 const flag_id flag_BIRD( "BIRD" );
 const flag_id flag_BLED( "BLED" );
 const flag_id flag_BLIND( "BLIND" );
+const flag_id flag_BLINDS_EYES_ON_HIT( "BLINDS_EYES_ON_HIT" );
 const flag_id flag_BLOCK_WHILE_WORN( "BLOCK_WHILE_WORN" );
 const flag_id flag_BOMB( "BOMB" );
 const flag_id flag_BOOK_CANNIBAL( "BOOK_CANNIBAL" );
@@ -79,6 +81,7 @@ const flag_id flag_DANGEROUS( "DANGEROUS" );
 const flag_id flag_DARK_IMMUNE( "DARK_IMMUNE" );
 const flag_id flag_DEAF( "DEAF" );
 const flag_id flag_DESTROY_ON_DECHARGE( "DESTROY_ON_DECHARGE" );
+const flag_id flag_DESTROY_ON_DROP( "DESTROY_ON_DROP" );
 const flag_id flag_DIAMOND( "DIAMOND" );
 const flag_id flag_DIG_TOOL( "DIG_TOOL" );
 const flag_id flag_DIMENSIONAL_ANCHOR( "DIMENSIONAL_ANCHOR" );
@@ -114,6 +117,7 @@ const flag_id flag_ELECTRIC_IMMUNE( "ELECTRIC_IMMUNE" );
 const flag_id flag_ETHEREAL_ITEM( "ETHEREAL_ITEM" );
 const flag_id flag_EXPLOSION_SMASHED( "EXPLOSION_SMASHED" );
 const flag_id flag_EXPLOSION_PROPELLED( "EXPLOSION_PROPELLED" );
+const flag_id flag_DRONE_CAM( "DRONE_CAM" );
 const flag_id flag_FAKE_MILL( "FAKE_MILL" );
 const flag_id flag_FAKE_CLONING_VAT( "FAKE_CLONING_VAT" );
 const flag_id flag_FAKE_SMOKE( "FAKE_SMOKE" );
@@ -150,6 +154,7 @@ const flag_id flag_GAS_DISCOUNT( "GAS_DISCOUNT" );
 const flag_id flag_GAS_PROOF( "GAS_PROOF" );
 const flag_id flag_GIBBED( "GIBBED" );
 const flag_id flag_GNV_EFFECT( "GNV_EFFECT" );
+const flag_id flag_GNVE_EFFECT( "GNVE_EFFECT" );
 const flag_id flag_HEATS_FOOD( "HEATS_FOOD" );
 const flag_id flag_HEATS_FOOD_IS_CONSUMED( "HEATS_FOOD_IS_CONSUMED" );
 const flag_id flag_HEATS_FOOD_USING_CHARGES( "HEATS_FOOD_USING_CHARGES" );
@@ -203,6 +208,8 @@ const flag_id flag_MOUNTED_GUN( "MOUNTED_GUN" );
 const flag_id flag_MYCUS_OK( "MYCUS_OK" );
 const flag_id flag_NANOFAB_TEMPLATE( "NANOFAB_TEMPLATE" );
 const flag_id flag_NAT_UPS( "NAT_UPS" );
+const flag_id flag_NATURE_CAMO( "NATURE_CAMO" );
+const flag_id flag_URBAN_CAMO( "URBAN_CAMO" );
 const flag_id flag_NEEDS_NO_LUBE( "NEEDS_NO_LUBE" );
 const flag_id flag_NEEDS_UNFOLD( "NEEDS_UNFOLD" );
 const flag_id flag_NEGATIVE_MONOTONY_OK( "NEGATIVE_MONOTONY_OK" );
@@ -239,6 +246,7 @@ const flag_id flag_OUTER( "OUTER" );
 const flag_id flag_OVERSIZE( "OVERSIZE" );
 const flag_id flag_PARTIAL_DEAF( "PARTIAL_DEAF" );
 const flag_id flag_PERFECT_LOCKPICK( "PERFECT_LOCKPICK" );
+const flag_id flag_DURABLE_LOCKPICK( "DURABLE_LOCKPICK" );
 const flag_id flag_PERPETUAL( "PERPETUAL" );
 const flag_id flag_PERSONAL( "PERSONAL" );
 const flag_id flag_PLACE_RANDOMLY( "PLACE_RANDOMLY" );
@@ -247,6 +255,7 @@ const flag_id flag_POLEARM( "POLEARM" );
 const flag_id flag_POWERARMOR_COMPATIBLE( "POWERARMOR_COMPATIBLE" );
 const flag_id flag_POWERARMOR_EXO( "POWERARMOR_EXO" );
 const flag_id flag_POWERARMOR_EXTERNAL( "POWERARMOR_EXTERNAL" );
+const flag_id flag_POWERARMOR_PLATING( "POWERARMOR_PLATING" );
 const flag_id flag_POWERARMOR_MOD( "POWERARMOR_MOD" );
 const flag_id flag_POWERED( "POWERED" );
 const flag_id flag_PRIMITIVE_RANGED_WEAPON( "PRIMITIVE_RANGED_WEAPON" );
@@ -281,6 +290,7 @@ const flag_id flag_REACH3( "REACH3" );
 const flag_id flag_REACH_ATTACK( "REACH_ATTACK" );
 const flag_id flag_REBREATHER( "REBREATHER" );
 const flag_id flag_RECHARGE( "RECHARGE" );
+const flag_id flag_RECON_VISION( "RECON_VISION" );
 const flag_id flag_REDUCED_BASHING( "REDUCED_BASHING" );
 const flag_id flag_REDUCED_WEIGHT( "REDUCED_WEIGHT" );
 const flag_id flag_RELOAD_AND_SHOOT( "RELOAD_AND_SHOOT" );
@@ -297,6 +307,7 @@ const flag_id flag_ROLLER_ONE( "ROLLER_ONE" );
 const flag_id flag_ROLLER_QUAD( "ROLLER_QUAD" );
 const flag_id flag_SAFECRACK( "SAFECRACK" );
 const flag_id flag_SEMITANGIBLE( "SEMITANGIBLE" );
+const flag_id flag_SECRET_ENCHANTMENTS( "SECRET_ENCHANTMENTS" );
 const flag_id flag_SHATTERS( "SHATTERS" );
 const flag_id flag_SHOCKING( "SHOCKING" );
 const flag_id flag_ACIDIC( "ACIDIC" );
@@ -314,6 +325,7 @@ const flag_id flag_SNIPPET_NEEDS_LITERACY( "SNIPPET_NEEDS_LITERACY" );
 const flag_id flag_SOLARPACK( "SOLARPACK" );
 const flag_id flag_SOLARPACK_ON( "SOLARPACK_ON" );
 const flag_id flag_SPAWN_FRIENDLY( "SPAWN_FRIENDLY" );
+const flag_id flag_SPAWN_HOSTILE( "SPAWN_HOSTILE" );
 const flag_id flag_SPEAR( "SPEAR" );
 const flag_id flag_SPEEDLOADER( "SPEEDLOADER" );
 const flag_id flag_SPLINT( "SPLINT" );
@@ -326,6 +338,7 @@ const flag_id flag_SUN_GLASSES( "SUN_GLASSES" );
 const flag_id flag_SUPER_FANCY( "SUPER_FANCY" );
 const flag_id flag_SWIM_GOGGLES( "SWIM_GOGGLES" );
 const flag_id flag_TACK( "TACK" );
+const flag_id flag_NET_TANGLE( "NET_TANGLE" );
 const flag_id flag_TANGLE( "TANGLE" );
 const flag_id flag_TARDIS( "TARDIS" );
 const flag_id flag_THERMOMETER( "THERMOMETER" );
@@ -365,6 +378,7 @@ const flag_id flag_WATER_DISABLE( "WATER_DISABLE" );
 const flag_id flag_WET( "WET" );
 const flag_id flag_WHIP( "WHIP" );
 const flag_id flag_WIND_EXTINGUISH( "WIND_EXTINGUISH" );
+const flag_id flag_WORN_GUN( "WORN_GUN" );
 const flag_id flag_WRITE_MESSAGE( "WRITE_MESSAGE" );
 const flag_id flag_ZERO_WEIGHT( "ZERO_WEIGHT" );
 const flag_id flag_ZOOM( "ZOOM" );
@@ -383,19 +397,7 @@ namespace
 generic_factory<json_flag> json_flags_all( "json_flags" );
 } // namespace
 
-/** @relates string_id */
-template<>
-bool flag_id ::is_valid() const
-{
-    return json_flags_all.is_valid( *this );
-}
-
-/** @relates string_id */
-template<>
-const json_flag &flag_id::obj() const
-{
-    return json_flags_all.obj( *this );
-}
+IMPLEMENT_STRING_AND_INT_IDS( json_flag, json_flags_all );
 
 json_flag::operator bool() const
 {
@@ -419,6 +421,7 @@ void json_flag::load( const JsonObject &jo, const std::string & )
     optional( jo, was_loaded, "requires_flag", requires_flag_ );
     optional( jo, was_loaded, "taste_mod", taste_mod_ );
     optional( jo, was_loaded, "restriction", restriction_ );
+    optional( jo, was_loaded, "tag", tag_ );
 
     // FIXME: most flags have a "context" field that isn't used for anything
     // Test for it here to avoid errors about unvisited members

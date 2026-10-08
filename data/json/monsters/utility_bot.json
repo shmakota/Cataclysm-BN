@@ -25,7 +25,17 @@
     "special_attacks": [ [ "PHOTOGRAPH", 30 ] ],
     "death_drops": { "groups": [ [ "robots", 4 ], [ "eyebot", 1 ] ] },
     "death_function": [ "BROKEN" ],
-    "flags": [ "SEES", "FLIES", "ELECTRONIC", "COLDPROOF", "NO_BREATHE", "NOHEAD", "PRIORITIZE_TARGETS", "BIOPROOF" ]
+    "flags": [
+      "SEES",
+      "FLIES",
+      "ELECTRONIC",
+      "COLDPROOF",
+      "NO_BREATHE",
+      "NOHEAD",
+      "PRIORITIZE_TARGETS",
+      "BIOPROOF",
+      "POLICE_EYEBOT"
+    ]
   },
   {
     "id": "mon_grocerybot",
@@ -124,7 +134,8 @@
       "PRIORITIZE_TARGETS",
       "CARD_OVERRIDE",
       "PATH_AVOID_DANGER_1",
-      "BIOPROOF"
+      "BIOPROOF",
+      "NO_SLIP"
     ]
   },
   {
@@ -151,6 +162,8 @@
     "armor_fire": 10,
     "vision_day": 50,
     "revert_to_itype": "bot_haulerbot",
+    "//": "Marks targets for you if friendly, does nothing else otherwise since lacks POLICE_EYEBOT flag.",
+    "special_attacks": [ [ "PHOTOGRAPH", 60 ] ],
     "death_function": [ "BROKEN" ],
     "flags": [
       "SEES",
@@ -163,7 +176,8 @@
       "PET_MOUNTABLE",
       "CARD_OVERRIDE",
       "MILITARY_MECH",
-      "BIOPROOF"
+      "BIOPROOF",
+      "NO_SLIP"
     ]
   },
   {

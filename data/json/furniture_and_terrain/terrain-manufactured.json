@@ -42,7 +42,7 @@
     "color": "red",
     "move_cost": 0,
     "coverage": 65,
-    "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "SEALED", "CONTAINER", "REDUCE_SCENT", "PERMEABLE" ],
+    "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "SEALED", "CONTAINER", "LIQUIDCONT", "REDUCE_SCENT", "PERMEABLE" ],
     "examine_action": "gaspump",
     "bash": {
       "str_min": 8,
@@ -65,7 +65,7 @@
     "color": "brown_red",
     "move_cost": 0,
     "coverage": 50,
-    "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "SEALED", "CONTAINER", "REDUCE_SCENT" ],
+    "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "SEALED", "CONTAINER", "LIQUIDCONT", "REDUCE_SCENT" ],
     "bash": {
       "str_min": 40,
       "str_max": 100,
@@ -114,7 +114,7 @@
     "color": "yellow_red",
     "move_cost": 0,
     "coverage": 65,
-    "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "SEALED", "CONTAINER", "REDUCE_SCENT" ],
+    "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "SEALED", "CONTAINER", "LIQUIDCONT", "REDUCE_SCENT" ],
     "examine_action": "gaspump",
     "bash": {
       "str_min": 8,
@@ -164,7 +164,7 @@
     "looks_like": "t_gas_pump",
     "move_cost": 0,
     "coverage": 65,
-    "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "SEALED", "CONTAINER", "REDUCE_SCENT", "PERMEABLE" ],
+    "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "SEALED", "CONTAINER", "LIQUIDCONT", "REDUCE_SCENT", "PERMEABLE" ],
     "examine_action": "gaspump",
     "bash": {
       "str_min": 8,
@@ -528,40 +528,6 @@
   },
   {
     "type": "terrain",
-    "id": "t_cvdmachine",
-    "name": "CVD control panel",
-    "description": "This is a VERY expensive-looking apparatus that's labeled 'Chemical Vapor Deposition Machine'.  With the input of certain exceptionally rare chemicals and elements, one could conceivably coat one's weapon with diamond.  While the process is extremely complicated, a previous user has helpfully sketched: Hydrogen + charcoal = smiley face.",
-    "symbol": "&",
-    "color": "cyan",
-    "looks_like": "t_console",
-    "move_cost": 0,
-    "coverage": 50,
-    "flags": [ "TRANSPARENT", "NOITEM", "PERMEABLE" ],
-    "examine_action": "cvdmachine",
-    "bash": {
-      "str_min": 8,
-      "str_max": 150,
-      "sound": "crunch!",
-      "sound_fail": "whack!",
-      "ter_set": "t_console_broken",
-      "items": [
-        { "item": "processor", "prob": 25 },
-        { "item": "RAM", "count": [ 0, 2 ], "prob": 50 },
-        { "item": "cable", "charges": [ 1, 2 ], "prob": 50 },
-        { "item": "small_lcd_screen", "prob": 25 },
-        { "item": "e_scrap", "count": [ 1, 4 ], "prob": 50 },
-        { "item": "circuit", "count": [ 0, 2 ], "prob": 50 },
-        { "item": "power_supply", "prob": 25 },
-        { "item": "amplifier", "prob": 25 },
-        { "item": "plastic_chunk", "count": [ 4, 10 ], "prob": 50 },
-        { "item": "scrap", "count": [ 2, 6 ], "prob": 50 }
-      ],
-      "//": "reduction equal to broken console, but destroy_threshold equal to str_min since fragile",
-      "ranged": { "reduction": [ 8, 16 ], "destroy_threshold": 8, "block_unaimed_chance": "50%" }
-    }
-  },
-  {
-    "type": "terrain",
     "id": "t_nanofab_body",
     "name": "nanofabricator",
     "symbol": "%",
@@ -569,7 +535,15 @@
     "color": "dark_gray",
     "move_cost": 0,
     "coverage": 65,
-    "flags": [ "PLACE_ITEM" ],
+    "flags": [ "PLACE_ITEM", "NANOFAB_BODY", "ADV_DECONSTRUCT" ],
+    "deconstruct": {
+      "ter_set": "t_strconc_floor",
+      "items": [
+        { "item": "nanofab_body_item", "charges": 1 },
+        { "item": "power_supply", "charges": [ 3, 3 ] },
+        { "item": "cable", "charges": [ 15, 15 ] }
+      ]
+    },
     "bash": {
       "str_min": 120,
       "str_max": 150,
@@ -603,8 +577,83 @@
     "looks_like": "t_console",
     "move_cost": 0,
     "coverage": 50,
-    "flags": [ "WALL", "NOITEM", "PERMEABLE" ],
+    "flags": [ "WALL", "NOITEM", "PERMEABLE", "ADV_DECONSTRUCT" ],
     "examine_action": "nanofab",
+    "deconstruct": {
+      "ter_set": "t_strconc_floor",
+      "items": [
+        { "item": "nanofab_item", "charges": 1 },
+        { "item": "power_supply", "charges": [ 3, 3 ] },
+        { "item": "cable", "charges": [ 15, 15 ] }
+      ]
+    },
+    "bash": {
+      "str_min": 8,
+      "str_max": 150,
+      "sound": "crunch!",
+      "sound_fail": "whack!",
+      "ter_set": "t_console_broken",
+      "items": [
+        { "item": "processor", "prob": 25 },
+        { "item": "RAM", "count": [ 0, 2 ], "prob": 50 },
+        { "item": "cable", "charges": [ 1, 2 ], "prob": 50 },
+        { "item": "small_lcd_screen", "prob": 25 },
+        { "item": "e_scrap", "count": [ 1, 4 ], "prob": 50 },
+        { "item": "circuit", "count": [ 0, 2 ], "prob": 50 },
+        { "item": "power_supply", "prob": 25 },
+        { "item": "amplifier", "prob": 25 },
+        { "item": "plastic_chunk", "count": [ 4, 10 ], "prob": 50 },
+        { "item": "scrap", "count": [ 2, 6 ], "prob": 50 }
+      ],
+      "//": "reduction equal to broken console, but destroy_threshold equal to str_min since fragile",
+      "ranged": { "reduction": [ 8, 16 ], "destroy_threshold": 8, "block_unaimed_chance": "50%" }
+    }
+  },
+  {
+    "type": "terrain",
+    "id": "t_nanoforge_body",
+    "name": "superalloy forge",
+    "symbol": "%",
+    "description": "A great column of advanced machinery.  Within this self-contained, miniaturized factory, several specialized 3d printers work in tandem with robotic forge units to efficiently manufacture superalloy sheets from steel sheets and nanomaterial.",
+    "color": "dark_gray",
+    "move_cost": 0,
+    "coverage": 65,
+    "flags": [ "PLACE_ITEM", "NANOFORGE_BODY" ],
+    "bash": {
+      "str_min": 120,
+      "str_max": 150,
+      "sound": "crunch!",
+      "sound_fail": "whack!",
+      "ter_set": "t_floor",
+      "items": [
+        { "item": "e_scrap", "count": [ 10, 14 ] },
+        { "item": "processor", "count": [ 10, 20 ] },
+        { "item": "RAM", "count": [ 14, 20 ] },
+        { "item": "nanomaterial", "count": 1, "prob": 10 },
+        { "item": "bearing", "charges": [ 20, 60 ] },
+        { "item": "motor", "count": 4 },
+        { "item": "power_supply", "count": [ 4, 16 ] },
+        { "item": "amplifier", "count": [ 4, 16 ] },
+        { "item": "cable", "charges": [ 250, 500 ] },
+        { "item": "circuit", "count": [ 1, 6 ] },
+        { "item": "scrap", "count": [ 12, 18 ] }
+      ],
+      "//": "Variable reduction since might hit more or less material.",
+      "ranged": { "reduction": [ 60, 120 ], "destroy_threshold": 150 }
+    }
+  },
+  {
+    "type": "terrain",
+    "id": "t_nanoforge",
+    "name": "superalloy forge control panel",
+    "symbol": "&",
+    "description": "A small computer panel attached to a superalloy forge.",
+    "color": "red",
+    "looks_like": "t_nanofab",
+    "move_cost": 0,
+    "coverage": 50,
+    "flags": [ "WALL", "NOITEM", "PERMEABLE" ],
+    "examine_action": "nanoforge",
     "bash": {
       "str_min": 8,
       "str_max": 150,
@@ -644,8 +693,8 @@
       "str_max": 80,
       "sound": "ker-rash!",
       "sound_fail": "plunk.",
-      "sound_vol": 16,
-      "sound_fail_vol": 12,
+      "sound_vol": "100 dB",
+      "sound_fail_vol": "80 dB",
       "ter_set": "t_floor",
       "items": [ { "item": "glass_shard", "count": [ 3, 6 ] }, { "item": "scrap", "count": [ 0, 2 ] } ],
       "//": "reduction and destroy_threshold are lower for plain glass",
@@ -662,7 +711,7 @@
     "move_cost": 0,
     "coverage": 50,
     "roof": "t_flat_roof",
-    "flags": [ "NOITEM", "INDOORS" ],
+    "flags": [ "NOITEM" ],
     "examine_action": "slot_machine",
     "bash": {
       "str_min": 8,
@@ -1151,7 +1200,7 @@
     "symbol": "=",
     "color": "brown",
     "move_cost": 6,
-    "flags": [ "TRANSPARENT", "BASHABLE", "PLACE_ITEM", "INDOORS", "ADV_DECONSTRUCT" ],
+    "flags": [ "TRANSPARENT", "BASHABLE", "PLACE_ITEM", "ADV_DECONSTRUCT" ],
     "coverage": 30,
     "deconstruct": {
       "ter_set": "t_rock_floor",
@@ -1457,7 +1506,7 @@
     "color": "green",
     "looks_like": "t_pit",
     "move_cost": 0,
-    "flags": [ "TRANSPARENT", "CONTAINER", "PLACE_ITEM", "INDOORS", "DECONSTRUCT" ],
+    "flags": [ "TRANSPARENT", "CONTAINER", "PLACE_ITEM", "DECONSTRUCT" ],
     "deconstruct": {
       "ter_set": "t_pit",
       "items": [ { "item": "rock", "count": 40 }, { "item": "stick", "count": 6 }, { "item": "straw_pile", "count": 12 } ]
@@ -1511,7 +1560,6 @@
       "FLAMMABLE_ASH",
       "THIN_OBSTACLE",
       "REDUCE_SCENT",
-      "INDOORS",
       "MOUNTABLE",
       "BLOCK_WIND",
       "HIDE_PLACE"
@@ -1545,34 +1593,7 @@
         { "item": "pine_bough", "count": [ 0, 2 ] }
       ]
     },
-    "flags": [ "TRANSPARENT", "CONTAINER", "FLAMMABLE_ASH", "THIN_OBSTACLE", "REDUCE_SCENT", "INDOORS", "MOUNTABLE", "BLOCK_WIND" ]
-  },
-  {
-    "id": "t_tarptent",
-    "type": "terrain",
-    "name": "tarp lean-to",
-    "description": "A small shelter covered by waterproof tarp, that can be used to take refuge from the elements.",
-    "symbol": ";",
-    "color": "light_blue",
-    "looks_like": "t_leanto",
-    "move_cost": 2,
-    "bash": {
-      "str_min": 6,
-      "str_max": 12,
-      "ter_set": "t_dirt",
-      "sound": "crash!",
-      "sound_fail": "whack!",
-      "items": [
-        { "item": "stick", "count": [ 1, 2 ] },
-        { "item": "splinter", "count": [ 1, 4 ] },
-        { "item": "plastic_chunk", "count": [ 4, 8 ] }
-      ]
-    },
-    "deconstruct": {
-      "ter_set": "t_dirt",
-      "items": [ { "item": "pointy_stick", "count": 4 }, { "item": "string_6", "count": 4 }, { "item": "tarp", "count": 1 } ]
-    },
-    "flags": [ "TRANSPARENT", "FLAMMABLE", "THIN_OBSTACLE", "INDOORS", "MOUNTABLE", "EASY_DECONSTRUCT", "FLAT", "BLOCK_WIND" ]
+    "flags": [ "TRANSPARENT", "CONTAINER", "FLAMMABLE_ASH", "THIN_OBSTACLE", "REDUCE_SCENT", "MOUNTABLE", "BLOCK_WIND" ]
   },
   {
     "type": "terrain",

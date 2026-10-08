@@ -1,41 +1,33 @@
-#include "avatar_functions.h"
-#include "npc.h"
-#include "pickup.h"
-#include "player.h" // IWYU pragma: associated
 #include "consumption.h" // IWYU pragma: associated
-#include "character.h"
-
-#include <algorithm>
-#include <array>
-#include <cstdlib>
-#include <memory>
-#include <optional>
-#include <string>
-#include <tuple>
 
 #include "activity_handlers.h"
 #include "addiction.h"
 #include "avatar.h"
+#include "avatar_functions.h"
 #include "bionics.h"
 #include "calendar.h"
 #include "cata_utility.h"
+#include "character.h"
 #include "craft_command.h"
 #include "debug.h"
+#include "enchantments/enchantment.h"
 #include "enums.h"
-#include "flat_set.h"
 #include "flag.h"
+#include "flat_set.h"
 #include "game.h"
 #include "item_contents.h"
 #include "itype.h"
-#include "magic_enchantment.h"
-#include "map.h"
+#include "map/map.h"
 #include "material.h"
 #include "messages.h"
 #include "monster.h"
 #include "morale_types.h"
 #include "mtype.h"
 #include "mutation.h"
+#include "npc.h"
 #include "options.h"
+#include "pickup.h"
+#include "player.h" // IWYU pragma: associated
 #include "pldata.h"
 #include "recipe.h"
 #include "recipe_dictionary.h"
@@ -48,7 +40,15 @@
 #include "type_id.h"
 #include "units.h"
 #include "vitamin.h"
-#include "weather.h"
+#include "weather/weather.h"
+
+#include <algorithm>
+#include <array>
+#include <cstdlib>
+#include <memory>
+#include <optional>
+#include <string>
+#include <tuple>
 
 static const std::string comesttype_DRINK( "DRINK" );
 static const std::string comesttype_FOOD( "FOOD" );
@@ -74,6 +74,7 @@ static const efftype_id effect_paincysts( "paincysts" );
 static const efftype_id effect_poison( "poison" );
 static const efftype_id effect_tapeworm( "tapeworm" );
 static const efftype_id effect_visuals( "visuals" );
+static const efftype_id effect_lactaid( "lactaid" );
 
 static const itype_id itype_syringe( "syringe" );
 
@@ -87,7 +88,6 @@ static const trait_id trait_ANTIWHEAT( "ANTIWHEAT" );
 static const trait_id trait_BEAK_HUM( "BEAK_HUM" );
 static const trait_id trait_CANNIBAL( "CANNIBAL" );
 static const trait_id trait_CARNIVORE( "CARNIVORE" );
-static const trait_id trait_EATDEAD( "EATDEAD" );
 static const trait_id trait_EATHEALTH( "EATHEALTH" );
 static const trait_id trait_FANGS_SPIDER( "FANGS_SPIDER" );
 static const trait_id trait_GIZZARD( "GIZZARD" );
@@ -99,6 +99,7 @@ static const trait_id trait_M_IMMUNE( "M_IMMUNE" );
 static const trait_id trait_MANDIBLES( "MANDIBLES" );
 static const trait_id trait_MEATARIAN( "MEATARIAN" );
 static const trait_id trait_MOUTH_TENTACLES( "MOUTH_TENTACLES" );
+static const trait_id trait_NO_THIRST( "NO_THIRST" );
 static const trait_id trait_PARAIMMUNE( "PARAIMMUNE" );
 static const trait_id trait_POISRESIST( "POISRESIST" );
 static const trait_id trait_PROBOSCIS( "PROBOSCIS" );
@@ -134,6 +135,15 @@ static const vitamin_id vitamin_veggy_allergen( "veggy_allergen" );
 static const vitamin_id vitamin_wheat_allergen( "wheat_allergen" );
 
 static const trait_flag_str_id trait_flag_CANNIBAL( "CANNIBAL" );
+
+static const enchantment_value_id ench_val_FOOD_FUN( "FOOD_FUN" );
+static const enchantment_value_id ench_val_METABOLISM( "METABOLISM" );
+
+static const enchantment_flag_id ench_flag_EAT_ROTTEN( "EAT_ROTTEN" );
+static const enchantment_flag_id ench_flag_ONLY_EAT_ROTTEN( "ONLY_EAT_ROTTEN" );
+static const enchantment_flag_id ench_flag_EAT_ROTTEN_MORALE( "EAT_ROTTEN_MORALE" );
+static const enchantment_flag_id ench_flag_FOOD_POISON_IMMUNE( "FOOD_POISON_IMMUNE" );
+static const enchantment_flag_id ench_flag_FOOD_PARASITE_IMMUNE( "FOOD_PARASITE_IMMUNE" );
 
 // note: cannot use constants from flag.h (e.g. flag_ALLERGEN_VEGGY) here, as they
 // might be uninitialized at the time these const arrays are created
@@ -488,7 +498,7 @@ std::pair<int, int> Character::fun_for( const item &comest ) const
 
     const float relative_rot = comest.get_relative_rot();
 
-    if( relative_rot > 1.0f && !has_trait( trait_SAPROPHAGE ) && !has_trait( trait_SAPROVORE ) ) {
+    if( relative_rot > 1.0f && !has_enchantment_flag( ench_flag_EAT_ROTTEN_MORALE ) ) {
         // Rotten food should be pretty disgusting.
         // Baseline minumum is the same as eating raw meat as a normal human being.
         fun = std::min( fun - 5, -10.0f );
@@ -603,7 +613,7 @@ float Character::metabolic_rate_base() const
     const float hunger_rate = get_option< float >( hunger_rate_string );
     const float mut_bonus = 1.0f + mutation_value( metabolism_modifier );
     const float with_mut = hunger_rate * mut_bonus;
-    const float ench_bonus = bonus_from_enchantments( with_mut, enchant_vals::mod::METABOLISM );
+    const float ench_bonus = bonus_from_enchantments( with_mut, ench_val_METABOLISM );
 
     return std::max( 0.0f, with_mut + ench_bonus );
 }
@@ -629,6 +639,9 @@ morale_type Character::allergy_type( const item &food ) const
     for( const auto &tp : allergy_tuples ) {
         if( has_trait( std::get<0>( tp ) ) &&
             food.has_vitamin( std::get<1>( tp ) ) ) {
+            if( std::get<0>( tp ) == trait_LACTOSE && has_effect( effect_lactaid ) ) {
+                continue;
+            }
             return std::get<2>( tp );
         }
     }
@@ -741,14 +754,10 @@ ret_val<edible_rating> Character::will_eat( const item &food, bool interactive )
         consequences.emplace_back( ret_val<edible_rating>::make_failure( code, msg ) );
     };
 
-    const bool saprophage = has_trait( trait_SAPROPHAGE );
     const auto &comest = food.get_comestible();
 
-    if( food.rotten() ) {
-        const bool saprovore = has_trait( trait_SAPROVORE );
-        if( !saprophage && !saprovore && !has_bionic( bio_digestion ) ) {
-            add_consequence( _( "This is rotten and smells awful!" ), edible_rating::rotten );
-        }
+    if( food.rotten() && !has_enchantment_flag( ench_flag_EAT_ROTTEN ) ) {
+        add_consequence( _( "This is rotten and smells awful!" ), edible_rating::rotten );
     }
 
     const bool carnivore = has_trait( trait_CARNIVORE );
@@ -776,9 +785,8 @@ ret_val<edible_rating> Character::will_eat( const item &food, bool interactive )
         add_consequence( _( "Your stomach won't be happy (allergy)." ), edible_rating::allergy );
     }
 
-    if( saprophage && edible && food.rotten() && !food.has_flag( flag_FERTILIZER ) ) {
+    if( has_enchantment_flag( ench_flag_ONLY_EAT_ROTTEN ) && edible && food.rotten() ) {
         // Note: We're allowing all non-solid "food". This includes drugs
-        // Hard-coding fertilizer for now - should be a separate flag later
         //~ No, we don't eat "rotten" food. We eat properly aged food, like a normal person.
         //~ Semantic difference, but greatly facilitates people being proud of their character.
         add_consequence( _( "Your stomach won't be happy (not rotten enough)." ),
@@ -786,10 +794,10 @@ ret_val<edible_rating> Character::will_eat( const item &food, bool interactive )
     }
 
     if( !food.has_infinite_charges() &&
-        ( ( food_kcal > 0 &&
+        ( ( food_kcal > 0 && !has_active_mutation( trait_EATHEALTH ) &&
             get_stored_kcal() + stomach.get_calories() + food_kcal
             > max_stored_kcal() ) ||
-          ( comest->quench > 0 && get_thirst() < comest->quench ) ) ) {
+          ( comest->quench > 0 && get_thirst() < comest->quench && !has_trait( trait_NO_THIRST ) ) ) ) {
         add_consequence( _( "You're full already and the excess food will be wasted." ),
                          edible_rating::too_full );
     }
@@ -842,7 +850,7 @@ bool Character::eat( item &food, bool force )
     int charges_used = 0;
     if( food.type->has_use() ) {
         if( !food.type->can_use( "PETFOOD" ) ) {
-            charges_used = food.type->invoke( *this->as_player(), food, pos() );
+            charges_used = food.type->invoke( *this->as_player(), food, bub_pos() );
             if( charges_used <= 0 ) {
                 return false;
             }
@@ -862,15 +870,16 @@ bool Character::eat( item &food, bool force )
     const bool drinkable = !chew && food.get_comestible()->comesttype == comesttype_DRINK;
     // If neither of the above is true then it's a drug and shouldn't get mealtime penalty/bonus
 
-    const bool saprophage = has_trait( trait_SAPROPHAGE );
-    if( spoiled && !saprophage ) {
-        add_msg_if_player( m_bad, _( "Ick, this %s doesn't taste so good…" ), food.tname() );
-        if( !has_trait( trait_SAPROVORE ) && !has_trait( trait_EATDEAD ) &&
-            !has_bionic( bio_digestion ) ) {
+    if( spoiled ) {
+        if( !has_enchantment_flag( ench_flag_EAT_ROTTEN_MORALE ) ) {
+            add_msg_if_player( m_bad, _( "Ick, this %s doesn't taste so good…" ), food.tname() );
+        } else {
+            add_msg_if_player( m_good, _( "Mmm, this %s tastes delicious…" ), food.tname() );
+        }
+        if( !has_enchantment_flag( ench_flag_EAT_ROTTEN ) &&
+            !has_enchantment_flag( ench_flag_FOOD_POISON_IMMUNE ) ) {
             add_effect( effect_foodpoison, rng( 6_minutes, ( nutr + 1 ) * 6_minutes ) );
         }
-    } else if( spoiled && saprophage ) {
-        add_msg_if_player( m_good, _( "Mmm, this %s tastes delicious…" ), food.tname() );
     }
 
     if( !consume_effects( food ) ) {
@@ -944,7 +953,7 @@ bool Character::eat( item &food, bool force )
     }
 
     // Chance to become parasitised
-    if( !( has_bionic( bio_digestion ) || has_trait( trait_PARAIMMUNE ) ) ) {
+    if( !has_enchantment_flag( ench_flag_FOOD_PARASITE_IMMUNE ) ) {
         if( food.get_comestible()->parasites > 0 && !food.has_flag( flag_NO_PARASITES ) &&
             one_in( food.get_comestible()->parasites ) ) {
             switch( rng( 0, 3 ) ) {
@@ -1064,7 +1073,7 @@ void Character::modify_morale( item &food, int nutr )
 
     if( food.has_flag( flag_EATEN_HOT ) ) {
         auto heater = find_food_heater( *this, crafting_inventory(),
-                                        get_map().has_nearby_fire( pos(), PICKUP_RANGE ) );
+                                        get_map().has_nearby_fire( bub_pos(), PICKUP_RANGE ) );
         if( heater && heater->consume( *this ) ) {
             add_msg_player_or_npc( m_good,
                                    _( "You heat up your %1$s using the %2$s." ),
@@ -1074,7 +1083,7 @@ void Character::modify_morale( item &food, int nutr )
             food_morale( MORALE_FOOD_HOT );
         }
     } else if( food.has_flag( flag_EATEN_COLD ) ) {
-        const auto temp = rot::temperature_flag_for_location( get_map(), food );
+        const auto temp = rot::temp::for_location( get_map(), food );
 
         if( temp == temperature_flag::TEMP_FREEZER ) {
             add_msg_if_player( m_good, _( "This stuff is icy!" ), food.tname() );
@@ -1090,6 +1099,9 @@ void Character::modify_morale( item &food, int nutr )
 
 
     std::pair<int, int> fun = fun_for( food );
+
+    fun.first += bonus_from_enchantments( fun.first, ench_val_FOOD_FUN );
+
     if( fun.first < 0 ) {
         if( has_active_bionic( bio_taste_blocker ) &&
             get_power_level() > units::from_kilojoule( -fun.first ) ) {
@@ -1105,9 +1117,9 @@ void Character::modify_morale( item &food, int nutr )
 
     if( food.has_flag( flag_HIDDEN_HALLU ) ) {
         if( has_trait( trait_SPIRITUAL ) ) {
-            add_morale( MORALE_FOOD_GOOD, 36, 72, 2_hours, 1_hours, false );
+            add_morale( MORALE_FEELING_GOOD, 36, 72, 2_hours, 1_hours, false );
         } else {
-            add_morale( MORALE_FOOD_GOOD, 18, 36, 1_hours, 30_minutes, false );
+            add_morale( MORALE_FEELING_GOOD, 18, 36, 1_hours, 30_minutes, false );
         }
     }
 
@@ -1156,7 +1168,7 @@ void Character::modify_morale( item &food, int nutr )
     }
     const bool chew = food.get_comestible()->comesttype == comesttype_FOOD ||
                       food.has_flag( flag_USE_EAT_VERB );
-    if( !food.rotten() && chew && has_trait( trait_SAPROPHAGE ) ) {
+    if( !food.rotten() && chew && has_enchantment_flag( ench_flag_ONLY_EAT_ROTTEN ) ) {
         // It's OK to *drink* things that haven't rotted.  Alternative is to ban water.  D:
         add_msg_if_player( m_bad, _( "Your stomach begins gurgling and you feel bloated and ill." ) );
         add_morale( MORALE_NO_DIGEST, -75, -400, 30_minutes, 24_minutes );
@@ -1198,8 +1210,7 @@ bool Character::consume_effects( item &food )
 
     // Rotten food causes health loss
     const float relative_rot = food.get_relative_rot();
-    if( relative_rot > 1.0f && !has_trait( trait_SAPROPHAGE ) &&
-        !has_trait( trait_SAPROVORE ) && !has_bionic( bio_digestion ) ) {
+    if( relative_rot > 1.0f && !has_enchantment_flag( ench_flag_EAT_ROTTEN ) ) {
         const float rottedness = clamp( 2 * relative_rot - 2.0f, 0.1f, 1.0f );
         // ~-1 health per 1 nutrition at halfway-rotten-away, ~0 at "just got rotten"
         // But always round down
@@ -1230,7 +1241,7 @@ bool Character::consume_effects( item &food )
         mod_pain( 5 );
         int numslime = 1;
         for( int i = 0; i < numslime; i++ ) {
-            if( monster *const slime = g->place_critter_around( mon_player_blob, pos(), 1 ) ) {
+            if( monster *const slime = g->place_critter_around( mon_player_blob, bub_pos(), 1 ) ) {
                 slime->friendly = -1;
             }
         }
@@ -1265,7 +1276,8 @@ bool Character::consume_effects( item &food )
     mod_thirst( -contained_food.type->comestible->quench );
 
 
-    if( ( excess_kcal > 0 || excess_quench > 0 ) && !food.has_flag( flag_NO_BLOAT ) &&
+    if( ( excess_kcal > 0 || ( excess_quench > 0 && !has_trait( trait_NO_THIRST ) ) ) &&
+        !food.has_flag( flag_NO_BLOAT ) &&
         !has_trait( trait_GOURMAND ) ) {
         add_effect( effect_bloated, 5_minutes );
     }
@@ -1673,7 +1685,7 @@ bool Character::consume_med( item &target )
 
     int amount_used = 1;
     if( target.type->has_use() ) {
-        amount_used = target.type->invoke( *this->as_player(), target, pos() );
+        amount_used = target.type->invoke( *this->as_player(), target, bub_pos() );
         if( amount_used <= 0 ) {
             return false;
         }
@@ -1710,8 +1722,8 @@ void consume_poison( Character &consumer, item &food )
 {
     // If it's poisonous... poison us.
     // TODO: Move this to a flag
-    if( food.poison > 0 && !consumer.has_trait( trait_POISRESIST ) &&
-        !consumer.has_trait( trait_EATDEAD ) && !consumer.has_bionic( bio_digestion ) ) {
+    if( food.poison > 0 &&
+        !consumer.has_enchantment_flag( ench_flag_FOOD_POISON_IMMUNE ) ) {
         if( food.poison >= rng( 2, 4 ) ) {
             consumer.add_effect( effect_poison, food.poison * 1_minutes );
         }

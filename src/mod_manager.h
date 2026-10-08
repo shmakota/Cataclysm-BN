@@ -26,7 +26,7 @@ const std::map<std::string, std::string> &get_mod_list_cat_tab();
 struct translatable_mod_info {
     private:
         std::string mod_path;
-        std::string name_raw;
+        std::string name_raw_;
         std::string name_tr;
         std::string description_raw;
         std::string description_tr;
@@ -35,8 +35,9 @@ struct translatable_mod_info {
     public:
         translatable_mod_info();
         translatable_mod_info( std::string name, std::string description, std::string path );
-        std::string name();
-        std::string description();
+        auto name() -> std::string;
+        auto name_raw() const -> std::string;
+        auto description() -> std::string;
 };
 
 struct MOD_INFORMATION {
@@ -44,8 +45,9 @@ struct MOD_INFORMATION {
         mutable translatable_mod_info translatable_info;
 
     public:
-        std::string name() const;
-        std::string description() const;
+        auto name() const -> std::string;
+        auto name_raw() const -> std::string;
+        auto description() const -> std::string;
 
         void set_translatable_info( translatable_mod_info &&tmi ) {
             translatable_info = std::move( tmi );
@@ -75,6 +77,9 @@ struct MOD_INFORMATION {
          */
         std::set<std::string> maintainers;
 
+        /** Mod-relative loading screen image file or directory paths */
+        std::set<std::string> loading_images;
+
         /**
          * Arbitrary string that should help maintainers in figuring out
          * what version of the mod the error in a bugreport comes from.
@@ -90,6 +95,10 @@ struct MOD_INFORMATION {
 
         /** What mods cannot be loaded together with this one? */
         std::vector<mod_id> conflicts;
+
+        /** Path to load options from */
+        bool load_options = false;
+        std::string options_path;
 
         /** Core mods are loaded before any other mods */
         bool core = false;
@@ -157,6 +166,8 @@ class mod_manager
         void refresh_mod_list();
 
         std::vector<mod_id> all_mods() const;
+
+        std::vector<MOD_INFORMATION> all_mod_objects() const;
 
         /**
          * Returns the dependency tree for the loaded mods.
@@ -230,5 +241,3 @@ class mod_ui
         bool can_shift_up( size_t selection, const std::vector<mod_id> &active_list );
         bool can_shift_down( size_t selection, const std::vector<mod_id> &active_list );
 };
-
-

@@ -31,19 +31,7 @@
     "harvest": "zombie",
     "death_function": [ "SMOKEBURST", "NORMAL" ],
     "upgrades": { "half_life": 14, "into_group": "GROUP_CHILD_ZOMBIE_UPGRADE" },
-    "flags": [
-      "SEES",
-      "HEARS",
-      "STUMBLES",
-      "POISON",
-      "GRABS",
-      "NO_BREATHE",
-      "REVIVES",
-      "REVIVES_HEALTHY",
-      "NO_NECRO",
-      "GUILT",
-      "CLIMBS"
-    ]
+    "flags": [ "SEES", "HEARS", "STUMBLES", "POISON", "GRABS", "NO_BREATHE", "REVIVES", "REVIVES_HEALTHY", "NO_NECRO", "CLIMBS" ]
   },
   {
     "id": "mon_zombie_fiend",
@@ -67,6 +55,7 @@
     "melee_dice": 1,
     "melee_dice_sides": 10,
     "melee_cut": 14,
+    "grab_strength": 2,
     "armor_bash": 6,
     "armor_cut": 12,
     "armor_bullet": 10,

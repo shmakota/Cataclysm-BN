@@ -8,6 +8,7 @@
     "volume": "600 ml",
     "price": "30 USD",
     "price_postapoc": "250 cent",
+    "rigid": false,
     "material": [ "leather", "steel" ],
     "symbol": "[",
     "looks_like": "sheath",
@@ -199,6 +200,17 @@
     "flags": [ "WAIST", "COMPACT", "OVERSIZE", "WATER_FRIENDLY", "ALLOWS_TAIL_SNAKE" ]
   },
   {
+    "id": "sheath_birchbark",
+    "copy-from": "sheath",
+    "type": "ARMOR",
+    "name": { "str": "birchbark sheath", "str_pl": "birchbark sheathes" },
+    "description": "A hand made sheath made from birch bark, for holding knives and other small blades.  Activate to sheathe/draw a weapon.",
+    "price": "15 USD",
+    "material": [ "wood" ],
+    "color": "light_gray",
+    "coverage": 7
+  },
+  {
     "id": "spearsling",
     "type": "ARMOR",
     "name": { "str": "spear strap" },
@@ -208,6 +220,7 @@
     "price": "52 USD",
     "price_postapoc": "250 cent",
     "to_hit": -1,
+    "rigid": false,
     "material": [ "leather" ],
     "symbol": "[",
     "looks_like": "bscabbard",

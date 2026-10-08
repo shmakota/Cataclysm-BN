@@ -14,6 +14,46 @@
   },
   {
     "type": "construction",
+    "id": "constr_remove_nanofab",
+    "category": "OTHER",
+    "required_skills": [ [ "fabrication", 6 ], [ "electronics", 10 ] ],
+    "time": "12 h",
+    "using": [ [ "advanced_electronics_high_voltage", 1 ], [ "metal_removal_standard", 1 ], [ "welding_standard", 12 ] ],
+    "qualities": [ [ { "id": "LIFT", "level": 2 } ] ],
+    "pre_terrain": "t_nanofab",
+    "pre_special": "check_deconstruct",
+    "post_flags": [ "keep_items" ],
+    "post_special": "done_deconstruct",
+    "group": "advanced_object_deconstruction"
+  },
+  {
+    "type": "construction",
+    "id": "constr_remove_nanofab_body",
+    "category": "OTHER",
+    "required_skills": [ [ "fabrication", 6 ], [ "electronics", 10 ] ],
+    "time": "12 h",
+    "using": [ [ "advanced_electronics_high_voltage", 1 ], [ "metal_removal_standard", 1 ], [ "welding_standard", 12 ] ],
+    "qualities": [ [ { "id": "LIFT", "level": 2 } ] ],
+    "pre_terrain": "t_nanofab_body",
+    "pre_special": "check_deconstruct",
+    "post_flags": [ "keep_items" ],
+    "post_special": "done_deconstruct",
+    "group": "advanced_object_deconstruction"
+  },
+  {
+    "type": "construction",
+    "id": "constr_remove_nanofab_portable",
+    "category": "OTHER",
+    "required_skills": [ [ "fabrication", 0 ] ],
+    "time": "1 m",
+    "pre_terrain": "t_nanofab_body",
+    "pre_special": "check_deconstruct",
+    "post_flags": [ "keep_items" ],
+    "post_special": "done_deconstruct",
+    "group": "advanced_object_deconstruction"
+  },
+  {
+    "type": "construction",
     "id": "constr_deconstruct_simple",
     "group": "deconstruct_simple_furniture",
     "category": "OTHER",
@@ -105,10 +145,10 @@
     "category": "OTHER",
     "required_skills": [ [ "survival", 0 ] ],
     "time": "6 m",
+    "qualities": [ [ { "id": "CUT", "level": 2 } ] ],
     "byproducts": [ { "item": "straw_pile" } ],
     "pre_terrain": "t_grass_long",
-    "post_terrain": "t_grass",
-    "tools": [ [ [ "machete", -1 ], [ "makeshift_machete", -1 ], [ "scythe", -1 ], [ "sickle", -1 ], [ "survivor_machete", -1 ] ] ]
+    "post_terrain": "t_grass"
   },
   {
     "type": "construction",
@@ -117,10 +157,10 @@
     "category": "OTHER",
     "required_skills": [ [ "survival", 0 ] ],
     "time": "6 m",
+    "qualities": [ [ { "id": "CUT", "level": 2 } ] ],
     "byproducts": [ { "item": "straw_pile", "count": [ 1, 2 ] } ],
     "pre_terrain": "t_grass_tall",
-    "post_terrain": "t_grass",
-    "tools": [ [ [ "machete", -1 ], [ "makeshift_machete", -1 ], [ "scythe", -1 ], [ "sickle", -1 ], [ "survivor_machete", -1 ] ] ]
+    "post_terrain": "t_grass"
   },
   {
     "type": "construction",

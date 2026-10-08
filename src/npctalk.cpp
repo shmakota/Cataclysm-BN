@@ -1,19 +1,4 @@
-#include "dialogue.h" // IWYU pragma: associated
-
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstddef>
-#include <iterator>
-#include <list>
-#include <map>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
-#include <vector>
+#include "npctalk.h"
 
 #include "activity_type.h"
 #include "auto_pickup.h"
@@ -21,6 +6,8 @@
 #include "bodypart.h"
 #include "calendar.h"
 #include "cata_utility.h"
+#include "catalua_hooks.h"
+#include "catalua_sol.h"
 #include "character.h"
 #include "character_effects.h"
 #include "character_functions.h"
@@ -28,10 +15,12 @@
 #include "clzones.h"
 #include "color.h"
 #include "condition.h"
+#include "creature.h"
 #include "debug.h"
+#include "dialogue.h" // IWYU pragma: associated
 #include "enums.h"
-#include "flag.h"
 #include "faction.h"
+#include "flag.h"
 #include "game.h"
 #include "game_constants.h"
 #include "game_inventory.h"
@@ -43,19 +32,18 @@
 #include "itype.h"
 #include "json.h"
 #include "line.h"
+#include "magic/magic.h"
 #include "make_static.h"
-#include "magic.h"
-#include "map.h"
-#include "mapgen_functions.h"
+#include "map/map.h"
+#include "mapgen/mapgen_functions.h"
 #include "martialarts.h"
-#include "messages.h"
 #include "message_types.h"
+#include "messages.h"
 #include "mission.h"
 #include "monster.h"
 #include "mtype.h"
 #include "npc.h"
 #include "npc_class.h"
-#include "npctalk.h"
 #include "npctrade.h"
 #include "options.h"
 #include "output.h"
@@ -74,16 +62,32 @@
 #include "string_utils.h"
 #include "text_snippets.h"
 #include "translations.h"
+#include "type_id.h"
 #include "ui.h"
 #include "ui_manager.h"
 #include "units.h"
 #include "units_utility.h"
 #include "value_ptr.h"
-#include "veh_type.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-#include "vpart_position.h"
-#include "vpart_range.h"
+#include "vehicle/veh_type.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+#include "vehicle/vpart_position.h"
+#include "vehicle/vpart_range.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <iterator>
+#include <list>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 static const activity_id ACT_AIM( "ACT_AIM" );
 static const activity_id ACT_SOCIALIZE( "ACT_SOCIALIZE" );
@@ -105,11 +109,6 @@ static const zone_type_id zone_type_npc_investigate_only( "NPC_INVESTIGATE_ONLY"
 static const zone_type_id zone_type_npc_no_investigate( "NPC_NO_INVESTIGATE" );
 
 static const skill_id skill_speech( "speech" );
-
-static const bionic_id bio_armor_eyes( "bio_armor_eyes" );
-static const bionic_id bio_deformity( "bio_deformity" );
-static const bionic_id bio_face_mask( "bio_face_mask" );
-static const bionic_id bio_voice( "bio_voice" );
 
 static const trait_id trait_DEBUG_MIND_CONTROL( "DEBUG_MIND_CONTROL" );
 static const trait_id trait_PROF_FOODP( "PROF_FOODP" );
@@ -432,17 +431,17 @@ void game::chat()
 
     const std::vector<npc *> available = get_npcs_if( [&]( const npc & guy ) {
         // TODO: Get rid of the z-level check when z-level vision gets "better"
-        return u.posz() == guy.posz() && u.sees( guy.pos() ) &&
-               rl_dist( u.pos(), guy.pos() ) <= SEEX * 2;
+        return u.bub_pos().z() == guy.bub_pos().z() && u.sees( guy.bub_pos() ) &&
+               rl_dist( u.bub_pos(), guy.bub_pos() ) <= SEEX * 2;
     } );
     const int available_count = available.size();
     const std::vector<npc *> followers = get_npcs_if( [&]( const npc & guy ) {
-        return guy.is_player_ally() && guy.is_following() && guy.can_hear( u.pos(), volume );
+        return guy.is_player_ally() && guy.is_following() && guy.can_hear( u.bub_pos(), volume );
     } );
     const int follower_count = followers.size();
     const std::vector<npc *> guards = get_npcs_if( [&]( const npc & guy ) {
         return guy.mission == NPC_MISSION_GUARD_ALLY &&
-               guy.can_hear( u.pos(), volume );
+               guy.can_hear( u.bub_pos(), volume );
     } );
     const int guard_count = guards.size();
 
@@ -705,13 +704,13 @@ void game::chat()
             }
 
             map &here = get_map();
-            std::optional<tripoint> p = look_around();
+            std::optional<tripoint_bub_ms> p = look_around();
 
             if( !p ) {
                 return;
             }
 
-            if( here.impassable( tripoint( *p ) ) ) {
+            if( here.impassable( *p ) ) {
                 add_msg( m_info, _( "This destination can't be reached." ) );
                 return;
             }
@@ -719,12 +718,11 @@ void game::chat()
             const auto &to = p.value();
             if( npcselect == follower_count ) {
                 for( npc *them : followers ) {
-                    tripoint_abs_ms( here.getabs( to ) );
-                    them->goto_to_this_pos = here.getglobal( to );
+                    them->goto_to_this_pos = bub_to_abs( to );
                 }
                 yell_msg = _( "Everyone move there!" );
             } else {
-                followers[npcselect]->goto_to_this_pos = here.getglobal( to );
+                followers[npcselect]->goto_to_this_pos = bub_to_abs( to );
                 yell_msg = string_format( _( "Move there, %s!" ), followers[npcselect]->get_name() );
             }
             break;
@@ -868,32 +866,74 @@ void game::chat()
     u.moves -= 100;
 }
 
-void npc::handle_sound( const sounds::sound_t spriority, const std::string &description,
-                        int heard_volume, const tripoint &spos )
+void npc::handle_sound( const short heard_vol, sound_event sound )
 {
+
+    // Remember that our heard volume is in milli-decibels spl
+    // Only sounds that are marked as being from a monster/npc/the player are passed to handle_sound, so we have a source creature.
     map &here = get_map();
-    const tripoint s_abs_pos = here.getabs( spos );
-    const tripoint my_abs_pos = here.getabs( pos() );
+    const auto &spos = sound.origin;
 
-    add_msg( m_debug, "%s heard '%s', priority %d at volume %d from %d:%d, my pos %d:%d",
-             disp_name(), description, static_cast<int>( spriority ), heard_volume,
-             s_abs_pos.x, s_abs_pos.y, my_abs_pos.x, my_abs_pos.y );
+    // What entity is the source of the sound? We effectively have two logic cases, source is a monster or source is a "player" i.e., the player character or an npc.
+    Creature *const critter = g->critter_at<Creature>( spos );
+    // If we get passed a sound and we have no critter, then its an actual enviornmental sound or said critter is dead. Jump out either way.
+    // If a sound is set to ambient but was played from a creatures tile, we blame it on the creature because we are evil.
+    if( !critter ) {
+        return;
+    }
 
-    bool player_ally = get_player_character().pos() == spos && is_player_ally();
+    const auto s_abs_pos = bub_to_abs( sound.origin );
+    const std::string &description = sound.description.empty() ? _( "a noise" ) : sound.description;
+
+    const auto &source_monster = sound.from_monster;
+    const auto &source_player = sound.from_player;
+    const auto &source_npc = sound.from_npc;
+
+    add_msg( m_debug, "%s heard '%s', priority %d at volume %d mdB from %d:%d, my pos %d:%d",
+             disp_name(), description, static_cast<int>( sound.category ), heard_vol,
+             s_abs_pos.x(), s_abs_pos.y(), abs_pos().x(), abs_pos().y() );
+
+    // bool player_ally = get_player_character().bub_pos() == spos && is_player_ally();
     player *const sound_source = g->critter_at<player>( spos );
     bool npc_ally = sound_source && sound_source->is_npc() && is_ally( *sound_source );
 
-    if( ( player_ally || npc_ally ) && spriority == sounds::sound_t::order ) {
+    // Is the player the source of the sound, and is the NPC an ally of the player?
+    const bool player_ally = ( ( source_player ||
+                                 ( get_player_character().bub_pos() == sound.origin ) ) &&
+                               is_player_ally() ) ;
+
+    // ONLY reference this in cases where we know the sound source is an NPC
+    //Character const *npc_critter = dynamic_cast<Character>( *critter );
+
+    // Is the sound source an NPC, and is the source NPC an ally of the hearing NPC?
+    //const bool npc_ally = ( source_npc ) ? ( critter->as_npc()->is_ally( *this ) ) : false;
+
+    // Is the sound source a monster, and is said monster an ally of the hearing NPC?
+
+    // Grab the attitude of our monster or set it to null if it the source is not a monster.
+    const monster *mon = critter->as_monster();
+    const monster_attitude mon_att = ( source_monster && mon ) ? ( mon->attitude(
+                                         this->as_character() ) ) : MATT_NULL;
+
+    // NPCs should generally ignore low priority sounds from non-hostile monsters such as dogs
+    const bool mon_nonhostile = ( source_monster ) ? ( mon_att != MATT_ATTACK ) : false;
+
+    if( ( player_ally || npc_ally ) && sound.category == sounds::sound_t::order ) {
         say( "<acknowledged>" );
     }
 
+    // Dont react to a sound if the NPC sees the source. Hallucinations dont react to sound.
     if( sees( spos ) || is_hallucination() ) {
         return;
     }
+
+    // We have 2 main cases: Sound came from a monster, and sound came from a player derived entity (player character and NPCs)
+    // We split the player derived entity case internally for player character source and NPC source.
+
     // ignore low priority sounds if the NPC "knows" it came from a friend.
     // TODO: NPC will need to respond to talking noise eventually
     // but only for bantering purposes, not for investigating.
-    if( spriority < sounds::sound_t::alarm ) {
+    if( sound.category < sounds::sound_t::alarm ) {
         if( player_ally ) {
             add_msg( m_debug, "Allied NPC ignored same faction %s", name );
             return;
@@ -902,19 +942,30 @@ void npc::handle_sound( const sounds::sound_t spriority, const std::string &desc
             add_msg( m_debug, "NPC ignored same faction %s", name );
             return;
         }
-    }
-    // discount if sound source is player, or seen by player,
-    // and listener is friendly and sound source is combat or alert only.
-    if( spriority < sounds::sound_t::alarm && get_avatar().sees( spos ) ) {
-        if( is_player_ally() ) {
-            add_msg( m_debug, "NPC %s ignored low priority noise that player can see", name );
-            return;
-            // discount if sound source is player, or seen by player,
-            // listener is neutral and sound type is worth investigating.
-        } else if( spriority < sounds::sound_t::destructive_activity &&
-                   get_attitude_group( get_attitude() ) != attitude_group::hostile ) {
+        if( mon_nonhostile ) {
+            add_msg( m_debug, "NPC ignored non-hostile monster" );
             return;
         }
+        // discount if sound source is player, or seen by player,
+        // and listener is friendly and sound source is combat or alert only.
+        if( is_player_ally() ) {
+            // Moved the sees check behind a relevant filter as its a bit more expensive.
+            if( get_avatar().sees( sound.origin ) ) {
+                add_msg( m_debug, "NPC %s ignored low priority noise that player can see", name );
+                return;
+                // discount if sound source is player, or seen by player,
+                // listener is neutral and sound type is worth investigating.
+            }
+        }
+        // If the NPC is not hostile to the person and they are not breaking something, ignore the noise.
+        if( ( source_npc || source_player ) ) {
+            // Only check the attitude group if the sound source is a player.h derived entity.
+            if( sound.category < sounds::sound_t::destructive_activity &&
+                get_attitude_group( get_attitude() ) != attitude_group::hostile ) {
+                return;
+            }
+        }
+
     }
     // patrolling guards will investigate more readily than stationary NPCS
     int investigate_dist = 10;
@@ -925,38 +976,105 @@ void npc::handle_sound( const sounds::sound_t spriority, const std::string &desc
         investigate_dist = 0;
     }
     if( ai_cache.total_danger < 1.0f ) {
-        if( spriority == sounds::sound_t::movement && !in_vehicle ) {
-            warn_about( "movement_noise", rng( 1, 10 ) * 1_minutes, description );
-        } else if( spriority > sounds::sound_t::movement ) {
-            if( ( spriority == sounds::sound_t::speech || spriority == sounds::sound_t::alert ||
-                  spriority == sounds::sound_t::order ) && sound_source &&
-                !has_faction_relationship( *sound_source, npc_factions::knows_your_voice ) ) {
-                warn_about( "speech_noise", rng( 1, 10 ) * 1_minutes );
-            } else if( spriority > sounds::sound_t::activity ) {
-                warn_about( "combat_noise", rng( 1, 10 ) * 1_minutes );
-            }
-            bool should_check = rl_dist( pos(), spos ) < investigate_dist;
+        if( sound.category == sounds::sound_t::movement && !in_vehicle ) {
+            bool should_check = rl_dist( bub_pos(), sound.origin ) < investigate_dist;
             if( should_check ) {
                 const zone_manager &mgr = zone_manager::get_manager();
                 if( mgr.has( zone_type_npc_no_investigate, s_abs_pos, fac_id ) ) {
                     should_check = false;
-                } else if( mgr.has( zone_type_npc_investigate_only, my_abs_pos, fac_id ) &&
+                } else if( mgr.has( zone_type_npc_investigate_only, abs_pos(), fac_id ) &&
                            !mgr.has( zone_type_npc_investigate_only, s_abs_pos, fac_id ) ) {
                     should_check = false;
                 }
             }
-            if( should_check ) {
-                add_msg( m_debug, "%s added noise at pos %d:%d", name, s_abs_pos.x, s_abs_pos.y );
-                dangerous_sound temp_sound;
-                temp_sound.abs_pos = s_abs_pos;
-                temp_sound.volume = heard_volume;
-                temp_sound.type = spriority;
-                if( !ai_cache.sound_alerts.empty() ) {
-                    if( ai_cache.sound_alerts.back().abs_pos != s_abs_pos ) {
+
+            // We always want to respond to allied combat sounds unless ignore noise is set or its in a no-invstigate zone.
+            // "No matter what you hear, what I say, do not open this door!"
+            if( investigate_dist > 0 && sound.category == sounds::sound_t::combat && ( player_ally ||
+                    npc_ally || mon_nonhostile ) ) {
+                // We already know we dont see the sound, so we are going to warn about it as long as the source is an ally.
+                // Only set false if the monster is a source that is not our friend, just neutral.
+                bool should_reinforce = true;
+                if( mon_nonhostile ) {
+                    if( mon_att != MATT_FRIEND && mon_att != MATT_FOLLOW && mon_att != MATT_FPASSIVE ) {
+                        should_reinforce = false;
+                    }
+                }
+                if( should_reinforce && should_check ) {
+                    sound_to_warn_about temp_warning;
+                    temp_warning.type = "combat_noise";
+                    temp_warning.duration = rng( 1, 10 ) * 1_minutes;
+                    ai_cache.warn_about_queue.push_back( temp_warning );
+                    add_msg( m_debug, "%s added noise at pos %d:%d", name, s_abs_pos.x(), s_abs_pos.y() );
+                    dangerous_sound temp_sound;
+                    temp_sound.abs_pos = s_abs_pos;
+                    // Convert out of mdB spl to dB spl
+                    temp_sound.volume = std::floor( 0.01 * heard_vol );
+                    temp_sound.type = sound.category;
+                    if( !ai_cache.sound_alerts.empty() ) {
+                        if( ai_cache.sound_alerts.back().abs_pos != s_abs_pos ) {
+                            ai_cache.sound_alerts.push_back( temp_sound );
+                        }
+                    } else {
                         ai_cache.sound_alerts.push_back( temp_sound );
                     }
-                } else {
-                    ai_cache.sound_alerts.push_back( temp_sound );
+                }
+            } else if( ai_cache.total_danger < 1.0f ) {
+
+                sound_to_warn_about temp_warning;
+                temp_warning.duration = rng( 1, 10 ) * 1_minutes;
+
+                if( sound.category == sounds::sound_t::movement && !in_vehicle ) {
+
+                    // At this point we know that the movement sound is from a hostile creature, npc, or player.
+                    temp_warning.type = "movement_noise";
+                    temp_warning.name = description;
+                    ai_cache.warn_about_queue.push_back( temp_warning );
+
+                } else if( sound.category > sounds::sound_t::movement ) {
+
+                    if( ( sound.category == sounds::sound_t::speech || sound.category == sounds::sound_t::alert ||
+                          sound.category == sounds::sound_t::order ) ) {
+
+                        temp_warning.type = "speech_noise";
+                        if( source_npc || source_player ) {
+
+                            if( !has_faction_relationship( *critter->as_character(), npc_factions::knows_your_voice ) ) {
+                                //The faction does not know the voice of the NPC in question, so alert.
+                                ai_cache.warn_about_queue.push_back( temp_warning );
+                            }
+                        } else if( source_monster && !mon_nonhostile ) {
+
+                            // Report if a hostile monster makes speech noise as well.
+                            ai_cache.warn_about_queue.push_back( temp_warning );
+                        }
+
+                    } else if( sound.category > sounds::sound_t::activity ) {
+
+                        temp_warning.type = "combat_noise";
+                        ai_cache.warn_about_queue.push_back( temp_warning );
+                    }
+
+                    if( should_check ) {
+                        add_msg( m_debug, "%s added noise at pos %d:%d", name, s_abs_pos.x(), s_abs_pos.y() );
+                        dangerous_sound temp_sound;
+
+                        temp_sound.abs_pos = s_abs_pos;
+                        // Convert out of mdB spl to dB spl
+                        temp_sound.volume = std::floor( 0.01 * heard_vol );
+                        temp_sound.type = sound.category;
+                        if( !ai_cache.sound_alerts.empty() ) {
+
+                            if( ai_cache.sound_alerts.back().abs_pos != s_abs_pos ) {
+
+                                ai_cache.sound_alerts.push_back( temp_sound );
+                            }
+
+                        } else {
+
+                            ai_cache.sound_alerts.push_back( temp_sound );
+                        }
+                    }
                 }
             }
         }
@@ -974,7 +1092,7 @@ void npc_chatbin::check_missions()
     ma.erase( last, ma.end() );
 }
 
-void npc::talk_to_u( bool radio_contact )
+void npc::talk_to_u( bool radio_contact, bool enforce_first_topic )
 {
     avatar &you = get_avatar();
     if( you.is_dead_state() ) {
@@ -1013,7 +1131,7 @@ void npc::talk_to_u( bool radio_contact )
             d.missions_assigned.push_back( mission );
         }
     }
-    d.add_topic( chatbin.first_topic );
+    if( !enforce_first_topic ) { d.add_topic( chatbin.first_topic ); }
     if( radio_contact ) {
         d.add_topic( "TALK_RADIO" );
         d.by_radio = true;
@@ -1091,6 +1209,19 @@ void npc::talk_to_u( bool radio_contact )
 
     decide_needs();
 
+    const auto hook_results = cata::run_hooks( "on_dialogue_start", [ &, this]( auto & params ) {
+        params["npc"] = this;
+        params["next_topic"] = d.topic_stack.back().id;
+    } );
+    for( const auto &result : hook_results ) {
+        if( !result.second.is<sol::table>() ) { continue; };
+        auto new_topic = result.second.as<sol::table>().get<std::string>( "result" );
+        if( !new_topic.empty() && new_topic != d.topic_stack.back().id ) {
+            d.add_topic( new_topic );
+        }
+    }
+    if( enforce_first_topic ) { d.add_topic( chatbin.first_topic ); }
+
     dialogue_window d_win;
     // Main dialogue loop
     do {
@@ -1108,7 +1239,24 @@ void npc::talk_to_u( bool radio_contact )
                 chatbin.mission_selected = d.missions_assigned.front();
             }
         }
-        const talk_topic next = d.opt( d_win, name, d.topic_stack.back() );
+        talk_topic next = d.opt( d_win, name, d.topic_stack.back() );
+
+        const auto hook_results = cata::run_hooks( "on_dialogue_option", [ &, this]( auto & params ) {
+            params["npc"] = this;
+            params["next_topic"] = next.id;
+        } );
+        auto final_result = d.topic_stack.back().id;
+        for( const auto &result : hook_results ) {
+            if( !result.second.is<sol::table>() ) { continue; };
+            final_result = result.second.as<sol::table>().get_or<std::string>( "result", final_result );
+            // Allow higher priority topics to veto, but still trigger subsequent calls?
+            // auto allowed = result.second.as<sol::table>().get<sol::object>( "allowed" );
+            // if ( allowed.is<bool>() && !allowed.as<bool>() ) { break; };
+        }
+        if( !final_result.empty() && final_result != d.topic_stack.back().id ) {
+            next = talk_topic( final_result );
+        }
+
         if( next.id == "TALK_NONE" ) {
             int cat = topic_category( d.topic_stack.back() );
             do {
@@ -1122,6 +1270,10 @@ void npc::talk_to_u( bool radio_contact )
             d.add_topic( next );
         }
     } while( !d.done );
+
+    cata::run_hooks( "on_dialogue_end", [ &, this]( auto & params ) {
+        params["npc"] = this;
+    } );
 
     if( you.activity->id() == ACT_AIM && !you.has_weapon() ) {
         you.cancel_activity();
@@ -1238,7 +1390,7 @@ std::string dialogue::dynamic_line( const talk_topic &the_topic ) const
         }
     } else if( topic == "TALK_HOW_MUCH_FURTHER" ) {
         // TODO: this ignores the z-component
-        const tripoint_abs_omt player_pos = p->global_omt_location();
+        const tripoint_abs_omt player_pos = p->abs_omt_pos();
         int dist = rl_dist( player_pos, p->goal );
         std::string response;
         dist *= 100;
@@ -1364,7 +1516,18 @@ std::string dialogue::dynamic_line( const talk_topic &the_topic ) const
     } else if( topic == "TALK_OPINION" ) {
         return "&" + p->opinion_text();
     } else if( topic == "TALK_MIND_CONTROL" ) {
-        bool not_following = !g->get_follower_list().contains( p->getID() );
+        const auto player_id = get_avatar().getID();
+        for( auto *miss : p->chatbin.missions_assigned ) {
+            if( miss->get_assigned_player_id() == player_id ) {
+                miss->fail();
+            }
+        }
+        std::erase_if( p->chatbin.missions_assigned, [player_id]( const auto * miss ) { return miss->get_assigned_player_id() == player_id; } );
+        if( p->chatbin.mission_selected != nullptr &&
+            p->chatbin.mission_selected->get_assigned_player_id() == player_id ) {
+            p->chatbin.mission_selected = nullptr;
+        }
+        const bool not_following = !g->get_follower_list().contains( p->getID() );
         talk_function::follow( *p );
         if( not_following ) {
             return _( "YES, MASTER!" );
@@ -1666,13 +1829,7 @@ int talk_trial::calc_chance( const dialogue &d ) const
                       p.op_of_u.trust * 3;
             chance += u_mods.lie;
 
-            //come on, who would suspect a robot of lying?
-            if( u.has_bionic( bio_voice ) ) {
-                chance += 10;
-            }
-            if( u.has_bionic( bio_face_mask ) ) {
-                chance += 20;
-            }
+            chance += u.bonus_from_enchantments( chance, enchantment_value_id( "LIE" ) );
             break;
         case TALK_TRIAL_PERSUADE:
             chance += character_effects::talk_skill( u ) -
@@ -1680,15 +1837,7 @@ int talk_trial::calc_chance( const dialogue &d ) const
                       p.op_of_u.trust * 2 + p.op_of_u.value;
             chance += u_mods.persuade;
 
-            if( u.has_bionic( bio_face_mask ) ) {
-                chance += 10;
-            }
-            if( u.has_bionic( bio_deformity ) ) {
-                chance -= 50;
-            }
-            if( u.has_bionic( bio_voice ) ) {
-                chance -= 20;
-            }
+            chance += u.bonus_from_enchantments( chance, enchantment_value_id( "PERSUADE" ) );
             break;
         case TALK_TRIAL_INTIMIDATE:
             chance += character_effects::intimidation( u ) -
@@ -1696,18 +1845,7 @@ int talk_trial::calc_chance( const dialogue &d ) const
                       p.op_of_u.fear * 2 - p.personality.bravery * 2;
             chance += u_mods.intimidate;
 
-            if( u.has_bionic( bio_face_mask ) ) {
-                chance += 10;
-            }
-            if( u.has_bionic( bio_armor_eyes ) ) {
-                chance += 10;
-            }
-            if( u.has_bionic( bio_deformity ) ) {
-                chance += 20;
-            }
-            if( u.has_bionic( bio_voice ) ) {
-                chance += 20;
-            }
+            chance += u.bonus_from_enchantments( chance, enchantment_value_id( "INTIMIDATE" ) );
             break;
         case TALK_TRIAL_NONE:
             chance = 100;
@@ -1840,8 +1978,31 @@ void parse_tags( std::string &phrase, const Character &u, const Character &me,
             return;
         }
 
+        if( tag.size() > 12 && tag.substr( 0, 11 ) == "<utalk_var_" ) {
+            std::string u_var = tag.substr( 2, tag.size() - 3 );
+            u_var = "npc" + u_var;
+            tag = u_var;
+            u_var = u.get_value( u_var );
+            if( u_var.empty() ) {
+                debugmsg( "Player talk variable not found.  '%s'  (%d - %d)", tag.c_str(), fa, fb );
+                phrase.replace( fa, fb - fa + 1, "????" );
+            } else {
+                phrase.replace( fa, l, u_var );
+            }
+        } else if( tag.size() > 14 && tag.substr( 0, 13 ) == "<npctalk_var_" ) {
+            std::string npc_var = tag.substr( 1, tag.size() - 2 );
+            tag = npc_var;
+            npc_var = me.get_value( npc_var );
+            if( npc_var.empty() ) {
+                debugmsg( "NPC talk variable not found.  '%s'  (%d - %d)", tag.c_str(), fa, fb );
+                phrase.replace( fa, fb - fa + 1, "????" );
+            } else {
+                phrase.replace( fa, l, npc_var );
+            }
+        }
+
         // Special, dynamic tags go here
-        if( tag == "<yrwp>" ) {
+        else if( tag == "<yrwp>" ) {
             phrase.replace( fa, l, remove_color_tags( u.primary_weapon().tname() ) );
         } else if( tag == "<mywp>" ) {
             if( !me.is_armed() ) {
@@ -2007,10 +2168,12 @@ talk_topic dialogue::opt( dialogue_window &d_win, const std::string &npc_name,
         // No name prepended!
         challenge = challenge.substr( 1 );
     } else if( challenge[0] == '*' ) {
-        challenge = string_format( pgettext( "npc does something", "%s %s" ), beta->name,
+        challenge = string_format( pgettext( "npc does something", "%s %s" ), colorize( beta->name,
+                                   c_light_green ),
                                    challenge.substr( 1 ) );
     } else {
-        challenge = string_format( pgettext( "npc says something", "%s: %s" ), beta->name,
+        challenge = string_format( pgettext( "npc says something", "%s: %s" ), colorize( beta->name,
+                                   c_light_green ),
                                    challenge );
     }
 
@@ -2022,6 +2185,7 @@ talk_topic dialogue::opt( dialogue_window &d_win, const std::string &npc_name,
     for( size_t i = 0; i < responses.size(); i++ ) {
         response_lines.push_back( responses[i].create_option_line( *this, 'a' + i ) );
     }
+    auto selected_response = size_t{ 0 };
 
 #if defined(__ANDROID__)
     input_context ctxt( "DIALOGUE_CHOOSE_RESPONSE" );
@@ -2042,33 +2206,50 @@ talk_topic dialogue::opt( dialogue_window &d_win, const std::string &npc_name,
 
     ui.on_redraw( [&]( const ui_adaptor & ) {
         d_win.print_header( npc_name );
-        d_win.display_responses( response_lines );
+        d_win.display_responses( response_lines, selected_response );
     } );
 
     int ch;
     bool okay;
+    const auto response_count = responses.size();
     do {
         d_win.refresh_response_display();
         do {
             ui_manager::redraw();
             ch = inp_mngr.get_input_event().get_first_input();
-            d_win.handle_scrolling( ch );
+            if( ch == KEY_UP ) {
+                if( selected_response > 0 ) {
+                    selected_response -= 1;
+                } else {
+                    selected_response = response_count - 1;
+                }
+                continue;
+            }
+            if( ch == KEY_DOWN ) {
+                if( selected_response + 1 < response_count ) {
+                    selected_response += 1;
+                } else {
+                    selected_response = 0;
+                }
+                continue;
+            }
+            if( ch == KEY_PPAGE || ch == KEY_NPAGE ) {
+                const auto scroll_entry_index = d_win.handle_scrolling( ch );
+                if( scroll_entry_index ) {
+                    selected_response = *scroll_entry_index;
+                }
+                continue;
+            }
             auto st = special_talk( ch );
             if( st.id != "TALK_NONE" ) {
                 return st;
             }
-            switch( ch ) {
-                case KEY_DOWN:
-                case KEY_NPAGE:
-                case KEY_UP:
-                case KEY_PPAGE:
-                    ch = -1;
-                    break;
-                default:
-                    ch -= 'a';
-                    break;
+            if( ch == KEY_ENTER || ch == '\n' || ch == '\r' ) {
+                ch = static_cast<int>( selected_response );
+            } else {
+                ch -= 'a';
             }
-        } while( ( ch < 0 || ch >= static_cast<int>( responses.size() ) ) );
+        } while( ( ch < 0 || ch >= static_cast<int>( response_count ) ) );
         okay = true;
         std::set<dialogue_consequence> consequences = responses[ch].get_consequences( *this );
         if( consequences.contains( dialogue_consequence::hostile ) ) {
@@ -2079,7 +2260,8 @@ talk_topic dialogue::opt( dialogue_window &d_win, const std::string &npc_name,
     } while( !okay );
 
     talk_response chosen = responses[ch];
-    std::string response_printed = string_format( pgettext( "you say something", "You: %s" ),
+    std::string response_printed = string_format( pgettext( "you say something", "%s: %s" ),
+                                   colorize( _( "You" ), c_green ),
                                    response_lines[ch].text );
     d_win.add_to_history( response_printed );
 
@@ -2282,7 +2464,8 @@ void talk_effect_fun_t::set_finish_mission( const JsonObject &jo, const std::str
     };
 }
 
-void talk_effect_fun_t::set_add_var( const JsonObject &jo, const std::string &member, bool is_npc )
+void talk_effect_fun_t::set_add_var( const JsonObject &jo, const std::string &member,
+                                     bool is_npc )
 {
     const std::string var_name = get_talk_varname( jo, member );
     const std::string &value = jo.get_string( "value" );
@@ -2682,7 +2865,7 @@ void talk_effect_fun_t::set_u_buy_monster( const std::string &monster_type_id, i
         const mtype_id mtype( monster_type_id );
 
         for( int i = 0; i < count; i++ ) {
-            monster *const mon_ptr = g->place_critter_around( mtype, u.pos(), 3 );
+            monster *const mon_ptr = g->place_critter_around( mtype, u.bub_pos(), 3 );
             if( !mon_ptr ) {
                 add_msg( m_debug, "Cannot place u_buy_monster, no valid placement locations." );
                 break;
@@ -2726,7 +2909,8 @@ void talk_effect_fun_t::set_npc_first_topic( const std::string &chat_topic )
     };
 }
 
-void talk_effect_t::set_effect_consequence( const talk_effect_fun_t &fun, dialogue_consequence con )
+void talk_effect_t::set_effect_consequence( const talk_effect_fun_t &fun,
+        dialogue_consequence con )
 {
     effects.push_back( fun );
     guaranteed_consequence = std::max( guaranteed_consequence, con );
@@ -2970,7 +3154,9 @@ void talk_effect_t::parse_string_effect( const std::string &effect_id, const Jso
             WRAP( do_mining ),
             WRAP( do_read ),
             WRAP( do_butcher ),
+            WRAP( do_dissect ),
             WRAP( do_farming ),
+            WRAP( do_craft ),
             WRAP( assign_guard ),
             WRAP( stop_guard ),
             WRAP( buy_cow ),
@@ -3022,6 +3208,7 @@ void talk_effect_t::parse_string_effect( const std::string &effect_id, const Jso
             WRAP( npc_die ),
             WRAP( npc_thankful ),
             WRAP( clear_overrides ),
+            WRAP( go_to_sleep ),
             WRAP( nothing )
 #undef WRAP
         }
@@ -3242,7 +3429,8 @@ static std::string translate_gendered_line(
     return gettext_gendered( gender_map, line );
 }
 
-dynamic_line_t dynamic_line_t::from_member( const JsonObject &jo, const std::string &member_name )
+dynamic_line_t dynamic_line_t::from_member( const JsonObject &jo,
+        const std::string &member_name )
 {
     if( jo.has_array( member_name ) ) {
         return dynamic_line_t( jo.get_array( member_name ) );
@@ -3367,7 +3555,8 @@ dynamic_line_t::dynamic_line_t( const JsonArray &ja )
     };
 }
 
-json_dynamic_line_effect::json_dynamic_line_effect( const JsonObject &jo, const std::string &id )
+json_dynamic_line_effect::json_dynamic_line_effect( const JsonObject &jo,
+        const std::string &id )
 {
     std::function<bool( const dialogue & )> tmp_condition;
     read_condition<dialogue>( jo, "condition", tmp_condition, true );
@@ -3586,7 +3775,7 @@ static consumption_result try_consume( npc &p, item &it, std::string &reason )
             reason = _( "Thanks, I feel better already." );
         }
         if( to_eat.type->has_use() ) {
-            amount_used = to_eat.type->invoke( p, to_eat, p.pos() );
+            amount_used = to_eat.type->invoke( p, to_eat, p.bub_pos() );
             if( amount_used <= 0 ) {
                 reason = _( "It doesn't look like a good idea to consume this…" );
                 return REFUSED;

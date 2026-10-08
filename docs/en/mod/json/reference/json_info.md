@@ -178,97 +178,6 @@ the appropriate JSON file.
 }
 ```
 
-### Bionics
-
-| Identifier                                                                                           | Description                                                                                                                                                                     |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| id                                                                                                   | (_mandatory_) Unique ID. Must be one continuous word, use underscores if necessary.                                                                                             |
-| name                                                                                                 | (_mandatory_) In-game name displayed.                                                                                                                                           |
-| description                                                                                          | (_mandatory_) In-game description.                                                                                                                                              |
-| flags                                                                                                | (_optional_) A list of flags. See json_flags.md for supported values.                                                                                                           |
-| act_cost                                                                                             | (_optional_) How many kJ it costs to activate the bionic. Strings can be used "1 kJ"/"1000 J"/"1000000 mJ" (default: `0`)                                                       |
-| deact_cost                                                                                           | (_optional_) How many kJ it costs to deactivate the bionic. Strings can be used "1 kJ"/"1000 J"/"1000000 mJ" (default: `0`)                                                     |
-| react_cost                                                                                           | (_optional_) How many kJ it costs over time to keep this bionic active, does nothing without a non-zero "time". Strings can be used "1 kJ"/"1000 J"/"1000000 mJ" (default: `0`) |
-| time                                                                                                 | (_optional_) How long, when activated, between drawing cost. If 0, it draws power once. (default: `0`)                                                                          |
-| upgraded_bionic                                                                                      | (_optional_) Bionic that can be upgraded by installing this one.                                                                                                                |
-| required_bionics                                                                                     | (_optional_) Bionics which are required to install this bionic, and which cannot be uninstalled if this bionic is installed                                                     |
-| can_uninstall                                                                                        | (_optional_) Can the bionic be uninstalled once installed?                                                                                                                      |
-| no_uninstall_reason                                                                                  | (_optional_) Required with can_uninstall being false, string displayed when trying to uninstall the CBM.                                                                        |
-| available_upgrades                                                                                   | (_optional_) Upgrades available for this bionic, i.e. the list of bionics                                                                                                       |
-| starting_bionic                                                                                      | (_optional_) Bool to determine weather it is permitted to choose on start                                                                                                       |
-| points                                                                                               | (_optional_) The number of points this bionic costs to choose                                                                                                                   |
-| having this one referenced by `upgraded_bionic`.                                                     |                                                                                                                                                                                 |
-| and how much this bionic encumber them.                                                              |                                                                                                                                                                                 |
-| carrying capacity in grams, can be negative. Strings can be used - "5000 g" or "5 kg" (default: `0`) |                                                                                                                                                                                 |
-|                                                                                                      | weight_capacity_modifier                                                                                                                                                        |
-| (default: `1`)                                                                                       |                                                                                                                                                                                 |
-| when this bionic is installed (e.g. because it replaces the fault biological part).                  |                                                                                                                                                                                 |
-| included_bionics                                                                                     | (_optional_) Additional bionics that are installed automatically when this bionic                                                                                               |
-| is installed. This can be used to install several bionics from one CBM item, which is useful as each |                                                                                                                                                                                 |
-| of those can be activated independently.                                                             |                                                                                                                                                                                 |
-| with another. If true this bionic does not require a CBM item to be defined. (default: `false`)      |                                                                                                                                                                                 |
-| env_protec                                                                                           | (_optional_) How much environmental protection does this bionic provide on the                                                                                                  |
-| specified body parts.                                                                                |                                                                                                                                                                                 |
-| provide on the specified body parts.                                                                 |                                                                                                                                                                                 |
-| bionic provide on the specified body parts.                                                          |                                                                                                                                                                                 |
-| protect does this bionic provide on the specified body parts.                                        |                                                                                                                                                                                 |
-| A list of body parts occupied by this bionic, and the number of bionic slots it take on those parts. |                                                                                                                                                                                 |
-|                                                                                                      | capacity                                                                                                                                                                        |
-| kJ"/"1000 J"/"1000000 mJ" (default: `0`)                                                             |                                                                                                                                                                                 |
-| bionic can use to produce bionic power.                                                              |                                                                                                                                                                                 |
-| allows you to plug your power banks to an external power source (solar backpack, UPS, vehicle etc)   |                                                                                                                                                                                 |
-| via a cable. (default: `false`)                                                                      |                                                                                                                                                                                 |
-| store.                                                                                               |                                                                                                                                                                                 |
-| `0`)                                                                                                 |                                                                                                                                                                                 |
-| (default: `1`)                                                                                       |                                                                                                                                                                                 |
-| converted into power. Useful for CBM using PERPETUAL fuel like `muscle`, `wind` or `sun_light`.      |                                                                                                                                                                                 |
-| (default: `0`)                                                                                       |                                                                                                                                                                                 |
-| power. (default: `false`)                                                                            |                                                                                                                                                                                 |
-| diminishing fuel_efficiency. Float between 0.0 and 1.0. (default: `nullopt`)                         |                                                                                                                                                                                 |
-| (_optional_) `emit_id` of the field emitted by this bionic when it produces energy. Emit_ids are     |                                                                                                                                                                                 |
-| defined in `emit.json`.                                                                              |                                                                                                                                                                                 |
-| designated as follow: "DEX", "INT", "STR", "PER".                                                    |                                                                                                                                                                                 |
-| enchantments applied by this CBM (see MAGIC.md for instructions on enchantment. NB: enchantments are |                                                                                                                                                                                 |
-| not necessarily magic.)                                                                              |                                                                                                                                                                                 |
-| installing this CBM, and lose when you uninstall this CBM. Spell classes are automatically gained.   |                                                                                                                                                                                 |
-| fake_item                                                                                            | (_optional_) ID of fake item used by this bionic. Mandatory for gun and weapon                                                                                                  |
-| bionics.                                                                                             |                                                                                                                                                                                 |
-
-```json
-{
-    "id"           : "bio_batteries",
-    "name"         : "Battery System",
-    "active"       : false,
-    "act_cost"     : 0,
-    "time"         : 1,
-    "fuel_efficiency": 1,
-    "stat_bonus": [ [ "INT", 2 ], [ "STR", 2 ] ],
-    "fuel_options": [ "battery" ],
-    "fuel_capacity": 500,
-    "encumbrance"  : [ [ "torso", 10 ], [ "arm_l", 10 ], [ "arm_r", 10 ], [ "leg_l", 10 ], [ "leg_r", 10 ], [ "foot_l", 10 ], [ "foot_r", 10 ] ],
-    "description"  : "You have a battery draining attachment, and thus can make use of the energy contained in normal, everyday batteries. Use 'E' to consume batteries.",
-    "canceled_mutations": ["HYPEROPIC"],
-    "included_bionics": ["bio_blindfold"]
-},
-{
-    "id": "bio_purifier",
-    "type": "bionic",
-    "name": "Air Filtration System",
-    "description": "Surgically implanted in your trachea is an advanced filtration system.  If toxins, or airborne diseases find their way into your windpipe, the filter will attempt to remove them.",
-    "occupied_bodyparts": [ [ "torso", 4 ], [ "mouth", 2 ] ],
-    "env_protec": [ [ "mouth", 7 ] ],
-    "bash_protec": [ [ "leg_l", 3 ], [ "leg_r", 3 ] ],
-    "cut_protec": [ [ "leg_l", 3 ], [ "leg_r", 3 ] ],
-    "bullet_protec": [ [ "leg_l", 3 ], [ "leg_r", 3 ] ],
-    "learned_spells": [ [ "mint_breath", 2 ] ],
-    "flags": [ "BIONIC_NPC_USABLE" ]
-}
-```
-
-Bionics effects are defined in the code and new effects cannot be created through JSON alone. When
-adding a new bionic, if it's not included with another one, you must also add the corresponding CBM
-item in `data/json/items/bionics.json`. Even for a faulty bionic.
-
 ### Dreams
 
 | Identifier | Description                                                          |
@@ -340,6 +249,16 @@ When you sort your inventory by category, these are the categories that are disp
 
 ```json
 { "name" : "Aaliyah", "gender" : "female", "usage" : "given" }, // Name, gender, "given"/"family"/"city" (first/last/city name).
+```
+
+### Named Colors
+
+```json
+{
+  "type": "named_color", // As you expect
+  "name": "Cataclysm Red", // Name to display
+  "value": "#622625" // Hex value of color
+}
 ```
 
 ### Scent_types
@@ -611,6 +530,95 @@ an `"anything"` constraint on it. For example:
 
 This is a simple "survive a day" but is triggered by waking up, so it will be completed when you
 wake up for the first time after 24 hours into the game.
+
+### `requirements`
+
+The requirements system in Cataclysm defines reusable sets of components, tools, and qualities needed for crafting, construction, and other game mechanics. Requirements are defined in JSON format and located in `data/json/requirements/`.
+
+## JSON Structure
+
+### Basic Format
+
+```json
+{
+  "id": "unique_id",
+  "type": "requirement",
+  "//": "Optional comment",
+  "components": [
+    [
+      ["gasoline", 1],
+      ["diesel", 1],
+      ["biodiesel", 1]
+    ]
+  ],
+  "tools": [
+    [
+      ["soldering_iron", 1],
+      ["soldering_ethanol", 10],
+      ["toolset", 1]
+    ]
+  ],
+  "qualities": [
+    { "id": "CUT", "level": 1 },
+    { "id": "HAMMER", "level": 2 }
+  ]
+}
+```
+
+#### Format
+
+Any of the three last arrays is optional, as long as one of them is present (a requirement must depend on _something_ after all!)
+
+**Components** are organized as nested arrays representing alternatives and requirements:
+
+```json
+"components": [
+  [ /* Group 1: ONE of these required */ ],
+  [ /* Group 2: ONE of these required */ ]
+]
+```
+
+- `[ "item_id", quantity ]` - Specific item
+- `[ "item_id", quantity, "LIST" ]` - References another requirement definition
+
+**Tools** specify items that are used but not consumed, along with charge costs:
+
+```json
+"tools": [
+  [
+    [ "tool_id", charges ],
+    [ "alternative", charges, "LIST" ]
+  ]
+]
+```
+
+`charges` can be a positive integer, in which case it references the number of charges consumed, or `-1` to signify that no charges are used.
+
+**Qualities** specify minimum tool quality levels needed:
+
+````json
+"qualities": [
+  { "id": "QUALITY_ID", "level": min_level }
+]
+
+#### Usage in Recipes
+
+Here is an example of a requirement in a recipe:
+
+```json
+"using": [ [ "requirement_id", multiplier ] ]
+````
+
+Multiple requirements:
+
+```json
+"using": [
+  [ "welding_standard", 1 ],
+  [ "forging_standard", 2 ]
+]
+```
+
+You can explore the files in the `/data/json/requirements` folder to see common examples of requirements for certain types of items or components. Make sure that your requirements do not form any circular dependencies.
 
 ### Skills
 

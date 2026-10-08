@@ -15,24 +15,82 @@ function remove_hidden_args(arg_list)
   return ret
 end
 
+---@param str string?
+---@param pat string
+---@param sep string
+---@param op? fun(match: string): string?
 function string_concat_matches(str, pat, sep, op)
   if str == nil or str == "" then return "" end
   local tbl = {}
   for match in string.gmatch(str, pat) do
-    if op then match = op(match) end
-    if match and match ~= "" then table.insert(tbl, match) end
+    local mapped_match = match
+    if op then mapped_match = op(match) end
+    if mapped_match and mapped_match ~= "" then table.insert(tbl, mapped_match) end
   end
   return table.concat(tbl, sep)
 end
 
-function get_meta_params(meta)
+---@class LuaDocOverload
+---@field args string[]
+---@field retval string
+
+---@class LuaDocMemberBase
+---@field name string
+---@field comment? string
+
+---@class LuaDocVariableMember : LuaDocMemberBase
+---@field type "var"
+---@field vartype string
+---@field hasval? boolean
+---@field varval any
+
+---@class LuaDocFunctionMember : LuaDocMemberBase
+---@field type "func"
+---@field overloads LuaDocOverload[]
+
+---@alias LuaDocMember LuaDocVariableMember|LuaDocFunctionMember
+
+---@class LuaDocSection
+---@field type_comment? string
+---@field lib_comment? string
+---@field ["#member"] LuaDocMember[]?
+---@field ["#bases"] string[]?
+---@field ["#construct"] string[][]?
+
+---@class LuaDocMetadata
+---@field ["#types"] table<string, LuaDocSection>?
+---@field ["#libs"] table<string, LuaDocSection>?
+
+---@class LuaDocParamSpec
+---@field name string
+---@field type? string
+
+---@param raw string
+---@return LuaDocParamSpec
+function parse_meta_param(raw)
+  local name, type_name = string.match(raw, "^([%w_]+%??)%s*:%s*(.+)$")
+  if name ~= nil then return { name = name, type = type_name } end
+  return { name = raw }
+end
+
+---@param meta string?
+---@return LuaDocParamSpec[]
+function get_meta_param_specs(meta)
   local tbl = {}
   if meta == nil or meta == "" then return tbl end
   for line in string.gmatch(meta, "[^\r\n]+") do
-    local name = string.match(line, "^@param (.*)$")
-    if name ~= nil then table.insert(tbl, name) end
+    local raw = string.match(line, "^@param (.*)$")
+    if raw ~= nil then table.insert(tbl, parse_meta_param(raw)) end
   end
   return tbl
+end
+
+---@param line string
+---@return boolean
+function is_luals_metadata_line(line)
+  return string.match(line, "^@alias%s+") ~= nil
+    or string.match(line, "^@class%s+") ~= nil
+    or string.match(line, "^@field%s+") ~= nil
 end
 
 ---@param a any
@@ -57,8 +115,8 @@ end
 
 --- wraps sol2 table/map proxies so it can be sorted.
 ---@generic T
----@param t? T[]
----@return { k: string, v: T }[]
+---@param t? table<string, T>|T[]
+---@return { k: string|integer, v: T }[]
 function wrapped(t)
   local res = {}
   for k, v in pairs(t or {}) do
@@ -121,17 +179,66 @@ end
 
 ---@param member { name: string, type: "var" | "func" }
 function field_sort_order(member)
-  if member.name == "NULL_ID" then return -1 end
+  local member_name = tostring(member.name)
+  if member_name == "NULL_ID" then return -1 end
 
-  if string.match(member.name, "^__") then return 4 end -- metamethods
-  if member.name == "deserialize" then return 3 end
-  if member.name == "serialize" then return 2 end
+  if string.match(member_name, "^__") then return 4 end -- metamethods
+  if member_name == "deserialize" then return 3 end
+  if member_name == "serialize" then return 2 end
   if member.type == "func" then return 1 end
   return 0
 end
 
--- Rudimentary mapping from C++/sol types to LuaLS types.
+---@param a LuaDocMember
+---@param b LuaDocMember
+function field_sort_less(a, b)
+  local a_priority = field_sort_order(a)
+  local b_priority = field_sort_order(b)
+
+  if a_priority ~= b_priority then return a_priority < b_priority end
+
+  local a_name = tostring(a.name)
+  local b_name = tostring(b.name)
+  if a_name ~= b_name then return a_name < b_name end
+
+  return tostring(a.type) < tostring(b.type)
+end
+
 ---@param cpp_type string
+function normalize_sol_object_type(cpp_type)
+  local compact_type = string.gsub(cpp_type, "%s+", "")
+  compact_type = string.gsub(compact_type, "::", "_")
+  local normalized_type = compact_type
+  normalized_type = string.gsub(normalized_type, "CppVal<sol_basic_object<sol_basic_reference<[^>]+>>>", "any")
+  normalized_type = string.gsub(normalized_type, "sol_basic_object<sol_basic_reference<[^>]+>>", "any")
+  normalized_type = string.gsub(normalized_type, "CppVal<any>", "any")
+
+  if normalized_type ~= compact_type then return normalized_type end
+  return cpp_type
+end
+
+---@param arg_list string
+function split_doc_type_args(arg_list)
+  local result = {}
+  local depth = 0
+  local start = 1
+  for index = 1, #arg_list do
+    local ch = string.sub(arg_list, index, index)
+    if ch == "(" or ch == "<" then
+      depth = depth + 1
+    elseif ch == ")" or ch == ">" then
+      depth = depth - 1
+    elseif ch == "," and depth == 0 then
+      table.insert(result, string.sub(arg_list, start, index - 1))
+      start = index + 1
+    end
+  end
+  table.insert(result, string.sub(arg_list, start))
+  return result
+end
+
+-- Rudimentary mapping from C++/sol types to LuaLS types.
+---@param cpp_type string?
 ---@param keep_cppval boolean
 ---@return string
 function map_cpp_type_to_lua(cpp_type, keep_cppval)
@@ -141,6 +248,9 @@ function map_cpp_type_to_lua(cpp_type, keep_cppval)
   cpp_type = string.gsub(cpp_type, "%s+&", "") -- Remove references
   cpp_type = string.gsub(cpp_type, "%s+%*", "") -- Remove pointers (basic)
   cpp_type = string.gsub(cpp_type, "%s+$", "") -- Trim trailing space
+  cpp_type = normalize_sol_object_type(cpp_type)
+
+  if string.match(cpp_type, "^%(%s*any%s*,%s*any%s*%)$") then return "(any, any)" end
 
   if cpp_type == "std::string" or cpp_type == "string" then
     return "string"
@@ -190,6 +300,7 @@ function map_cpp_type_to_lua(cpp_type, keep_cppval)
     local clean_type = string.gsub(cpp_type, "::", "_")
     -- Clean spaces
     clean_type = string.gsub(clean_type, "%s+", "")
+    clean_type = normalize_sol_object_type(clean_type)
     -- Try to extract the core type name, handling basic templates roughly
     clean_type = string.match(clean_type, "^[%w_]+%s*<?([%w_]+)?>?$") or clean_type
     clean_type = string.match(clean_type, "[%w_]+$") or clean_type -- Get the last part
@@ -200,36 +311,60 @@ function map_cpp_type_to_lua(cpp_type, keep_cppval)
       clean_type = string.gsub(
         clean_type,
         "^Vector%((%S+)%)$",
+        ---@param k string
         function(k) return ("%s[]"):format(map_cpp_type_to_lua(k, keep_cppval)) end
       )
     elseif string.match(clean_type, "^Set%(%S+%)$") then
       clean_type = string.gsub(
         clean_type,
         "^Set%((%S+)%)$",
+        ---@param k string
         function(k) return ("%s[]"):format(map_cpp_type_to_lua(k, keep_cppval)) end
       )
     elseif string.match(clean_type, "^Array%(%S+,%d+%)$") then
       clean_type = string.gsub(
         clean_type,
         "^Array%((%S+),(%d+)%)$",
+        ---@param k string
         function(k) return ("%s[]"):format(map_cpp_type_to_lua(k, keep_cppval)) end
       )
     elseif string.match(clean_type, "^Dict%(%S+,%S+%)$") then
       clean_type = string.gsub(
         clean_type,
         "^Dict%((%S+),(%S+)%)$",
+        ---@param k string
+        ---@param v string
         function(k, v) return ("table<%s, %s>"):format(map_cpp_type_to_lua(k, keep_cppval), map_cpp_type_to_lua(v, keep_cppval)) end
       )
     elseif string.match(clean_type, "^Opt%(%S+%)$") then
       clean_type = string.gsub(
         clean_type,
         "^Opt%((%S+)%)$",
+        ---@param k string
         function(k) return ("%s?"):format(map_cpp_type_to_lua(k, keep_cppval)) end
       )
+    elseif string.match(clean_type, "^Variant%(.+%)$") then
+      local mapped_types = {}
+      local inner = string.match(clean_type, "^Variant%((.*)%)$")
+      ---@cast inner string
+      for _, type_part in ipairs(split_doc_type_args(inner)) do
+        table.insert(mapped_types, map_cpp_type_to_lua(type_part, keep_cppval))
+      end
+      clean_type = table.concat(mapped_types, " | ")
+    elseif string.match(clean_type, "^%(.+%)$") then
+      local mapped_types = {}
+      local inner = string.match(clean_type, "^%((.*)%)$")
+      ---@cast inner string
+      for _, type_part in ipairs(split_doc_type_args(inner)) do
+        table.insert(mapped_types, map_cpp_type_to_lua(type_part, keep_cppval))
+      end
+      clean_type = "(" .. table.concat(mapped_types, ", ") .. ")"
     elseif string.match(clean_type, "^Pair%(%S+,%S+%)$") then
       clean_type = string.gsub(
         clean_type,
         "^Pair%((%S+),(%S+)%)$",
+        ---@param k string
+        ---@param v string
         function(k, v) return ("(%s, %s)"):format(map_cpp_type_to_lua(k, keep_cppval), map_cpp_type_to_lua(v, keep_cppval)) end
       )
     end

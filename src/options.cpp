@@ -1,13 +1,16 @@
 #include "options.h"
 
 #include <algorithm>
+#include <array>
 #include <locale>
 #include <cfloat>
 #include <climits>
 #include <iterator>
+#include <ranges>
 #include <stdexcept>
 
 #include "calendar.h"
+#include "cached_options.h"
 #include "cached_item_options.h"
 #include "cata_utility.h"
 #include "catacharset.h"
@@ -25,8 +28,10 @@
 #include "language.h"
 #include "line.h"
 #include "mapsharing.h"
+#include "mod_manager.h"
 #include "output.h"
 #include "path_info.h"
+#include "preload_config.h"
 #include "point.h"
 #include "popup.h"
 #include "sdlsound.h"
@@ -35,6 +40,7 @@
 #include "string_formatter.h"
 #include "string_input_popup.h"
 #include "string_utils.h"
+#include "title_screen.h"
 #include "translations.h"
 #include "ui_manager.h"
 #include "worldfactory.h"
@@ -154,6 +160,7 @@ options_manager &get_options()
 constexpr auto general = "general";
 constexpr auto interface = "interface";
 constexpr auto graphics = "graphics";
+constexpr auto performance = "performance";
 constexpr auto world_default = "world_default";
 constexpr auto debug = "debug";
 #if defined(__ANDROID__)
@@ -165,6 +172,7 @@ options_manager::options_manager()
     pages_.emplace_back( general, to_translation( "General" ) );
     pages_.emplace_back( interface, to_translation( "Interface" ) );
     pages_.emplace_back( graphics, to_translation( "Graphics" ) );
+    pages_.emplace_back( performance, to_translation( "Performance" ) );
     // when sharing maps only admin is allowed to change these.
     if( !MAP_SHARING::isCompetitive() || MAP_SHARING::isAdmin() ) {
         pages_.emplace_back( world_default, to_translation( "World Defaults" ) );
@@ -174,7 +182,17 @@ options_manager::options_manager()
     pages_.emplace_back( android, to_translation( "Android" ) );
 #endif
 
-    mMigrateOption = { {"DELETE_WORLD", { "WORLD_END", { {"no", "keep" }, {"yes", "delete"} } } } };
+    mMigrateOption = {
+        {"DELETE_WORLD", { "WORLD_END", { {"no", "keep" }, {"yes", "delete"} } } },
+        {
+            "COMPUTE_ACCELERATION", {
+                "COMPUTE_ACCELERATION", { {"off", "cpu" },
+                    {"software", "gpu_software" },
+                    {"force", "gpu" }
+                }
+            }
+        },
+    };
 
     enable_json( "DEFAULT_REGION" );
     // to allow class based init_data functions to add values to a 'string' type option, add:
@@ -184,6 +202,323 @@ options_manager::options_manager()
 }
 
 static const std::string blank_value( 1, 001 ); // because "" might be valid
+
+namespace
+{
+
+constexpr auto option_group_type = "OPTION_GROUP";
+constexpr auto option_space_type = "OPTION_SPACE";
+constexpr auto option_type = "OPTION";
+
+struct option_dependency_definition {
+    std::string option;
+    std::vector<std::string> values;
+};
+
+struct option_group_definition {
+    std::string id;
+    std::string page;
+    translation title;
+    translation desc;
+};
+
+struct int_map_item_definition {
+    int value = 0;
+    translation label;
+};
+
+struct option_definition {
+    std::string name;
+    std::string stype;
+    std::string scope;
+    std::string page;
+    std::string group;
+    translation menu_text;
+    translation tooltip;
+    options_manager::copt_hide_t hide = options_manager::COPT_NO_HIDE;
+    std::vector<option_dependency_definition> deps;
+    std::vector<options_manager::id_and_option> items;
+    std::vector<int_map_item_definition> int_map_items;
+    std::string default_string;
+    std::string default_string_android;
+    bool default_bool = false;
+    bool default_bool_android = false;
+    bool has_default_bool_android = false;
+    int min_int = 0;
+    int max_int = 0;
+    int default_int = 0;
+    int default_int_android = 0;
+    bool has_default_int_android = false;
+    float min_float = 0.0f;
+    float max_float = 0.0f;
+    float default_float = 0.0f;
+    float default_float_android = 0.0f;
+    bool has_default_float_android = false;
+    float step_float = 0.0f;
+    int max_length = 0;
+    bool verbose = false;
+    std::string format;
+};
+
+struct parsed_option_definitions {
+    std::vector<option_group_definition> groups;
+    std::vector<option_definition> options;
+};
+
+struct pending_option_prerequisites {
+    std::string option_name;
+    std::vector<option_dependency_definition> deps;
+};
+
+auto option_definitions_path() -> std::string
+{
+    return PATH_INFO::datadir() + "json/options";
+}
+
+auto read_translation_member( const JsonObject &jo, const std::string &member_name,
+                              const translation &fallback ) -> translation
+{
+    if( !jo.has_member( member_name ) ) {
+        return fallback;
+    }
+
+    auto result = fallback;
+    result.deserialize( *jo.get_raw( member_name ) );
+    return result;
+}
+
+auto read_option_hide( const JsonObject &jo ) -> options_manager::copt_hide_t
+{
+    if( !jo.has_string( "hide" ) ) {
+        return options_manager::COPT_NO_HIDE;
+    }
+
+    const auto hide = jo.get_string( "hide" );
+    if( hide == "none" ) {
+        return options_manager::COPT_NO_HIDE;
+    }
+    if( hide == "always" ) {
+        return options_manager::COPT_ALWAYS_HIDE;
+    }
+    if( hide == "sdl_hide" ) {
+        return options_manager::COPT_SDL_HIDE;
+    }
+    if( hide == "curses_hide" ) {
+        return options_manager::COPT_CURSES_HIDE;
+    }
+    if( hide == "posix_curses_hide" ) {
+        return options_manager::COPT_POSIX_CURSES_HIDE;
+    }
+    if( hide == "no_sound_hide" ) {
+        return options_manager::COPT_NO_SOUND_HIDE;
+    }
+    if( hide == "android_only" ) {
+        return options_manager::COPT_ANDROID_HIDE;
+    }
+
+    jo.throw_error( string_format( "Unknown option hide rule '%s'", hide ), "hide" );
+    return options_manager::COPT_NO_HIDE;
+}
+
+auto read_option_dependencies( const JsonObject &jo ) -> std::vector<option_dependency_definition>
+{
+    if( !jo.has_array( "deps" ) ) {
+        return {};
+    }
+
+    auto result = std::vector<option_dependency_definition>();
+    for( const JsonObject dep_jo : jo.get_array( "deps" ) ) {
+        auto dep = option_dependency_definition{ .option = dep_jo.get_string( "option" ), .values = {} };
+        if( dep_jo.has_array( "values" ) ) {
+            for( const std::string value : dep_jo.get_array( "values" ) ) {
+                dep.values.push_back( value );
+            }
+        }
+        result.push_back( dep );
+    }
+    return result;
+}
+
+auto parse_option_group_definition( const JsonObject &jo ) -> option_group_definition
+{
+    jo.allow_omitted_members();
+    const auto id = jo.get_string( "id" );
+    return option_group_definition{
+        .id = id,
+        .page = jo.get_string( "page" ),
+        .title = read_translation_member( jo, "title", no_translation( id ) ),
+        .desc = read_translation_member( jo, "desc", no_translation( "" ) ),
+    };
+}
+
+auto parse_string_items( const JsonObject &jo ) -> std::vector<options_manager::id_and_option>
+{
+    auto result = std::vector<options_manager::id_and_option>();
+    for( const JsonObject item_jo : jo.get_array( "items" ) ) {
+        const auto label = read_translation_member( item_jo, "label",
+                           no_translation( item_jo.get_string( "value" ) ) );
+        result.emplace_back( item_jo.get_string( "value" ), label );
+    }
+    return result;
+}
+
+auto parse_int_map_items( const JsonObject &jo ) -> std::vector<int_map_item_definition>
+{
+    auto result = std::vector<int_map_item_definition>();
+    for( const JsonObject item_jo : jo.get_array( "items" ) ) {
+        result.push_back( int_map_item_definition{
+            .value = item_jo.get_int( "value" ),
+            .label = read_translation_member( item_jo, "label", no_translation( std::to_string( item_jo.get_int( "value" ) ) ) ),
+        } );
+    }
+    return result;
+}
+
+auto parse_option_definition( const JsonObject &jo ) -> option_definition
+{
+    jo.allow_omitted_members();
+
+    auto option = option_definition{
+        .name = jo.get_string( "name" ),
+        .stype = jo.get_string( "stype" ),
+        .scope = jo.get_string( "scope" ),
+        .page = jo.get_string( "page" ),
+        .group = jo.has_string( "group" ) ? jo.get_string( "group" ) : std::string(),
+        .menu_text = read_translation_member( jo, "menu_text", no_translation( jo.get_string( "name" ) ) ),
+        .tooltip = read_translation_member( jo, "tooltip", no_translation( "" ) ),
+        .hide = read_option_hide( jo ),
+        .deps = read_option_dependencies( jo ),
+        .items = {},
+        .int_map_items = {},
+        .default_string = {},
+        .default_string_android = {},
+        .default_bool = false,
+        .default_bool_android = false,
+        .has_default_bool_android = false,
+        .min_int = 0,
+        .max_int = 0,
+        .default_int = 0,
+        .default_int_android = 0,
+        .has_default_int_android = false,
+        .min_float = 0.0f,
+        .max_float = 0.0f,
+        .default_float = 0.0f,
+        .default_float_android = 0.0f,
+        .has_default_float_android = false,
+        .step_float = 0.0f,
+        .max_length = 0,
+        .verbose = false,
+        .format = jo.has_string( "format" ) ? jo.get_string( "format" ) : std::string(),
+    };
+
+    if( option.stype == "bool" ) {
+        option.default_bool = jo.get_bool( "default" );
+        option.has_default_bool_android = jo.has_bool( "default_android" );
+        option.default_bool_android = jo.get_bool( "default_android", option.default_bool );
+#if defined(__ANDROID__)
+        if( option.has_default_bool_android ) {
+            option.default_bool = option.default_bool_android;
+        }
+#endif
+    } else if( option.stype == "int" ) {
+        option.min_int = jo.get_int( "min" );
+        option.max_int = jo.get_int( "max" );
+        option.default_int = jo.get_int( "default" );
+        option.has_default_int_android = jo.has_int( "default_android" );
+        option.default_int_android = jo.get_int( "default_android", option.default_int );
+#if defined(__ANDROID__)
+        if( option.has_default_int_android ) {
+            option.default_int = option.default_int_android;
+        }
+#endif
+    } else if( option.stype == "float" ) {
+        option.min_float = static_cast<float>( jo.get_float( "min" ) );
+        option.max_float = static_cast<float>( jo.get_float( "max" ) );
+        option.default_float = static_cast<float>( jo.get_float( "default" ) );
+        option.has_default_float_android = jo.has_float( "default_android" );
+        option.default_float_android = static_cast<float>( jo.get_float( "default_android",
+                                       option.default_float ) );
+#if defined(__ANDROID__)
+        if( option.has_default_float_android ) {
+            option.default_float = option.default_float_android;
+        }
+#endif
+        option.step_float = static_cast<float>( jo.get_float( "step" ) );
+    } else if( option.stype == "string_input" ) {
+        option.default_string = jo.get_string( "default" );
+        if( jo.has_string( "default_android" ) ) {
+            option.default_string_android = jo.get_string( "default_android" );
+#if defined(__ANDROID__)
+            option.default_string = option.default_string_android;
+#endif
+        }
+        option.max_length = jo.get_int( "max_length" );
+    } else if( option.stype == "string_select" ) {
+        option.default_string = jo.get_string( "default" );
+        if( jo.has_string( "default_android" ) ) {
+            option.default_string_android = jo.get_string( "default_android" );
+#if defined(__ANDROID__)
+            option.default_string = option.default_string_android;
+#endif
+        }
+        option.items = parse_string_items( jo );
+    } else if( option.stype == "int_map" ) {
+        option.default_int = jo.get_int( "default" );
+        option.has_default_int_android = jo.has_int( "default_android" );
+        option.default_int_android = jo.get_int( "default_android", option.default_int );
+#if defined(__ANDROID__)
+        if( option.has_default_int_android ) {
+            option.default_int = option.default_int_android;
+        }
+#endif
+        option.verbose = jo.get_bool( "verbose", false );
+        option.int_map_items = parse_int_map_items( jo );
+    } else {
+        jo.throw_error( string_format( "Unknown option stype '%s'", option.stype ), "stype" );
+    }
+
+    return option;
+}
+
+auto capture_option_values( const options_manager::options_container &container )
+-> std::map<std::string, std::string>
+{
+    auto values = std::map<std::string, std::string>();
+    for( const auto &[name, opt] : container ) {
+        values.emplace( name, opt.getValue( true ) );
+    }
+    return values;
+}
+
+auto restore_option_values( const std::map<std::string, std::string> &values,
+                            options_manager::options_container &container ) -> void
+{
+    for( const auto &[name, value] : values ) {
+        if( container.contains( name ) ) {
+            container[name].setValue( value );
+        }
+    }
+}
+
+auto sync_snapshot_keys( const options_manager::options_container &current,
+                         options_manager::options_container &snapshot ) -> void
+{
+    for( const auto &[name, option] : current ) {
+        if( !snapshot.contains( name ) ) {
+            snapshot.emplace( name, option );
+        }
+    }
+
+    for( auto iter = snapshot.begin(); iter != snapshot.end(); ) {
+        if( current.contains( iter->first ) ) {
+            ++iter;
+        } else {
+            iter = snapshot.erase( iter );
+        }
+    }
+}
+
+} // namespace
 
 void options_manager::enable_json( const std::string &lvar )
 {
@@ -221,21 +556,56 @@ void options_manager::add_value( const std::string &lvar, const std::string &lva
     }
 }
 
+auto options_manager::refresh_title_screen_option() -> void
+{
+    auto iter = options.find( title_screen::option_id );
+    if( iter == options.end() || iter->second.sType != "string_select" ) {
+        return;
+    }
+
+    auto &option = iter->second;
+    const auto old_value = option.getValue();
+    option.vItems = title_screen::get_options();
+    option.sDefault = title_screen::default_option_id;
+    option.setValue( option.getItemPos( old_value ) != -1 ? old_value :
+                     title_screen::default_option_id );
+}
+
 void options_manager::addOptionToPage( const std::string &name, const std::string &page )
 {
     for( Page &p : pages_ ) {
         if( p.id_ == page ) {
             // Don't add duplicate options to the page
-            for( const PageItem &i : p.items_ ) {
-                if( i.type == ItemType::Option && i.data == name ) {
-                    return;
-                }
+            const auto already_exists = std::ranges::any_of( p.items_, [&]( const PageItem & item ) {
+                return item.type == ItemType::Option && item.data == name;
+            } );
+            if( already_exists ) {
+                return;
             }
-            p.items_.emplace_back( ItemType::Option, name, adding_to_group_ );
+            insert_page_item( p, PageItem( ItemType::Option, name, adding_to_group_ ) );
             return;
         }
     }
     // @TODO handle the case when an option has no valid page id (note: consider hidden external options as well)
+}
+
+auto options_manager::insert_page_item( Page &page, const PageItem &item ) -> void
+{
+    if( item.group.empty() ) {
+        page.items_.push_back( item );
+        return;
+    }
+
+    const auto group_range = std::find_if( page.items_.rbegin(),
+    page.items_.rend(), [&]( const PageItem & existing ) {
+        return existing.group == item.group;
+    } );
+    if( group_range == page.items_.rend() ) {
+        page.items_.push_back( item );
+        return;
+    }
+
+    page.items_.insert( group_range.base(), item );
 }
 
 options_manager::cOpt::cOpt()
@@ -508,7 +878,7 @@ void options_manager::add_empty_line( const std::string &sPageIn )
 {
     for( Page &p : pages_ ) {
         if( p.id_ == sPageIn ) {
-            p.items_.emplace_back( ItemType::BlankLine, "", adding_to_group_ );
+            insert_page_item( p, PageItem( ItemType::BlankLine, "", adding_to_group_ ) );
             break;
         }
     }
@@ -531,11 +901,22 @@ void options_manager::add_option_group( const std::string &page_id,
         }
     }
     groups_.push_back( group );
+
+    for( Page &p : pages_ ) {
+        if( p.id_ != page_id ) {
+            continue;
+        }
+        if( !p.items_.empty() && p.items_.back().type != ItemType::BlankLine ) {
+            insert_page_item( p, PageItem( ItemType::BlankLine, "", "" ) );
+        }
+        break;
+    }
+
     adding_to_group_ = groups_.back().id_;
 
     for( Page &p : pages_ ) {
         if( p.id_ == page_id ) {
-            p.items_.emplace_back( ItemType::GroupHeader, group.id_, adding_to_group_ );
+            insert_page_item( p, PageItem( ItemType::GroupHeader, group.id_, adding_to_group_ ) );
             break;
         }
     }
@@ -565,7 +946,7 @@ void options_manager::cOpt::setPrerequisites( const std::string &sOption,
 {
     const bool hasOption = get_options().has_option( sOption );
     if( !hasOption ) {
-        debugmsg( "setPrerequisite: unknown option %s", sType );
+        debugmsg( "setPrerequisite: unknown option %s", sOption );
         return;
     }
 
@@ -648,6 +1029,13 @@ bool options_manager::cOpt::is_hidden() const
             return true;
 #else
             return false;
+#endif
+
+        case COPT_ANDROID_HIDE:
+#if defined(__ANDROID__)
+            return false;
+#else
+            return true;
 #endif
 
         case COPT_ALWAYS_HIDE:
@@ -1109,7 +1497,7 @@ std::vector<options_manager::id_and_option> options_manager::build_tilesets_list
     std::vector<options_manager::id_and_option> user_tilesets = load_tilesets_from(
                 PATH_INFO::user_gfx() );
     for( const options_manager::id_and_option &id : user_tilesets ) {
-        if( std::ranges::find( result, id ) == result.end() ) {
+        if( !std::ranges::contains( result, id ) ) {
             result.emplace_back( id );
         }
     }
@@ -1159,10 +1547,10 @@ std::vector<options_manager::id_and_option> options_manager::build_soundpacks_li
 }
 
 #if defined(__ANDROID__)
-bool android_get_default_setting( const char *settings_name, bool default_value )
+bool options_manager::android_get_default_setting( const char *settings_name, bool default_value )
 {
-    JNIEnv *env = static_cast< JNIEnv *>( SDL_AndroidGetJNIEnv() );
-    jobject activity = static_cast< jobject>( SDL_AndroidGetActivity() );
+    JNIEnv *env = static_cast< JNIEnv *>( SDL_GetAndroidJNIEnv() );
+    jobject activity = static_cast< jobject>( SDL_GetAndroidActivity() );
     jclass clazz( env->GetObjectClass( activity ) );
     jmethodID method_id = env->GetMethodID( clazz, "getDefaultSetting", "(Ljava/lang/String;Z)Z" );
     jboolean ans = env->CallBooleanMethod( activity, method_id, env->NewStringUTF( settings_name ),
@@ -1195,19 +1583,175 @@ void options_manager::Page::removeRepeatedEmptyLines()
     }
 }
 
+auto options_manager::parse_option_definition_entry( const JsonObject &jo ) -> void
+{
+    const auto type = jo.get_string( "type" );
+    const auto has_page = [&]( const std::string & page_id ) -> bool {
+        return std::ranges::any_of( pages_, [&]( const Page & page )
+        {
+            return page.id_ == page_id;
+        } );
+    };
+    const auto has_group = [&]( const std::string & group_id ) -> bool {
+        return std::ranges::any_of( groups_, [&]( const Group & group )
+        {
+            return group.id_ == group_id;
+        } );
+    };
+
+    if( type == option_group_type ) {
+        auto parsed = parse_option_group_definition( jo );
+        if( !has_page( parsed.page ) ) {
+            debugmsg( "Option group '%s' references unknown page '%s'", parsed.id, parsed.page );
+            return;
+        }
+        add_option_group( parsed.page, Group( parsed.id, parsed.title, parsed.desc ),
+        []( const std::string & ) {} );
+        return;
+    }
+    if( type == option_type ) {
+        auto parsed = parse_option_definition( jo );
+        if( !has_page( parsed.page ) ) {
+            debugmsg( "Option '%s' references unknown page '%s'", parsed.name, parsed.page );
+            return;
+        }
+        if( parsed.scope != "global" && parsed.scope != "world" ) {
+            debugmsg( "Option '%s' has unknown scope '%s'", parsed.name, parsed.scope );
+            return;
+        }
+        if( parsed.scope == "world" && parsed.page != world_default ) {
+            debugmsg( "World-scoped option '%s' must be placed on page '%s'", parsed.name, world_default );
+            return;
+        }
+        if( parsed.scope == "global" && parsed.page == world_default ) {
+            debugmsg( "Global option '%s' cannot be placed on page '%s'", parsed.name, world_default );
+            return;
+        }
+
+        const auto group_id = has_group( parsed.group ) ? parsed.group : std::string();
+        if( !parsed.group.empty() && group_id.empty() ) {
+            debugmsg( "Option '%s' references unknown group '%s'", parsed.name, parsed.group );
+            return;
+        }
+
+        adding_to_group_ = group_id;
+        if( parsed.stype == "bool" ) {
+            add( parsed.name, parsed.page, std::string( parsed.menu_text.debug_get_raw() ),
+                 std::string( parsed.tooltip.debug_get_raw() ),
+                 parsed.default_bool, parsed.hide );
+        } else if( parsed.stype == "int" ) {
+            add( parsed.name, parsed.page, std::string( parsed.menu_text.debug_get_raw() ),
+                 std::string( parsed.tooltip.debug_get_raw() ),
+                 parsed.min_int, parsed.max_int, parsed.default_int, parsed.hide,
+                 parsed.format.empty() ? "%i" : parsed.format );
+        } else if( parsed.stype == "float" ) {
+            add( parsed.name, parsed.page, std::string( parsed.menu_text.debug_get_raw() ),
+                 std::string( parsed.tooltip.debug_get_raw() ),
+                 parsed.min_float, parsed.max_float, parsed.default_float, parsed.step_float,
+                 parsed.hide, parsed.format.empty() ? "%.2f" : parsed.format );
+        } else if( parsed.stype == "string_input" ) {
+            add( parsed.name, parsed.page, std::string( parsed.menu_text.debug_get_raw() ),
+                 std::string( parsed.tooltip.debug_get_raw() ),
+                 parsed.default_string, parsed.max_length, parsed.hide );
+        } else if( parsed.stype == "string_select" ) {
+            add( parsed.name, parsed.page, std::string( parsed.menu_text.debug_get_raw() ),
+                 std::string( parsed.tooltip.debug_get_raw() ),
+                 parsed.items, parsed.default_string, parsed.hide );
+        } else if( parsed.stype == "int_map" ) {
+            const auto int_items = parsed.int_map_items
+            | std::views::transform( []( const int_map_item_definition & item ) {
+                return std::tuple<int, std::string>( item.value,
+                                                     std::string( item.label.debug_get_raw() ) );
+            } )
+            | std::ranges::to<std::vector>();
+            add( parsed.name, parsed.page, std::string( parsed.menu_text.debug_get_raw() ),
+                 std::string( parsed.tooltip.debug_get_raw() ),
+                 int_items, parsed.default_int, parsed.default_int, parsed.hide, parsed.verbose );
+        }
+        for( const auto &dep : parsed.deps ) {
+            if( dep.values.empty() ) {
+                get_option( parsed.name ).setPrerequisite( dep.option );
+            } else {
+                get_option( parsed.name ).setPrerequisites( dep.option, dep.values );
+            }
+        }
+        adding_to_group_.clear();
+        return;
+    }
+
+    if( type == option_space_type ) {
+        std::string page = jo.get_string( "page" );
+        if( !has_page( page ) ) {
+            debugmsg( "Option space references unknown page '%s'", page );
+            return;
+        }
+        add_empty_line( page );
+        return;
+    }
+
+    jo.throw_error( string_format( "Unknown option definition type '%s'", type ), "type" );
+}
+
+auto options_manager::parse_option_definition_file( JsonIn &jsin ) -> void
+{
+    if( jsin.test_object() ) {
+        auto jo = jsin.get_object();
+        parse_option_definition_entry( jo );
+        jo.finish();
+        return;
+    }
+
+    jsin.start_array();
+    while( !jsin.end_array() ) {
+        auto jo = jsin.get_object();
+        parse_option_definition_entry( jo );
+        jo.finish();
+    }
+}
+
+auto options_manager::load_option_definitions() -> void
+{
+    auto files = get_files_from_path( ".json", option_definitions_path(), true, true );
+
+    for( const auto &file : files ) {
+        read_from_file_json( file, [&]( JsonIn & jsin ) {
+            parse_option_definition_file( jsin );
+        }, true );
+    }
+
+    mod_manager manager = mod_manager();
+    manager.refresh_mod_list();
+    for( const auto &mod : manager.all_mod_objects() ) {
+        if( mod.load_options ) {
+            files = get_files_from_path( ".json", mod.options_path, true, true );
+
+            for( const auto &file : files ) {
+                read_from_file_json( file, [&]( JsonIn & jsin ) {
+                    parse_option_definition_file( jsin );
+                }, true );
+            }
+
+        }
+    }
+}
+
 void options_manager::init()
 {
     options.clear();
+    groups_.clear();
+    adding_to_group_.clear();
     for( Page &p : pages_ ) {
         p.items_.clear();
     }
 
-    add_options_general();
     add_options_interface();
     add_options_graphics();
+    add_options_performance();
     add_options_debug();
     add_options_world_default();
     add_options_android();
+    load_option_definitions();
+    add_options_general();
 
     for( Page &p : pages_ ) {
         p.removeRepeatedEmptyLines();
@@ -1222,280 +1766,6 @@ void options_manager::add_options_general()
         this->add_empty_line( general );
     };
 
-    add( "PROMPT_ON_CHARACTER_DEATH", general, translate_marker( "Prompt on character death" ),
-         translate_marker( "If enabled, when your character dies, the player is given a prompt that gives the option to reload the last saved game instead of dying." ),
-         false
-       );
-
-    add_empty_line();
-
-    add( "DEF_CHAR_NAME", general, translate_marker( "Default character name" ),
-         translate_marker( "Set a default character name that will be used instead of a random name on character creation." ),
-         "", 30
-       );
-
-    add( "DEF_CHAR_GENDER", general, translate_marker( "Default character gender" ),
-    translate_marker( "Set a default character gender that will be used on character creation." ), {
-        { "male", to_translation( "Male" )},
-        { "female", to_translation( "Female" )},
-    }, "male" );
-
-    add_empty_line();
-
-    add_option_group( general, Group( "comestible_merging",
-                                      to_translation( "Merge similar comestibles" ),
-                                      to_translation( "Configure how similar items are stacked." ) ),
-    [&]( auto & page_id ) {
-        add( "MERGE_COMESTIBLES", page_id, translate_marker( "Merging Mode" ),
-        translate_marker( "Merge similar comestibles.  Legacy: default behavior.  Liquid: Merge only liquid comestibles.  All: Merge all comestibles." ), {
-            { "legacy", to_translation( "Legacy" ) },
-            { "liquid", to_translation( "Liquid" ) },
-            { "all", to_translation( "All" ) }
-        }, "all" );
-
-        add( "MERGE_COMESTIBLES_THRESHOLD", general, translate_marker( "Freshness similarity threshold" ),
-             translate_marker( "Limit maximum allowed staleness difference when merging comestibles."
-                               "  The lower the value, the more similar the items must be to merge."
-                               "  0.0: Only merge identical items."
-                               "  1.0: Merge comestibles regardless of its freshness."
-                             ),
-             0.0, 1.0, 0.25, 0.05 );
-
-        get_option( "MERGE_COMESTIBLES_THRESHOLD" ).setPrerequisites( "MERGE_COMESTIBLES", {"liquid", "all"} );
-    } );
-
-    add_empty_line();
-
-    add( "AUTO_PICKUP", general, translate_marker( "Auto pickup enabled" ),
-         translate_marker( "Enable item auto pickup.  Change pickup rules with the Auto Pickup Manager." ),
-         false
-       );
-
-    add( "AUTO_PICKUP_ADJACENT", general, translate_marker( "Auto pickup adjacent" ),
-         translate_marker( "If true, will enable to pickup items one tile around to the player.  You can assign No Auto Pickup zones with the Zones Manager 'Y' key for e.g.  your homebase." ),
-         false
-       );
-
-    get_option( "AUTO_PICKUP_ADJACENT" ).setPrerequisite( "AUTO_PICKUP" );
-
-    add( "AUTO_PICKUP_WEIGHT_LIMIT", general, translate_marker( "Auto pickup weight limit" ),
-         translate_marker( "Auto pickup items with weight less than or equal to [option] * 50 grams.  You must also set the small items option.  '0' disables this option" ),
-         0, 20, 0
-       );
-
-    get_option( "AUTO_PICKUP_WEIGHT_LIMIT" ).setPrerequisite( "AUTO_PICKUP" );
-
-    add( "AUTO_PICKUP_VOL_LIMIT", general, translate_marker( "Auto pickup volume limit" ),
-         translate_marker( "Auto pickup items with volume less than or equal to [option] * 50 milliliters.  You must also set the light items option.  '0' disables this option" ),
-         0, 20, 0
-       );
-
-    get_option( "AUTO_PICKUP_VOL_LIMIT" ).setPrerequisite( "AUTO_PICKUP" );
-
-    add( "AUTO_PICKUP_SAFEMODE", general, translate_marker( "Auto pickup safe mode" ),
-         translate_marker( "Auto pickup is disabled as long as you can see monsters nearby.  This is affected by 'Safe Mode proximity distance'." ),
-         false
-       );
-
-    get_option( "AUTO_PICKUP_SAFEMODE" ).setPrerequisite( "AUTO_PICKUP" );
-
-    add( "NO_AUTO_PICKUP_ZONES_LIST_ITEMS", general,
-         translate_marker( "List items within no auto pickup zones" ),
-         translate_marker( "If false, you will not see messages about items, you step on, within no auto pickup zones." ),
-         true
-       );
-
-    get_option( "NO_AUTO_PICKUP_ZONES_LIST_ITEMS" ).setPrerequisite( "AUTO_PICKUP" );
-
-    add_empty_line();
-
-    add( "AUTO_FEATURES", general, translate_marker( "Additional auto features" ),
-         translate_marker( "If true, enables configured auto features below.  Disabled as long as any enemy monster is seen." ),
-         false
-       );
-
-    add( "AUTO_PULP_BUTCHER", general, translate_marker( "Auto pulp or butcher" ),
-         translate_marker( "Action to perform when 'Auto pulp or butcher' is enabled.  Pulp: Pulp corpses you stand on.  - Pulp Adjacent: Also pulp corpses adjacent from you.  - Butcher: Butcher corpses you stand on." ),
-    { { "off", to_translation( "options", "Disabled" ) }, { "pulp", translate_marker( "Pulp" ) }, { "pulp_adjacent", translate_marker( "Pulp Adjacent" ) }, { "butcher", translate_marker( "Butcher" ) } },
-    "off"
-       );
-
-    get_option( "AUTO_PULP_BUTCHER" ).setPrerequisite( "AUTO_FEATURES" );
-
-    add( "AUTO_MINING", general, translate_marker( "Auto mining" ),
-         translate_marker( "If true, enables automatic use of wielded pickaxes and jackhammers whenever trying to move into mineable terrain." ),
-         false
-       );
-
-    get_option( "AUTO_MINING" ).setPrerequisite( "AUTO_FEATURES" );
-
-    add( "AUTO_FORAGING", general, translate_marker( "Auto foraging" ),
-         translate_marker( "Action to perform when 'Auto foraging' is enabled.  Bushes: Only forage bushes.  - Trees: Only forage trees.  - Everything: Forage bushes, trees, and everything else including flowers, cattails etc." ),
-    { { "off", to_translation( "options", "Disabled" ) }, { "bushes", translate_marker( "Bushes" ) }, { "trees", translate_marker( "Trees" ) }, { "flowers", translate_marker( "Flowers" ) }, { "both", translate_marker( "Everything" ) } },
-    "off"
-       );
-
-    get_option( "AUTO_FORAGING" ).setPrerequisite( "AUTO_FEATURES" );
-
-    add_empty_line();
-
-    add( "DANGEROUS_PICKUPS", general, translate_marker( "Dangerous pickups" ),
-         translate_marker( "If false, will cause player to drop new items that cause them to exceed the weight limit." ),
-         false
-       );
-
-    add( "DANGEROUS_TERRAIN_WARNING_PROMPT", general,
-         translate_marker( "Dangerous terrain warning prompt" ),
-         translate_marker( "Always: You will be prompted to move onto dangerous tiles.  Running: You will only be able to move onto dangerous tiles while running and will be prompted.  Crouching: You will only be able to move onto a dangerous tile while crouching and will be prompted.  Never:  You will not be able to move onto a dangerous tile unless running and will not be warned or prompted.  Ignore:  You will be able to move onto a dangerous tile without any warnings or prompts." ),
-    {
-        { "ALWAYS", to_translation( "Always" ) },
-        { "RUNNING", translate_marker( "Running" ) },
-        { "CROUCHING", translate_marker( "Crouching" ) },
-        { "NEVER", translate_marker( "Never" ) },
-        { "IGNORE", translate_marker( "Ignore" ) }
-    },
-    "ALWAYS"
-       );
-
-    add_empty_line();
-
-    add( "SAFEMODE", general, translate_marker( "Safe mode" ),
-         translate_marker( "If true, will hold the game and display a warning if a hostile monster/npc is approaching." ),
-         true
-       );
-
-    add( "SAFEMODEPROXIMITY", general, translate_marker( "Safe mode proximity distance" ),
-         translate_marker( "If safe mode is enabled, distance to hostiles at which safe mode should show a warning.  0 = Max player view distance.  This option only has effect when no safe mode rule is specified.  Otherwise, edit the default rule in Safe Mode Manager instead of this value." ),
-         0, MAX_VIEW_DISTANCE, 0
-       );
-
-    add( "SAFEMODEVEH", general, translate_marker( "Safe mode when driving" ),
-         translate_marker( "When true, safe mode will alert you of hostiles while you are driving a vehicle." ),
-         false
-       );
-
-    add( "AUTOSAFEMODE", general, translate_marker( "Auto reactivate safe mode" ),
-         translate_marker( "If true, safe mode will automatically reactivate after a certain number of turns.  See option 'Turns to auto reactivate safe mode.'" ),
-         false
-       );
-
-    add( "AUTOSAFEMODETURNS", general, translate_marker( "Turns to auto reactivate safe mode" ),
-         translate_marker( "Number of turns after which safe mode is reactivated.  Will only reactivate if no hostiles are in 'Safe mode proximity distance.'" ),
-         1, 600, 50
-       );
-
-    add( "SAFEMODEIGNORETURNS", general, translate_marker( "Turns to remember ignored monsters" ),
-         translate_marker( "Number of turns an ignored monster stays ignored after it is no longer seen.  0 disables this option and monsters are permanently ignored." ),
-         0, 3600, 200
-       );
-
-    add( "QUERY_BEFORE_ATTACKING_NEUTRAL", general,
-         translate_marker( "Query before attacking neutral monsters" ),
-         translate_marker( "If true, you will be prompted to confirm before attacking neutral or fleeing monsters that you have yet to engage in combat with." ),
-         true
-       );
-
-    add_empty_line();
-
-    add_option_group( general, Group( "clothing_destruction_popup",
-                                      to_translation( "Clothing destruction popup" ),
-                                      to_translation( "Configure when popups appear due to clothing being destroyed." ) ),
-    [&]( auto & page_id ) {
-        add( "CLOTHING_DESTRUCTION_POPUP", page_id, translate_marker( "Enable popup" ),
-             translate_marker( "If true, a popup will display when a piece of the player/NPC's worn clothing is destroyed." ),
-             true );
-
-        add( "CLOTHING_DESTRUCTION_POPUP_CONTENTS", page_id, translate_marker( "Only if contents present" ),
-             translate_marker( "Only show popup if destroyed clothing has contents." ),
-             false );
-
-        add( "CLOTHING_DESTRUCTION_POPUP_MIN_WEIGHT", page_id,
-             translate_marker( "Min weight for popup (g)" ),
-             translate_marker( "Minimum weight of the item for the popup to trigger." ),
-             0, 1000000, 0 );
-
-        add( "CLOTHING_DESTRUCTION_POPUP_MIN_VOLUME", page_id,
-             translate_marker( "Min volume for popup (ml)" ),
-             translate_marker( "Minimum volume of the item for the popup to trigger." ),
-             0, 1000000, 0 );
-    } );
-
-    add_empty_line();
-
-    add( "TURN_DURATION", general, translate_marker( "Realtime turn progression" ),
-         translate_marker( "If enabled, monsters will take periodic gameplay turns.  This value is the delay between each turn, in seconds.  Works best with Safe Mode disabled.  0 = disabled." ),
-         0.0, 10.0, 0.0, 0.05
-       );
-
-    add_empty_line();
-
-    add( "AUTOSAVE", general, translate_marker( "Autosave" ),
-         translate_marker( "If true, game will periodically save the map.  Autosaves occur based on in-game turns or real-time minutes, whichever is larger." ),
-         true
-       );
-
-    add( "AUTOSAVE_TURNS", general, translate_marker( "Game turns between autosaves" ),
-         translate_marker( "Number of game turns between autosaves" ),
-         10, 1000, 50
-       );
-
-    get_option( "AUTOSAVE_TURNS" ).setPrerequisite( "AUTOSAVE" );
-
-    add( "AUTOSAVE_MINUTES", general, translate_marker( "Real minutes between autosaves" ),
-         translate_marker( "Number of real time minutes between autosaves" ),
-         0, 127, 5
-       );
-
-    get_option( "AUTOSAVE_MINUTES" ).setPrerequisite( "AUTOSAVE" );
-
-    add_empty_line();
-
-    add( "AUTO_NOTES", general, translate_marker( "Auto notes" ),
-         translate_marker( "If true, automatically sets notes" ),
-         true
-       );
-
-    add( "AUTO_NOTES_STAIRS", general, translate_marker( "Auto notes (stairs)" ),
-         translate_marker( "If true, automatically sets notes on places that have stairs that go up or down" ),
-         false
-       );
-
-    get_option( "AUTO_NOTES_STAIRS" ).setPrerequisite( "AUTO_NOTES" );
-
-    add( "AUTO_NOTES_MAP_EXTRAS", general, translate_marker( "Auto notes (map extras)" ),
-         translate_marker( "If true, automatically sets notes on places that contain various map extras" ),
-         true
-       );
-
-    get_option( "AUTO_NOTES_MAP_EXTRAS" ).setPrerequisite( "AUTO_NOTES" );
-
-    add( "AUTO_NOTES_DROPPED_FAVORITES", "general",
-         translate_marker( "Auto notes (dropped favorites)" ),
-         translate_marker( "If true, automatically sets notes when player drops favorited items." ),
-         true
-       );
-
-    get_option( "AUTO_NOTES_DROPPED_FAVORITES" ).setPrerequisite( "AUTO_NOTES" );
-
-    add_empty_line();
-
-    add( "CIRCLEDIST", general, translate_marker( "Circular distances" ),
-         translate_marker( "If true, the game will calculate range in a realistic way: light sources will be circles, diagonal movement will cover more ground and take longer.  If disabled, everything is square: moving to the northwest corner of a building takes as long as moving to the north wall." ),
-         true
-       );
-
-    add( "DROP_EMPTY", general, translate_marker( "Drop empty containers" ),
-         translate_marker( "Set to drop empty containers after use.  No: Don't drop any.  - Watertight: All except watertight containers.  - All: Drop all containers." ),
-    { { "no", translate_marker( "No" ) }, { "watertight", translate_marker( "Watertight" ) }, { "all", translate_marker( "All" ) } },
-    "no"
-       );
-
-    add( "DEATHCAM", general, translate_marker( "DeathCam" ),
-         translate_marker( "Always: Always start deathcam.  Ask: Query upon death.  Never: Never show deathcam." ),
-    { { "always", translate_marker( "Always" ) }, { "ask", translate_marker( "Ask" ) }, { "never", translate_marker( "Never" ) } },
-    "ask"
-       );
-
     add_empty_line();
 
     add( "SOUND_ENABLED", general, translate_marker( "Sound Enabled" ),
@@ -1503,9 +1773,13 @@ void options_manager::add_options_general()
          true, COPT_NO_SOUND_HIDE
        );
 
+    const auto soundpacks = build_soundpacks_list();
+    const auto bundled_soundpack = "otopack bn";
+    const auto default_soundpack = SOUNDPACKS.contains( bundled_soundpack ) ? bundled_soundpack :
+                                   "basic";
     add( "SOUNDPACKS", general, translate_marker( "Choose soundpack" ),
          translate_marker( "Choose the soundpack you want to use.  Requires restart." ),
-         build_soundpacks_list(), "basic", COPT_NO_SOUND_HIDE
+         soundpacks, default_soundpack, COPT_NO_SOUND_HIDE
        ); // populate the options dynamically
 
     get_option( "SOUNDPACKS" ).setPrerequisite( "SOUND_ENABLED" );
@@ -1550,6 +1824,12 @@ void options_manager::add_options_interface()
 
     add_empty_line();
 
+    add( title_screen::option_id, interface, translate_marker( "Title screen" ),
+         translate_marker( "Title screen ASCII art to display on the main menu." ),
+         title_screen::get_all_options(), title_screen::default_option_id );
+
+    add_empty_line();
+
     add( "HEALTH_STYLE", interface, translate_marker( "Health Display Style" ),
     translate_marker( "Switch health-related display styling such as HP and hunger" ), {
         {"number", translate_marker( "Numerical" ) },
@@ -1568,7 +1848,7 @@ void options_manager::add_options_interface()
 
     add( "HHG_URL", interface, translate_marker( "Hitchhiker's Guide URL" ),
          translate_marker( "The URL opened by pressing the open HHG keybind." ),
-         "https://cbn-guide.pages.dev", 60
+         "https://cataclysmbn-guide.com", 60
        );
 
     add_empty_line();
@@ -1599,6 +1879,11 @@ void options_manager::add_options_interface()
          translate_marker( "Metric or Imperial" ),
     { { "metric", translate_marker( "Metric" ) }, { "imperial", translate_marker( "Imperial" ) } },
     "metric" );
+    add( "SOUND_DISPLAY_TYPE", interface, translate_marker( "Sound Display Type" ),
+         translate_marker( "Switch between decibles, relative decibels, and rough tile distance." ),
+    {  { "decibels", translate_marker( "Decibels" ) }, { "relative_decibels", translate_marker( "Relative Decibels" ) }, { "tiles", translate_marker( "Rough Tiles" ) } },
+    "tiles"
+       );
 
     add(
         "OVERMAP_COORDINATE_FORMAT",
@@ -1614,13 +1899,19 @@ void options_manager::add_options_interface()
          //~ 12h time, e.g.  11:59pm
     {   { "12h", translate_marker( "12h" ) },
         //~ Military time, e.g.  2359
-        { "military", translate_marker( "Military" ) },
+        { "military", translate_marker_context( "time format", "Military" ) },
         //~ 24h time, e.g.  23:59
         { "24h", translate_marker( "24h" ) }
     },
     "12h" );
 
     add_empty_line();
+
+    add( "USE_PINYIN_SEARCH", interface, translate_marker( "Use pinyin in search" ),
+         translate_marker( "If true, pinyin can be used in searching and filtering Chinese text.  "
+                           "May slow down searches with many entries." ),
+         false
+       );
 
     add( "FORCE_CAPITAL_YN", interface, translate_marker( "Force Y/N in prompts" ),
          translate_marker( "If true, Y/N prompts are case-sensitive and y and n are not accepted." ),
@@ -1661,6 +1952,12 @@ void options_manager::add_options_interface()
     add( "INV_USE_ACTION_NAMES", interface, translate_marker( "Display actions in Use Item menu" ),
          translate_marker( "If true, actions ( like \"Read\", \"Smoke\", \"Wrap tighter\" ) will be displayed next to the corresponding items." ),
          true
+       );
+
+    add( "VERBOSE_CRAFTING_SPEED_MODIFIERS", interface,
+         translate_marker( "Verbose crafting/construction speed modifiers" ),
+         translate_marker( "If true, show 100% crafting/construction speed modifiers in the info panels." ),
+         false
        );
 
     add( "AUTOSELECT_SINGLE_VALID_TARGET", interface,
@@ -1815,6 +2112,11 @@ void options_manager::add_options_interface()
          translate_marker( "If true, Advanced Inventory Manager filters will be reset when leaving the menu" ),
          false );
 
+    add( "NEW_PICKUP_MENU", interface,
+         translate_marker( "Use new pickup menu ui (EXPERIMENTAL)" ),
+         translate_marker( "Whether to use the new or old pickup menu ui. WARNING: Is experimental feature" ),
+         false );
+
     add_empty_line();
 
     add( "MOVE_VIEW_OFFSET", interface, translate_marker( "Move view offset" ),
@@ -1859,6 +2161,10 @@ void options_manager::add_options_interface()
        );
     add( "HIGHLIGHT_UNREAD_RECIPES", interface, translate_marker( "Highlight unread recipes" ),
          translate_marker( "Highlight unread recipes to allow tracking of newly learned recipes." ),
+         true
+       );
+    add( "ENABLE_NESTED_CATEGORIES", interface, translate_marker( "Enable nested crafting categories" ),
+         translate_marker( "Show nested crafting categories in the crafting UI.  When disabled, nested recipes appear directly in their normal subcategories." ),
          true
        );
     add( "HIGHLIGHT_UNREAD_ITEMS", interface, translate_marker( "Highlight unread items" ),
@@ -1968,6 +2274,34 @@ void options_manager::add_options_graphics()
          true
        );
 
+    add( "NIGHT_VISION_DEFAULT_COLOR", graphics, translate_marker( "Night Vision Default Colors" ),
+    translate_marker( "Choose from default night vision colors." ), {
+        { "#2eab01", translate_marker( "Green" ) },
+        { "#ff141c", translate_marker( "Red" ) },
+        { "#888888", translate_marker( "Gray" ) },
+        { "custom", translate_marker( "Custom" ) }
+    }, "#2eab01" );
+
+    add( "NIGHT_VISION_COLOR", graphics, translate_marker( "Night Vision Color" ),
+         translate_marker( "Sets custom night vision color." ), "#2eab01", 60 );
+
+    get_option( "NIGHT_VISION_COLOR" ).setPrerequisite( "NIGHT_VISION_DEFAULT_COLOR", "custom" );
+
+    add( "ENHANCED_NIGHT_VISION_DEFAULT_COLOR", graphics,
+         translate_marker( "Enhanced Night Vision Default Colors" ),
+    translate_marker( "Choose from default night vision colors." ), {
+        { "#6cf5e7", translate_marker( "White Phosphor" ) },
+        { "#33e84e", translate_marker( "Green Phosphor" ) },
+        { "#888888", translate_marker( "Gray" ) },
+        { "custom", translate_marker( "Custom" ) }
+    }, "#6cf5e7" );
+
+    add( "ENHANCED_NIGHT_VISION_COLOR", graphics, translate_marker( "Enhanced Night Vision Color" ),
+         translate_marker( "Sets custom night vision color." ), "#6cf5e7", 60 );
+
+    get_option( "ENHANCED_NIGHT_VISION_COLOR" ).setPrerequisite( "ENHANCED_NIGHT_VISION_DEFAULT_COLOR",
+            "custom" );
+
     add_empty_line();
 
     add( "TERMINAL_X", graphics, translate_marker( "Terminal width" ),
@@ -2028,6 +2362,17 @@ void options_manager::add_options_graphics()
          true, COPT_CURSES_HIDE
        );
 
+#if defined(__ANDROID__)
+    const auto default_colored_lighting = false;
+#else
+    const auto default_colored_lighting = true;
+#endif
+    add( "COLORED_LIGHTING", graphics, translate_marker( "Colored lighting" ),
+         translate_marker( "If true, map tiles and entities can be tinted by colored light sources." ),
+         default_colored_lighting, COPT_CURSES_HIDE
+       );
+    get_option( "COLORED_LIGHTING" ).setPrerequisite( "USE_TILES" );
+
     add( "TILES", graphics, translate_marker( "Choose tileset" ),
          translate_marker( "Choose the tileset you want to use." ),
          build_tilesets_list(), "UNDEAD_PEOPLE_BASE", COPT_CURSES_HIDE
@@ -2065,6 +2410,13 @@ void options_manager::add_options_graphics()
 
     get_option( "USE_CHARACTER_PREVIEW" ).setPrerequisite( "USE_TILES" );
 
+    add( "LOADING_SCREEN_IMAGES", graphics, translate_marker( "Loading screen images" ),
+         translate_marker( "If true, shows loading splash images when available." ),
+         true, COPT_CURSES_HIDE
+       );
+
+    get_option( "LOADING_SCREEN_IMAGES" ).setPrerequisite( "USE_TILES" );
+
     add_empty_line();
 
     add( "MEMORY_MAP_MODE", graphics, translate_marker( "Memory map drawing mode" ),
@@ -2083,6 +2435,13 @@ void options_manager::add_options_graphics()
          translate_marker( "If true, overmap z levels with air are transparent, lower layers are rendered. Decreases rendering perfomance." ),
          true, COPT_CURSES_HIDE
        );
+
+    add( "STATE_MODIFIERS", graphics, translate_marker( "Character state modifiers" ),
+         translate_marker( "If true, enables tileset-defined character sprite modifications based on movement state (crouching, running, etc.)." ),
+         true, COPT_CURSES_HIDE
+       );
+
+    get_option( "STATE_MODIFIERS" ).setPrerequisite( "USE_TILES" );
 
     add_empty_line();
 
@@ -2201,6 +2560,17 @@ void options_manager::add_options_graphics()
        );
 #endif
 
+#if defined(TILES)
+    add( "TEXTURE_STREAMING", graphics, translate_marker( "Texture Streaming" ),
+         translate_marker( "Use texture-streaming instead of render-to-texture for dynamic graphics. Requires restart." ),
+    {
+        { "auto", translate_marker( "Auto" ) },
+        { "on", translate_marker( "Enable" ) },
+        { "off", translate_marker( "Disable" ) }
+    },
+    "auto" );
+#endif
+
 #if defined(SDL_HINT_RENDER_BATCHING)
     add( "RENDER_BATCHING", graphics, translate_marker( "Allow render batching" ),
          translate_marker( "Use render batching for 2D render API to make it more efficient.  Requires restart." ),
@@ -2240,6 +2610,23 @@ void options_manager::add_options_graphics()
     "1", COPT_CURSES_HIDE );
 #endif
 
+#if defined(CATA_SDL)
+    add_empty_line();
+    add( "COMPUTE_ACCELERATION", graphics, translate_marker( "Compute Acceleration" ),
+         translate_marker( "Controls compute backend selection for lighting, visibility, and line of sight.  Requires restart." ),
+    {
+        { "auto", translate_marker( "Auto" ) },
+        { "gpu", translate_marker( "GPU" ) },
+        { "cpu", translate_marker( "CPU compute" ) },
+        { "gpu_software", translate_marker( "Software GPU (debug)" ) }
+    },
+    "auto" );
+#endif
+
+}
+
+void options_manager::add_options_performance()
+{
 }
 
 void options_manager::add_options_debug()
@@ -2248,26 +2635,14 @@ void options_manager::add_options_debug()
         this->add_empty_line( debug );
     };
 
-    add_option_group( debug, Group( "rem_act_perf", to_translation( "Performance" ),
-                                    to_translation( "Configure performance settings that can detract from the game." ) ),
-    [&]( auto & page_id ) {
-        add( "SLEEP_SKIP_VEH", page_id, translate_marker( "Sleep Boost: Skip Vehicle Movement" ),
-             translate_marker( "Turns off vehicle movement and autodrive while sleeping" ),
-             true );
-        add( "SLEEP_SKIP_SOUND", page_id, translate_marker( "Sleep Boost: Skip Sound Processing On Sleep" ),
-             translate_marker( "Sounds are not processed while sleeping" ),
-             false );
-        add( "SLEEP_SKIP_MON", page_id, translate_marker( "Sleep Boost: Skip Monster Movement" ),
-             translate_marker( "Monsters do not move while sleeping" ),
-             false );
-    } );
-
-    add_empty_line();
-
     add( "STRICT_JSON_CHECKS", debug, translate_marker( "Strict JSON checks" ),
          translate_marker( "If true, will show additional warnings for JSON data correctness." ),
          true
        );
+
+    add( "MIGRATION_CHECKS", debug, translate_marker( "Migration checks" ),
+         translate_marker( "If true, the game will report any migrated items in itemgroups. This will not function with certain mods that depend on migrations" ),
+         false );
 
     add( "FORCE_TILESET_RELOAD", debug, translate_marker( "Force tileset reload" ),
          translate_marker( "If false, the game will keep tileset in memory after first load to speed up subsequent loadings of game data.  Enable this if you're working on a tileset for the game or a mod." ),
@@ -2286,6 +2661,9 @@ void options_manager::add_options_debug()
          false
        );
 
+    add( "LOG_ACTIVITY_SKIP_STATE", debug, translate_marker( "Log Reason for No Activity Skip State" ),
+         translate_marker( "Logs the rough reason for when activity skip state returns, used for debugging slow activities." ),
+         false );
     add_empty_line();
 
     add_option_group( debug, Group( "debug_log", to_translation( "Logging" ),
@@ -2357,20 +2735,6 @@ void options_manager::add_options_debug()
          1, 30, 6
        );
 
-    add_empty_line();
-
-    add( "FOV_3D", debug, translate_marker( "3D field of vision" ),
-         translate_marker( "If false, vision is limited to current z-level.  If true and the world is in z-level mode, the vision will extend beyond current z-level." ),
-         true
-       );
-
-    add( "FOV_3D_Z_RANGE", debug, translate_marker( "Vertical range of 3D field of vision" ),
-         translate_marker( "How many levels up and down the experimental 3D field of vision reaches.  (This many levels up, this many levels down.)  3D vision of the full height of the world can slow the game down a lot.  Seeing fewer Z-levels is faster." ),
-         0, OVERMAP_LAYERS, 4
-       );
-
-    get_option( "FOV_3D_Z_RANGE" ).setPrerequisite( "FOV_3D" );
-
     add( "ENABLE_EVENTS", debug, translate_marker( "Event bus system" ),
          translate_marker( "If false, achievements and some Magiclysm functionality won't work, but performance will be better." ),
          true
@@ -2400,17 +2764,13 @@ void options_manager::add_options_debug()
 
     add_empty_line();
 
-    add( "MIN_AUTODRIVE_SPEED", debug, translate_marker( "Minimum auto-drive speed" ),
-         translate_marker( "Set the minimum speed for the auto-drive feature.  In tiles/s.  Default is 1 (6 km/h or 4 mph)." ),
-         1, 100, 1 );
-
-    add( "MAX_AUTODRIVE_SPEED", debug, translate_marker( "Maximum auto-drive speed" ),
-         translate_marker( "Set the maximum speed for the auto-drive feature.  In tiles/s.  Default is 9 (57 km/h or 36 mph)." ),
-         1, 100, 9 );
-
     add( "LIMITED_BAYONETS", debug, translate_marker( "New bayonet system" ),
          translate_marker( "If true, bayonets replace weapon attack instead of adding to it.  WIP feature, weakens bayonets heavily at the moment." ),
          false );
+
+    add( "NEW_ARMOR_CALCULATION", debug, translate_marker( "New armor damage calculation" ),
+         translate_marker( "If true, armor will be able to take damage from attacks that don't penetrate it, but attacks in general damage armor less frequently." ),
+         true );
 
     add_empty_line();
 
@@ -2418,6 +2778,15 @@ void options_manager::add_options_debug()
          translate_marker( "Use legacy pathfinding" ),
          translate_marker( "If true, opt out of new pathfinding in favor of legacy one. This makes pathfinding mods not work." ),
          false );
+    add( "PATHFINDING_MAX_DIST", debug,
+         translate_marker( "Legacy Pathfinder Distance Cap" ),
+         translate_marker( "Hard cap on straight-line pathfinding distance (in tiles) for the legacy pathfinder.  "
+                           "Monsters and NPCs whose configured range exceeds this value are limited to it.  "
+                           "The old fixed map allowed at most 120 tiles end-to-end; "
+                           "the default of 96 is 50%% larger than the old per-side maximum of 60.  "
+                           "Raise this if mods require longer paths; lower it to reduce pathfinding cost at large bubble sizes." ),
+         16, 1000, 96 );
+    get_option( "PATHFINDING_MAX_DIST" ).setPrerequisite( "USE_LEGACY_PATHFINDING" );
 }
 
 void options_manager::add_options_world_default()
@@ -2471,6 +2840,12 @@ void options_manager::add_options_world_default()
          0.0, 5.0, 1.0, 0.01
        );
 
+    add( "VEHICLE_GUN_RECOIL_FACTOR", world_default,
+         translate_marker( "Vehicle gun recoil scaling factor" ),
+         translate_marker( "A scaling factor that determines how strongly firing guns pushes the vehicle you are on.  0.0 disables this behavior, 1.0 uses the default mass-based recoil propulsion, and higher values exaggerate it." ),
+         0.0, 100.0, 1.0, 0.1
+       );
+
     add( "SPAWN_DENSITY", world_default, translate_marker( "Spawn rate scaling factor" ),
          translate_marker( "A scaling factor that determines density of monster spawns." ),
          0.0, 50.0, 1.0, 0.1
@@ -2496,6 +2871,20 @@ void options_manager::add_options_world_default()
          0.0, 100, 2.0, 0.01
        );
 
+    add( "EVOLVE_MAX_ITERS", world_default,
+         translate_marker( "Maximum Evolution Half Lives" ),
+         translate_marker( "The maximum number of attempts for a zombie to evolve at the next half life for one evolution stage" ),
+         0, 200, 5 );
+
+    add( "ALWAYS_EVOLVE", world_default,
+         translate_marker( "Zombies Always Evolve" ),
+         translate_marker( "When reaching the maximum half lives, instead of never evolving they will evolve at that time." ),
+         false );
+    add( "CROWD_CRUSH", world_default,
+         translate_marker( "Crowd crush" ),
+         translate_marker( "When enabled, being grabbed by enough adjacent creatures can drain breath and eventually cause crushing damage." ),
+         false );
+
     add_empty_line();
 
     add( "RESTOCK_DELAY_MULT", world_default, translate_marker( "Merchant restock scaling factor" ),
@@ -2503,8 +2892,13 @@ void options_manager::add_options_world_default()
          0.01, 10.0, 1.0, 0.01
        );
 
-    add_empty_line();
+    add( "CROSS_Z_LEVEL_MELEE_DIFFICULTY_MODIFIER", world_default,
+         translate_marker( "Cross z-level melee difficulty modifier" ),
+         translate_marker( "A scaling factor that determines additional move and stamina cost for melee attacks against a target above or below you.  1.00 disables the modifier." ),
+         1.00, 3.00, 1.20, 0.01
+       );
 
+    add_empty_line();
     add_option_group( world_default, Group( "skill_buff_category",
                                             to_translation( "Enabled Skill Buffs" ),
                                             to_translation( "Enable or disable major skill buffs" ) ),
@@ -2517,17 +2911,22 @@ void options_manager::add_options_world_default()
              true );
     }
                     );
+    add_empty_line();
+
+    add( "canmutprofmut", world_default, "Starting Trait Cancelling",
+         "Allow starting traits to be cancelled and effected by purifiers?",
+         false );
 
     add_empty_line();
 
     add( "ITEM_SPAWNRATE", world_default,
          "Item spawn scaling factor",
-         "A scaling factor that determines density of item spawns. A higher number means more items.",
+         "A scaling factor that determines density of item spawns. A higher number means more items. Affects both map generation and monster death drops.",
          0.01, 10.0, 1.0, 0.01 );
 
     add_option_group( world_default, Group( "item_category_spawn_rate",
                                             to_translation( "Item category scaling factors" ),
-                                            to_translation( "Spawn rate for item categories. Values ≤ 1.0 represent a chance to spawn. >1.0 means extra spawns. Set to 0.0 to disable spawning items from that category." ) ),
+                                            to_translation( "Spawn rate for item categories. For map generation: values ≤ 1.0 represent a chance to spawn, >1.0 means extra spawns. For monster drops: values >1.0 increase spawn probability (capped at 100%). Set to 0.0 to disable spawning items from that category." ) ),
     [&]( const std::string & page_id ) {
 
         add( "SPAWN_RATE_ammo", page_id, "AMMO",
@@ -2720,10 +3119,54 @@ void options_manager::add_options_world_default()
 
     add_empty_line();
 
-    add( "MONSTER_SPEED", world_default, translate_marker( "Monster speed percentage" ),
-         translate_marker( "Determines the movement rate of monsters.  A higher value increases monster speed and a lower reduces it.  Requires world reset." ),
-         1, 1000, 100, COPT_NO_HIDE, "%i%%"
-       );
+    struct time_scale_option {
+        const char *id;
+        const char *name;
+        const char *description;
+    };
+
+    static constexpr auto time_scale_max_percent = 10000;
+    static constexpr auto time_scale_options = std::array<time_scale_option, 7> {{
+            {
+                "TIME_ACTION_SCALE", translate_marker( "Global action speed percentage" ),
+                translate_marker( "Determines the baseline action rate for creatures and activities.  A higher value allows more actions per in-game second, while a lower value makes calendar time pass faster relative to actions." )
+            },
+            {
+                "PLAYER_ACTION_SCALE", translate_marker( "Player action speed percentage" ),
+                translate_marker( "Determines the player's action rate as a percentage of the global action speed.  A higher value allows more player actions per in-game second and a lower value allows fewer." )
+            },
+            {
+                "NPC_ACTION_SCALE", translate_marker( "NPC action speed percentage" ),
+                translate_marker( "Determines NPC action rate as a percentage of the global action speed.  A higher value allows more NPC actions per in-game second and a lower value allows fewer." )
+            },
+            {
+                "ACTIVITY_PROGRESS_SCALE", translate_marker( "Activity progress percentage" ),
+                translate_marker( "Determines long activity and crafting progress as a percentage of the global action speed.  A higher value completes activities faster per in-game second and a lower value completes them slower." )
+            },
+            {
+                "VEHICLE_CONTROL_SCALE", translate_marker( "Vehicle control speed percentage" ),
+                translate_marker( "Determines driver control action rate as a percentage of the global action speed without changing physical vehicle movement.  A higher value allows more steering, braking, and throttle inputs per in-game second and a lower value allows fewer." )
+            },
+            {
+                "OVERMAP_HORDE_SCALE", translate_marker( "Overmap horde speed percentage" ),
+                translate_marker( "Determines overmap horde movement speed as a percentage of global action speed and monster speed.  A higher value makes hordes travel faster over the overmap and a lower value makes them slower." )
+            },
+            {
+                "MONSTER_SPEED", translate_marker( "Monster speed percentage" ),
+                translate_marker( "Determines monster action rate as a percentage of the global action speed.  A higher value allows more monster actions per in-game second and a lower value allows fewer." )
+            },
+        }
+    };
+
+    add_option_group( world_default, Group( "time_scaling",
+                                            to_translation( "Time Scaling" ),
+                                            to_translation( "Configure experimental calendar and action-rate scaling." ) ),
+    [&]( const std::string & page_id ) {
+        for( const auto &option : time_scale_options ) {
+            add( option.id, page_id, option.name, option.description,
+                 1, time_scale_max_percent, 100, COPT_NO_HIDE, "%i%%" );
+        }
+    } );
 
     add( "MONSTER_RESILIENCE", world_default,
          translate_marker( "Monster resilience percentage" ),
@@ -2740,11 +3183,6 @@ void options_manager::add_options_world_default()
 
     add_empty_line();
 
-    add( "INITIAL_TIME", world_default, translate_marker( "Initial time" ),
-         translate_marker( "Initial starting time of day on character generation." ),
-         0, 23, 8
-       );
-
     add( "INITIAL_DAY", world_default, translate_marker( "Initial day" ),
          translate_marker( "How many days into the year the cataclysm occurred.  Day 0 is Spring 1.  Day -1 randomizes the start date.  Can be overridden by scenarios.  This does not advance food rot or monster evolution." ),
          -1, 999, 15
@@ -2755,9 +3193,39 @@ void options_manager::add_options_world_default()
          0, 9999, 0
        );
 
+    add( "INITIAL_TIME", world_default, translate_marker( "Initial time" ),
+         translate_marker( "Hour of the day at which the player starts the game." ),
+         0, 23, 8
+       );
+
     add( "SEASON_LENGTH", world_default, translate_marker( "Season length" ),
          translate_marker( "Season length, in days." ),
          14, 127, 30
+       );
+
+    add( "SUNRISE_SUMMER", world_default, translate_marker( "Sunrise hour (summer)" ),
+         translate_marker( "Hour of sunrise at the summer solstice for the base dimension.  Per-dimension overrides can be set in world_types JSON." ),
+         0, 12, 5
+       );
+    add( "SUNRISE_WINTER", world_default, translate_marker( "Sunrise hour (winter)" ),
+         translate_marker( "Hour of sunrise at the winter solstice for the base dimension." ),
+         0, 12, 7
+       );
+    add( "SUNRISE_EQUINOX", world_default, translate_marker( "Sunrise hour (equinox)" ),
+         translate_marker( "Hour of sunrise at the spring and autumn equinox for the base dimension." ),
+         0, 12, 6
+       );
+    add( "SUNSET_SUMMER", world_default, translate_marker( "Sunset hour (summer)" ),
+         translate_marker( "Hour of sunset at the summer solstice for the base dimension." ),
+         12, 23, 21
+       );
+    add( "SUNSET_WINTER", world_default, translate_marker( "Sunset hour (winter)" ),
+         translate_marker( "Hour of sunset at the winter solstice for the base dimension." ),
+         12, 23, 17
+       );
+    add( "SUNSET_EQUINOX", world_default, translate_marker( "Sunset hour (equinox)" ),
+         translate_marker( "Hour of sunset at the spring and autumn equinox for the base dimension." ),
+         12, 23, 19
        );
 
     add( "CONSTRUCTION_SCALING", world_default,
@@ -2772,8 +3240,16 @@ void options_manager::add_options_world_default()
          0, 1000, 100, COPT_NO_HIDE, "%i%%"
        );
 
-    add( "GROWTH_SCALING", world_default, translate_marker( "Growth scaling percentage" ),
+    add( "GROWTH_SCALING", world_default, translate_marker( "Crop growth scaling percentage" ),
          translate_marker( "Sets the time of crop growth in percents.  '50' is two times faster than default, '200' is two times longer.  '0' automatically scales growth time to match the world's season length." ),
+         0, 1000, 0, COPT_NO_HIDE, "%i%%"
+       );
+
+    add( "ANIMAL_LIFE_CYCLE_SCALING", world_default,
+         translate_marker( "Animal life cycle scaling" ),
+         translate_marker( "Sets the time of animal reproduction and growth in percents.  "
+                           "'50' is two times faster than default, '200' is two times longer.  "
+                           "'0' automatically scales animal life cycle time to match the world's season length." ),
          0, 1000, 0, COPT_NO_HIDE, "%i%%"
        );
 
@@ -2823,11 +3299,32 @@ void options_manager::add_options_world_default()
 
     add_empty_line();
 
+    add( "POCKET_SIMULATION_LEVEL", world_default, translate_marker( "Pocket Dimension Simulation" ),
+         translate_marker( "How to handle the last visited pocket dimension. "
+                           "'Off' unloads normally. 'None' keeps loaded but frozen for fast travel. "
+                           "'Minimal' simulates fields only (fire, gas). "
+                           "'Moderate' adds vehicle systems (solar charging). "
+    "'Full' simulates everything including off-screen combat." ), {
+        { "off", translate_marker( "Off" ) },
+        { "none", translate_marker( "None (Fast Travel)" ) },
+        { "minimal", translate_marker( "Minimal (Fields)" ) },
+        { "moderate", translate_marker( "Moderate (Fields + Vehicles)" ) },
+        { "full", translate_marker( "Full (Everything)" ) }
+    },
+    "off" );
+
+    add_empty_line();
+
     add( "CHARACTER_POINT_POOLS", world_default, translate_marker( "Character point pools" ),
          translate_marker( "Allowed point pools for character generation." ),
     { { "any", translate_marker( "Any" ) }, { "multi_pool", translate_marker( "Multi-pool only" ) }, { "no_freeform", translate_marker( "No freeform" ) } },
     "any"
        );
+
+    add( "ENFORCE_PROFESSION_AGE_RANGE", world_default,
+         translate_marker( "Enforce profession age ranges" ),
+         translate_marker( "When enabled, character ages are constrained by profession-defined age ranges when available." ),
+         true );
 
     add( "DISABLE_LIFTING", world_default,
          translate_marker( "Disables lifting requirements for vehicle parts." ),
@@ -3256,6 +3753,10 @@ std::string options_manager::show( bool ingame, const bool world_options_only,
             *world_options.value() :
             OPTIONS;
 
+    if( !world_options_only ) {
+        refresh_title_screen_option();
+    }
+
     auto OPTIONS_OLD = OPTIONS;
     auto WOPTIONS_OLD = ACTIVE_WORLD_OPTIONS;
     if( world_generator->active_world == nullptr ) {
@@ -3273,7 +3774,6 @@ std::string options_manager::show( bool ingame, const bool world_options_only,
     std::unordered_map<std::string, bool> groups_state;
     groups_state.emplace( "", true ); // Non-existent group
     for( const Group &g : groups_ ) {
-        // Start collapsed
         groups_state.emplace( g.id_, false );
     }
 
@@ -3381,11 +3881,11 @@ std::string options_manager::show( bool ingame, const bool world_options_only,
         // Format name & value strings for given entry
         const auto fmt_name_value = [&]( const PageItem & it, bool is_selected )
         -> std::pair<string_col, string_col> {
-            const char *IN_GROUP_PREFIX = ": ";
+            const auto in_group_prefix = "  ";
             switch( it.type )
             {
                 case ItemType::BlankLine: {
-                    std::string name = it.group.empty() ? "" : IN_GROUP_PREFIX;
+                    std::string name = it.group.empty() ? "" : in_group_prefix;
                     return { string_col( name, c_white ), string_col() };
                 }
                 case ItemType::GroupHeader: {
@@ -3399,7 +3899,7 @@ std::string options_manager::show( bool ingame, const bool world_options_only,
                     const bool hasPrerequisite = opt.hasPrerequisite();
                     const bool hasPrerequisiteFulfilled = opt.checkPrerequisite();
 
-                    std::string name_prefix = it.group.empty() ? "" : IN_GROUP_PREFIX;
+                    std::string name_prefix = it.group.empty() ? "" : in_group_prefix;
                     string_col name( name_prefix + opt.getMenuText(), !hasPrerequisite ||
                                      hasPrerequisiteFulfilled ? c_white : c_light_gray );
 
@@ -3650,6 +4150,7 @@ std::string options_manager::show( bool ingame, const bool world_options_only,
     bool pixel_minimap_changed = false;
     bool terminal_size_changed = false;
     bool force_tile_change = false;
+    bool colored_lighting_changed = false;
 
     for( auto &iter : OPTIONS_OLD ) {
         if( iter.second != OPTIONS[iter.first] ) {
@@ -3666,9 +4167,15 @@ std::string options_manager::show( bool ingame, const bool world_options_only,
                 pixel_minimap_changed = true;
 
             } else if( iter.first == "TILES" || iter.first == "USE_TILES" || iter.first == "STATICZEFFECT" ||
-                       iter.first == "MEMORY_MAP_MODE" || iter.first == "OVERMAP_TILES" ) {
+                       iter.first == "MEMORY_MAP_MODE" || iter.first == "OVERMAP_TILES" ||
+                       iter.first == "NIGHT_VISION_COLOR" || iter.first == "NIGHT_VISION_DEFAULT_COLOR" ||
+                       iter.first == "ENHANCED_NIGHT_VISION_COLOR" ||
+                       iter.first == "ENHANCED_NIGHT_VISION_DEFAULT_COLOR" ) {
                 used_tiles_changed = true;
-                if( iter.first == "STATICZEFFECT" || iter.first == "MEMORY_MAP_MODE" ) {
+                if( iter.first == "STATICZEFFECT" || iter.first == "MEMORY_MAP_MODE" ||
+                    iter.first == "NIGHT_VISION_COLOR" || iter.first == "NIGHT_VISION_DEFAULT_COLOR" ||
+                    iter.first == "ENHANCED_NIGHT_VISION_COLOR" ||
+                    iter.first == "ENHANCED_NIGHT_VISION_DEFAULT_COLOR" ) {
                     force_tile_change = true;
                 }
             } else if( iter.first == "USE_LANG" ) {
@@ -3676,6 +4183,9 @@ std::string options_manager::show( bool ingame, const bool world_options_only,
 
             } else if( iter.first == "TERMINAL_X" || iter.first == "TERMINAL_Y" ) {
                 terminal_size_changed = true;
+            }
+            if( iter.first == "COLORED_LIGHTING" || iter.first == "USE_TILES" ) {
+                colored_lighting_changed = true;
             }
         }
     }
@@ -3698,12 +4208,16 @@ std::string options_manager::show( bool ingame, const bool world_options_only,
                 world_generator->active_world->info->WORLD_OPTIONS = ACTIVE_WORLD_OPTIONS;
                 world_generator->active_world->info->save();
             }
+            if( ingame && colored_lighting_changed ) {
+                g->m.invalidate_lightmap_caches();
+            }
             g->on_options_changed();
         } else {
             lang_changed = false;
             terminal_size_changed = false;
             used_tiles_changed = false;
             pixel_minimap_changed = false;
+            colored_lighting_changed = false;
             OPTIONS = OPTIONS_OLD;
             if( ingame && world_options_changed ) {
                 ACTIVE_WORLD_OPTIONS = WOPTIONS_OLD;
@@ -3817,24 +4331,85 @@ void options_manager::cache_to_globals()
     setDebugLogClasses( classes );
 
     json_report_strict = test_mode || ::get_option<bool>( "STRICT_JSON_CHECKS" );
+    log_activity_skip_state = ::get_option<bool>( "LOG_ACTIVITY_SKIP_STATE" );
     display_mod_source = ::get_option<bool>( "MOD_SOURCE" );
     display_object_ids = ::get_option<bool>( "SHOW_IDS" );
     trigdist = ::get_option<bool>( "CIRCLEDIST" );
 #if defined(TILES)
     use_tiles = ::get_option<bool>( "USE_TILES" );
+    colored_lighting = use_tiles && ::get_option<bool>( "COLORED_LIGHTING" );
     use_tiles_overmap = ::get_option<bool>( "USE_TILES_OVERMAP" );
 #else
     use_tiles = false;
+    colored_lighting = false;
     use_tiles_overmap = false;
 #endif
+    use_pinyin_search = ::get_option<bool>( "USE_PINYIN_SEARCH" );
     log_from_top = ::get_option<std::string>( "LOG_FLOW" ) == "new_top";
     message_ttl = ::get_option<int>( "MESSAGE_TTL" );
     message_cooldown = ::get_option<int>( "MESSAGE_COOLDOWN" );
-    fov_3d = ::get_option<bool>( "FOV_3D" );
-    fov_3d_z_range = ::get_option<int>( "FOV_3D_Z_RANGE" );
+    angled_sunlight_shadows = ::get_option<bool>( "FOV_3D_OCCLUSION" );
+    const auto prevent_occlusion_option = ::get_option<std::string>( "PREVENT_OCCLUSION" );
+    prevent_occlusion = prevent_occlusion_option == "off" ? 0 : prevent_occlusion_option == "on" ? 1 :
+                        2;
+    prevent_occlusion_retract = ::get_option<bool>( "PREVENT_OCCLUSION_RETRACT" );
+    prevent_occlusion_transp = ::get_option<bool>( "PREVENT_OCCLUSION_TRANSP" );
+    prevent_occlusion_min_dist = ::get_option<float>( "PREVENT_OCCLUSION_MIN_DIST" );
+    prevent_occlusion_max_dist = ::get_option<float>( "PREVENT_OCCLUSION_MAX_DIST" );
     static_z_effect = ::get_option<bool>( "STATICZEFFECT" );
     overmap_transparency = ::get_option<bool>( "OVERMAP_TRANSPARENCY" );
     PICKUP_RANGE = ::get_option<int>( "PICKUP_RANGE" );
+
+    monster_lod_enabled       = ::get_option<bool>( "MONSTER_LOD_ENABLED" );
+    lod_tier_full_dist        = ::get_option<int>( "LOD_TIER_FULL_DIST" );
+    lod_tier_coarse_dist      = ::get_option<int>( "LOD_TIER_COARSE_DIST" );
+    lod_demotion_cooldown     = ::get_option<int>( "LOD_DEMOTION_COOLDOWN" );
+    lod_action_budget         = ::get_option<int>( "LOD_ACTION_BUDGET" );
+    lod_macro_interval        = ::get_option<int>( "LOD_MACRO_INTERVAL" );
+    lod_coarse_scent_interval = ::get_option<int>( "LOD_COARSE_SCENT_INTERVAL" );
+    lod_group_morale_max_tier = ::get_option<int>( "LOD_GROUP_MORALE_MAX_TIER" );
+    activity_skip_monster_lod_gate = ::get_option<int>( "ACTIVITY_SKIP_MONSTER_LOD_GATE" );
+
+    activity_skip_mon_skip = ::get_option<bool>( "ACTIVITY_SKIP_MON_SKIP" );
+    activity_skip_npc_skip = ::get_option<bool>( "ACTIVITY_SKIP_NPC_SKIP" );
+    activity_skip_sound_skip = ::get_option<bool>( "ACTIVITY_SKIP_SOUND_SKIP" );
+    activity_skip_stat_update_ticks = ::get_option<int>( "ACTIVITY_SKIP_STAT_UPDATE_TICKS" ) *
+                                      1_seconds;
+    // Temporary fix for #8726: force out-of-bubble fire spread off while the
+    // corresponding options are commented out above.
+    reality_bubble_fire_spread = false;
+    fire_spread_submap_cap = 0;
+    {
+        const auto opt = ::get_option<std::string>( "VISIBILITY_SCALING" );
+        visibility_scaling = opt == "perfect" ? visibility_scaling_mode::perfect
+                             : opt == "none" ? visibility_scaling_mode::no_scale
+                             : visibility_scaling_mode::smart;
+    }
+
+    {
+        const auto psl_str = ::get_option<std::string>( "POCKET_SIMULATION_LEVEL" );
+        if( psl_str == "off" ) {
+            pocket_simulation_level = pocket_sim_level::off;
+        } else if( psl_str == "none" ) {
+            pocket_simulation_level = pocket_sim_level::none;
+        } else if( psl_str == "minimal" ) {
+            pocket_simulation_level = pocket_sim_level::minimal;
+        } else if( psl_str == "moderate" ) {
+            pocket_simulation_level = pocket_sim_level::moderate;
+        } else {
+            pocket_simulation_level = pocket_sim_level::full;
+        }
+    }
+
+    safe_mode_proximity = ::get_option<int>( "SAFEMODEPROXIMITY" );
+
+    parallel_enabled          = ::get_option<bool>( "MULTITHREADING_ENABLED" );
+    parallel_monster_planning = ::get_option<bool>( "PARALLEL_MONSTER_PLANNING" );
+    monster_plan_chunk_size   = ::get_option<int>( "MONSTER_PLAN_CHUNK_SIZE" );
+    parallel_map_cache        = ::get_option<bool>( "PARALLEL_MAP_CACHE" );
+    parallel_scent_update     = ::get_option<bool>( "PARALLEL_SCENT_UPDATE" );
+    lazy_border_enabled = ::get_option<bool>( "LAZY_BORDER" );
+    retained_omt_cache_length = ::get_option<int>( "RETAINED_OMT_CACHE_LENGTH" );
 
     merge_comestible_mode = ( [] {
         const auto opt = ::get_option<std::string>( "MERGE_COMESTIBLES" );
@@ -3848,6 +4423,22 @@ void options_manager::cache_to_globals()
 #if defined(SDL_SOUND)
     sounds::sound_enabled = ::get_option<bool>( "SOUND_ENABLED" );
 #endif
+
+#if defined(CATA_SDL)
+    if( options.contains( "COMPUTE_ACCELERATION" ) ) {
+        preload_config::set_compute_accel(
+            preload_config::compute_accel_from_string(
+                ::get_option<std::string>( "COMPUTE_ACCELERATION" ) ) );
+    }
+#endif
+
+#if defined(TILES)
+    if( options.contains( "TEXTURE_STREAMING" ) ) {
+        preload_config::set_texture_streaming(
+            preload_config::tristate_from_string(
+                ::get_option<std::string>( "TEXTURE_STREAMING" ) ) );
+    }
+#endif
 }
 
 bool options_manager::save()
@@ -3856,10 +4447,16 @@ bool options_manager::save()
     cache_to_globals();
     update_volumes();
 
-    return write_to_file( savefile, [&]( std::ostream & fout ) {
+    auto const ok = write_to_file( savefile, [&]( std::ostream & fout ) {
         JsonOut jout( fout, true );
         serialize( jout );
     }, _( "options" ) );
+
+#if defined(CATA_SDL)
+    preload_config::save();
+#endif
+
+    return ok;
 }
 
 void options_manager::load()

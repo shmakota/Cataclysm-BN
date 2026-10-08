@@ -1,21 +1,22 @@
 #pragma once
 
+#include "calendar.h"
+#include "character_id.h"
+#include "coordinates.h"
+#include "enums.h"
+#include "game_constants.h"
+#include "npc_favor.h"
+#include "overmap/overmap.h"
+#include "point.h"
+#include "translations.h"
+#include "type_id.h"
+
 #include <functional>
 #include <map>
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "calendar.h"
-#include "character_id.h"
-#include "enums.h"
-#include "game_constants.h"
-#include "npc_favor.h"
-#include "overmap.h"
-#include "point.h"
-#include "translations.h"
-#include "type_id.h"
 
 class Creature;
 class JsonArray;
@@ -64,6 +65,7 @@ enum mission_goal : int {
     MGOAL_ASSASSINATE,       // Kill a given NPC
     MGOAL_KILL_MONSTER,      // Kill a particular hostile monster
     MGOAL_KILL_MONSTER_TYPE, // Kill a number of a given monster type
+    MGOAL_KILL_NEMESIS,      // Kill the nemesis monster from the "hunted" trait
     MGOAL_RECRUIT_NPC,       // Recruit a given NPC
     MGOAL_RECRUIT_NPC_CLASS, // Recruit an NPC class
     MGOAL_COMPUTER_TOGGLE,   // Activating the correct terminal will complete the mission
@@ -98,19 +100,11 @@ struct mission_start {
     static void place_dog( mission * );          // Put a dog in a house!
     static void place_zombie_mom( mission * );   // Put a zombie mom in a house!
     static void kill_horde_master( mission * );  // Kill the master zombie at the center of the horde
+    static void kill_nemesis( mission * );       // Kill the nemesis spawned with the "hunted" trait
     static void place_npc_software( mission * ); // Put NPC-type-dependent software
     static void place_priest_diary( mission * ); // Hides the priest's diary in a local house
     static void place_deposit_box( mission * );  // Place a safe deposit box in a nearby bank
     static void find_safety( mission * );        // Goal is set to non-spawn area
-    static void ranch_nurse_1( mission * );      // Need aspirin
-    static void ranch_nurse_2( mission * );      // Need hotplates
-    static void ranch_nurse_3( mission * );      // Need vitamins
-    static void ranch_nurse_4( mission * );      // Need charcoal water filters
-    static void ranch_nurse_5( mission * );      // Need chemistry set
-    static void ranch_nurse_6( mission * );      // Need filter masks
-    static void ranch_nurse_7( mission * );      // Need rubber gloves
-    static void ranch_nurse_8( mission * );      // Need X-acto
-    static void ranch_nurse_9( mission * );      // Need Guide to Advanced Emergency Care
     static void ranch_scavenger_1( mission * );  // Expand Junk Shop
     static void ranch_scavenger_2( mission * );  // Expand Junk Shop
     static void ranch_scavenger_3( mission * );  // Expand Junk Shop
@@ -158,13 +152,13 @@ struct mission_target_params {
 
 namespace mission_util
 {
-tripoint_abs_omt random_house_in_closest_city();
+tripoint_abs_omt random_house_in_closest_city( overmapbuffer &omb );
 tripoint_abs_omt target_closest_lab_entrance( const tripoint_abs_omt &origin, int reveal_rad,
         mission *miss );
 bool reveal_road( const tripoint_abs_omt &source, const tripoint_abs_omt &dest,
                   overmapbuffer &omb );
 tripoint_abs_omt reveal_om_ter( const std::string &omter, int reveal_rad, bool must_see,
-                                int target_z = 0 );
+                                overmapbuffer &omb, int target_z = 0 );
 tripoint_abs_omt target_om_ter( const std::string &omter, int reveal_rad, mission *miss,
                                 bool must_see, int target_z = 0 );
 tripoint_abs_omt target_om_ter_random(
@@ -346,6 +340,8 @@ class mission
         mission_type_id follow_up;
         // The id of the player that has accepted this mission.
         character_id player_id;
+        // Dimension in which mission targets exist; empty = primary dimension (legacy saves)
+        dimension_id dimension_id_;
     public:
 
         std::string name();
@@ -368,6 +364,10 @@ class mission
         int get_id() const;
         const itype_id &get_item_id() const;
         character_id get_npc_id() const;
+        auto get_dimension() const -> const dimension_id &;
+        auto set_dimension( const dimension_id &dim_id ) -> void {
+            dimension_id_ = dim_id;
+        }
         const std::vector<std::pair<int, itype_id>> &get_likely_rewards() const;
         bool has_generic_rewards() const;
         void register_kill_needed();
@@ -477,5 +477,3 @@ template<>
 struct enum_traits<mission::mission_status> {
     static constexpr mission::mission_status last = mission::mission_status::num_mission_status;
 };
-
-

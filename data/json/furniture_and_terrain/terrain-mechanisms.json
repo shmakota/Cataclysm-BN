@@ -9,7 +9,7 @@
     "move_cost": 0,
     "coverage": 50,
     "roof": "t_flat_roof",
-    "flags": [ "TRANSPARENT", "NOITEM", "INDOORS", "SHORT", "PERMEABLE", "ADV_DECONSTRUCT" ],
+    "flags": [ "TRANSPARENT", "NOITEM", "SHORT", "PERMEABLE", "ADV_DECONSTRUCT" ],
     "deconstruct": {
       "ter_set": "t_floor",
       "items": [
@@ -58,7 +58,7 @@
     "coverage": 50,
     "light_emitted": 10,
     "roof": "t_flat_roof",
-    "flags": [ "TRANSPARENT", "CONSOLE", "NOITEM", "INDOORS", "SHORT", "PERMEABLE", "ADV_DECONSTRUCT" ],
+    "flags": [ "TRANSPARENT", "CONSOLE", "NOITEM", "SHORT", "PERMEABLE", "ADV_DECONSTRUCT" ],
     "deconstruct": {
       "ter_set": "t_floor",
       "items": [
@@ -104,7 +104,7 @@
     "symbol": "6",
     "color": "cyan_red",
     "move_cost": 0,
-    "flags": [ "TRANSPARENT", "NOITEM", "INDOORS", "PERMEABLE", "THIN_OBSTACLE" ],
+    "flags": [ "TRANSPARENT", "NOITEM", "PERMEABLE", "THIN_OBSTACLE" ],
     "examine_action": "controls_gate",
     "bash": {
       "str_min": 18,
@@ -123,7 +123,7 @@
     "symbol": "6",
     "color": "cyan_red",
     "move_cost": 0,
-    "flags": [ "TRANSPARENT", "NOITEM", "INDOORS", "PERMEABLE", "THIN_OBSTACLE" ],
+    "flags": [ "TRANSPARENT", "NOITEM", "PERMEABLE", "THIN_OBSTACLE" ],
     "examine_action": "controls_gate",
     "bash": {
       "str_min": 18,
@@ -142,7 +142,7 @@
     "symbol": "6",
     "color": "cyan_red",
     "move_cost": 0,
-    "flags": [ "TRANSPARENT", "NOITEM", "INDOORS", "PERMEABLE", "THIN_OBSTACLE" ],
+    "flags": [ "TRANSPARENT", "NOITEM", "PERMEABLE", "THIN_OBSTACLE" ],
     "examine_action": "controls_gate",
     "bash": {
       "str_min": 18,
@@ -161,7 +161,7 @@
     "symbol": "6",
     "color": "cyan_red",
     "move_cost": 0,
-    "flags": [ "TRANSPARENT", "NOITEM", "INDOORS", "PERMEABLE", "THIN_OBSTACLE" ],
+    "flags": [ "TRANSPARENT", "NOITEM", "PERMEABLE", "THIN_OBSTACLE" ],
     "examine_action": "controls_gate",
     "bash": {
       "str_min": 18,
@@ -180,7 +180,7 @@
     "symbol": "6",
     "color": "cyan_red",
     "move_cost": 0,
-    "flags": [ "TRANSPARENT", "NOITEM", "INDOORS", "PERMEABLE", "THIN_OBSTACLE" ],
+    "flags": [ "TRANSPARENT", "NOITEM", "PERMEABLE", "THIN_OBSTACLE" ],
     "examine_action": "controls_gate",
     "bash": {
       "str_min": 18,
@@ -199,7 +199,7 @@
     "symbol": "6",
     "color": "cyan_red",
     "move_cost": 0,
-    "flags": [ "TRANSPARENT", "NOITEM", "INDOORS", "PERMEABLE", "THIN_OBSTACLE" ],
+    "flags": [ "TRANSPARENT", "NOITEM", "PERMEABLE", "THIN_OBSTACLE" ],
     "examine_action": "controls_gate",
     "bash": {
       "str_min": 18,
@@ -256,7 +256,7 @@
     "symbol": "|",
     "color": "brown",
     "move_cost": 0,
-    "flags": [ "TRANSPARENT", "NOITEM", "INDOORS", "PERMEABLE", "THIN_OBSTACLE" ],
+    "flags": [ "TRANSPARENT", "NOITEM", "PERMEABLE", "THIN_OBSTACLE" ],
     "examine_action": "controls_gate",
     "bash": {
       "str_min": 8,
@@ -461,7 +461,7 @@
     "move_cost": 0,
     "coverage": 50,
     "roof": "t_flat_roof",
-    "flags": [ "NOITEM", "INDOORS" ],
+    "flags": [ "NOITEM" ],
     "examine_action": "elevator",
     "bash": {
       "str_min": 40,
@@ -504,7 +504,7 @@
     "move_cost": 0,
     "coverage": 50,
     "roof": "t_flat_roof",
-    "flags": [ "NOITEM", "INDOORS" ],
+    "flags": [ "NOITEM" ],
     "bash": {
       "str_min": 40,
       "str_max": 150,
@@ -629,10 +629,60 @@
     "type": "terrain",
     "name": "nuclear reactor core",
     "//": "just a copy of aftershock nuclear reactor",
-    "description": "Naval A1B reactor, used in Gerald R. Ford–class aircraft carriers, and can produce enough steam to generate 125 megawatts of energy.",
+    "description": "The critical infrastructure of a nuclear reactor.  If it was still running, it could produce enough steam to generate 125 megawatts of energy.  It could be salvaged for valuable components, which could be used to juryrig more smaller-scale sources of nuclear power.",
     "symbol": "R",
     "color": "light_green",
     "move_cost": 0,
-    "flags": [ "TRANSPARENT", "CONTAINER", "REDUCE_SCENT", "PERMEABLE", "PLACE_ITEM" ]
+    "flags": [ "TRANSPARENT", "CONTAINER", "REDUCE_SCENT", "PERMEABLE", "PLACE_ITEM", "ADV_DECONSTRUCT" ],
+    "deconstruct": {
+      "ter_set": "t_concrete",
+      "items": [
+        { "item": "compact_reactor_assembly", "count": 2 },
+        { "item": "alloy_plate", "count": [ 4, 6 ] },
+        { "item": "nuclear_fuel", "charges": [ 8, 16 ] },
+        { "item": "nuclear_waste", "charges": [ 2, 4 ] },
+        { "item": "lead", "charges": [ 250, 400 ] },
+        { "item": "cable", "charges": [ 60, 90 ] },
+        { "item": "power_supply", "count": [ 16, 20 ] },
+        { "item": "circuit", "count": [ 22, 28 ] },
+        { "item": "amplifier", "count": [ 10, 14 ] },
+        { "item": "RAM", "count": 8 },
+        { "item": "small_lcd_screen", "count": 4 },
+        { "item": "large_lcd_screen", "count": 1 },
+        { "item": "e_scrap", "count": 24 },
+        { "item": "scrap", "count": [ 48, 80 ] },
+        { "item": "steel_lump", "count": [ 20, 35 ] },
+        { "item": "steel_chunk", "count": [ 30, 50 ] }
+      ]
+    },
+    "bash": {
+      "str_min": 100,
+      "str_max": 500,
+      "explosive": 100,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "ter_set": "t_concrete",
+      "items": [
+        { "item": "compact_reactor_assembly", "prob": 25 },
+        { "item": "alloy_plate", "count": [ 1, 2 ] },
+        { "item": "alloy_sheet", "count": [ 10, 20 ] },
+        { "item": "nuclear_fuel", "charges": [ 2, 8 ] },
+        { "item": "nuclear_waste", "charges": [ 0, 2 ] },
+        { "item": "lead", "charges": [ 100, 200 ] },
+        { "item": "cable", "charges": [ 30, 45 ] },
+        { "item": "power_supply", "count": [ 4, 6 ] },
+        { "item": "circuit", "count": [ 6, 8 ] },
+        { "item": "amplifier", "count": [ 2, 4 ] },
+        { "item": "RAM", "count": [ 0, 2 ] },
+        { "item": "small_lcd_screen", "count": [ 0, 2 ] },
+        { "item": "large_lcd_screen", "prob": 25 },
+        { "item": "e_scrap", "count": [ 15, 30 ] },
+        { "item": "scrap", "count": [ 30, 90 ] },
+        { "item": "steel_lump", "count": [ 15, 40 ] },
+        { "item": "steel_chunk", "count": [ 20, 60 ] }
+      ],
+      "//": "Variable reduction, destroy_threshold equal to str_min instead of str_max due to delicate electronics",
+      "ranged": { "reduction": [ 50, 100 ], "destroy_threshold": 100, "block_unaimed_chance": "75%" }
+    }
   }
 ]

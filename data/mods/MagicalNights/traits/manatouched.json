@@ -75,7 +75,7 @@
     "id": "WEAK",
     "type": "mutation",
     "name": { "str": "Weak" },
-    "passive_mods": { "str_mod": -2 },
+    "mut_enchantments": [ { "values": [ { "value": "STRENGTH_PERMANENT", "add": -2 } ] } ],
     "points": -1,
     "description": "Your body is unnaturally weak.  -2 Strength.",
     "category": [ "MANATOUCHED" ],
@@ -100,9 +100,9 @@
     "extend": { "cancels": [ "WEAK" ] }
   },
   {
-    "id": "STR_UP_ALPHA",
+    "id": "STR_ALPHA",
     "type": "mutation",
-    "copy-from": "STR_UP_ALPHA",
+    "copy-from": "STR_ALPHA",
     "extend": { "cancels": [ "WEAK" ] }
   },
   {

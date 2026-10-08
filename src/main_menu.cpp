@@ -1,17 +1,5 @@
 #include "main_menu.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <exception>
-#include <functional>
-#include <istream>
-#include <memory>
-#include <ctime>
-#include <optional>
-
 #include "auto_pickup.h"
 #include "avatar.h"
 #include "cata_utility.h"
@@ -25,17 +13,18 @@
 #include "filesystem.h"
 #include "fstream_utils.h"
 #include "game.h"
+#include "game_info.h"
 #include "gamemode.h"
 #include "get_version.h"
 #include "help.h"
 #include "loading_ui.h"
-#include "mapbuffer.h"
+#include "map/mapbuffer.h"
 #include "mapsharing.h"
 #include "messages.h"
 #include "newcharacter.h"
 #include "options.h"
 #include "output.h"
-#include "overmapbuffer.h"
+#include "overmap/overmapbuffer.h"
 #include "path_info.h"
 #include "pldata.h"
 #include "popup.h"
@@ -46,12 +35,22 @@
 #include "string_formatter.h"
 #include "text_snippets.h"
 #include "translations.h"
-#include "ui_manager.h"
 #include "ui.h"
+#include "ui_manager.h"
 #include "wcwidth.h"
 #include "worldfactory.h"
-#include "game_info.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <ctime>
+#include <exception>
+#include <functional>
+#include <istream>
+#include <memory>
+#include <optional>
 enum class main_menu_opts : int {
     MOTD = 0,
     NEWCHAR = 1,
@@ -623,6 +622,11 @@ bool main_menu::opening_screen()
         return false;
     }
 
+    if( !assure_dir_exist( PATH_INFO::user_moddir() ) ) {
+        popup( _( "Unable to make user mods directory.  Check permissions." ) );
+        return false;
+    }
+
     if( !assure_dir_exist( PATH_INFO::savedir() ) ) {
         popup( _( "Unable to make save directory.  Check permissions." ) );
         return false;
@@ -992,7 +996,7 @@ bool main_menu::new_character_tab()
     if( !pc.create( play_type, selected_template ) ) {
         load_char_templates();
         MAPBUFFER.clear();
-        overmap_buffer.clear();
+        get_primary_overmapbuffer().clear();
         return false;
     }
 
@@ -1073,13 +1077,17 @@ void main_menu::world_tab( const std::string &worldname )
         return;
     }
 
+    auto *world = world_generator->get_world( worldname );
+    const auto is_v2_world = world->world_save_format == save_format::V2_COMPRESSED_SQLITE3;
+
     uilist mmenu( string_format( _( "Manage world \"%s\"" ), worldname ), {} );
     mmenu.border_color = c_light_gray;
     mmenu.hotkey_color = c_yellow;
     sound_on_move_uilist_callback cb( this );
     mmenu.callback = &cb;
     for( size_t i = 0; i < vWorldSubItems.size(); i++ ) {
-        mmenu.entries.emplace_back( static_cast<int>( i ), true, vWorldHotkeys[i], vWorldSubItems[i] );
+        const auto enabled = !( i == 6 && is_v2_world );
+        mmenu.entries.emplace_back( static_cast<int>( i ), enabled, vWorldHotkeys[i], vWorldSubItems[i] );
     }
     mmenu.query();
     int opt_val = mmenu.ret;
@@ -1091,7 +1099,7 @@ void main_menu::world_tab( const std::string &worldname )
         world_generator->delete_world( worldname, do_delete );
         savegames.clear();
         MAPBUFFER.clear();
-        overmap_buffer.clear();
+        get_primary_overmapbuffer().clear();
         if( do_delete ) {
             sel2 = 0; // reset to create world selection
         }
@@ -1101,7 +1109,7 @@ void main_menu::world_tab( const std::string &worldname )
         world_generator->set_active_world( nullptr );
         savegames.clear();
         MAPBUFFER.clear();
-        overmap_buffer.clear();
+        get_primary_overmapbuffer().clear();
         world_generator->convert_to_v2( worldname );
     };
 
@@ -1133,7 +1141,6 @@ void main_menu::world_tab( const std::string &worldname )
                               "If you have just started playing, consider creating new world instead.\n"
                               "Proceed?"
                           ) ) ) {
-                WORLDINFO *world = world_generator->get_world( worldname );
                 world_generator->edit_active_world_mods( world );
             }
             break;
@@ -1148,7 +1155,7 @@ void main_menu::world_tab( const std::string &worldname )
                 pc.character_to_template( pc.name );
                 pc = avatar();
                 MAPBUFFER.clear();
-                overmap_buffer.clear();
+                get_primary_overmapbuffer().clear();
                 load_char_templates();
             }
             break;

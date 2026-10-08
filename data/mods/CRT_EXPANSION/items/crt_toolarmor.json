@@ -4,7 +4,7 @@
     "type": "TOOL_ARMOR",
     "category": "armor",
     "name": { "str": "C.R.I.T. gasmask (off)", "str_pl": "C.R.I.T. gasmasks (off)" },
-    "description": "This is the C.R.I.T. Spec Ops modified gasmask, fitted with top-of-the-line electronics and lined with Kevlar for extra protection in order to keep one's head where it should be.  Various filters and other high tech wizardry allow for enhanced oxygen intake and safety even under bombardment.  It has an integrated HUD and the option to turn it on for more features.",
+    "description": "This is the C.R.I.T. Spec Ops modified gasmask, fitted with top-of-the-line electronics and lined with Kevlar for extra protection in order to keep one's head where it should be.  Various filters and other high tech wizardry allow for enhanced oxygen intake and safety even under bombardment.  It has an integrated HUD that can receive targeting data from friendly drones, and the option to turn it on for more features.",
     "weight": "5 kg",
     "volume": "1 L",
     "price": "25 kUSD",
@@ -12,6 +12,7 @@
     "to_hit": 1,
     "max_charges": 200,
     "initial_charges": 200,
+    "ammo": "battery",
     "use_action": [
       {
         "type": "transform",
@@ -34,24 +35,24 @@
       "recharge_scheme": [ { "type": "solar", "interval": "10 m", "rate": 1 } ],
       "passive_effects": [
         {
-          "has": "WORN",
-          "condition": "ACTIVE",
+          "conditions": [ "WORN", "ACTIVE" ],
           "values": [
             { "value": "STRENGTH", "add": 2 },
             { "value": "DEXTERITY", "add": 2 },
             { "value": "INTELLIGENCE", "add": -2 },
             { "value": "PERCEPTION", "add": 2 }
           ]
-        }
+        },
+        { "id": "DRONE_CAM" }
       ]
     },
     "material_thickness": 3,
     "environmental_protection": 16,
+    "hearing_protection": 6,
     "qualities": [ [ "GLARE", 1 ] ],
     "flags": [
       "WATERPROOF",
       "STURDY",
-      "PARTIAL_DEAF",
       "SUN_GLASSES",
       "VARSIZE",
       "GAS_PROOF",
@@ -75,6 +76,7 @@
     "max_charges": 250,
     "initial_charges": 0,
     "turns_per_charge": 1,
+    "ammo": "battery",
     "revert_to": "crt_gasmask",
     "use_action": { "type": "transform", "menu_text": "Turn off", "msg": "C.R.T HUD deactivating.", "target": "crt_gasmask" },
     "material": [ "plastic", "kevlar" ],
@@ -88,15 +90,15 @@
       "recharge_scheme": [ { "type": "solar", "interval": "10 m", "rate": 1 } ],
       "passive_effects": [
         {
-          "has": "WORN",
-          "condition": "ACTIVE",
+          "conditions": [ "WORN", "ACTIVE" ],
           "values": [
             { "value": "STRENGTH", "add": 2 },
             { "value": "DEXTERITY", "add": 2 },
             { "value": "INTELLIGENCE", "add": -2 },
             { "value": "PERCEPTION", "add": 2 }
           ]
-        }
+        },
+        { "id": "DRONE_CAM" }
       ]
     },
     "material_thickness": 2,
@@ -105,7 +107,6 @@
     "flags": [
       "WATERPROOF",
       "STURDY",
-      "PARTIAL_DEAF",
       "SUN_GLASSES",
       "FLASH_PROTECTION",
       "ELECTRIC_IMMUNE",
@@ -118,7 +119,9 @@
       "SLEEP_IGNORE",
       "COMBAT_NPC_USE",
       "COMBAT_NPC_ON"
-    ]
+    ],
+    "hearing_protection": 6,
+    "adv_hearing_protection": 24
   },
   {
     "id": "crt_em_vest",
@@ -138,6 +141,7 @@
     "covers": [ "torso" ],
     "max_charges": 300,
     "initial_charges": 300,
+    "ammo": "battery",
     "use_action": [
       {
         "type": "transform",
@@ -154,8 +158,7 @@
       "recharge_scheme": [ { "type": "solar", "interval": "10 m", "rate": 1 } ],
       "passive_effects": [
         {
-          "has": "WORN",
-          "condition": "ACTIVE",
+          "conditions": [ "WORN", "ACTIVE" ],
           "values": [
             { "value": "STRENGTH", "add": 2 },
             { "value": "DEXTERITY", "add": 2 },
@@ -199,14 +202,14 @@
     "max_charges": 300,
     "initial_charges": 0,
     "turns_per_charge": 1,
+    "ammo": "battery",
     "revert_to": "crt_em_vest",
     "use_action": { "type": "transform", "menu_text": "Turn off armor", "msg": "C.R.I.T. E.M powering off…", "target": "crt_em_vest" },
     "relic_data": {
       "recharge_scheme": [ { "type": "solar", "interval": "10 m", "rate": 1 } ],
       "passive_effects": [
         {
-          "has": "WORN",
-          "condition": "ACTIVE",
+          "conditions": [ "WORN", "ACTIVE" ],
           "values": [
             { "value": "STRENGTH", "add": 2 },
             { "value": "DEXTERITY", "add": 2 },

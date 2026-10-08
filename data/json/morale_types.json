@@ -65,6 +65,21 @@
     "text": "Good feeling"
   },
   {
+    "id": "morale_shower",
+    "type": "morale_type",
+    "text": "Had shower"
+  },
+  {
+    "id": "morale_bath",
+    "type": "morale_type",
+    "text": "Had bath"
+  },
+  {
+    "id": "morale_cleansed_self",
+    "type": "morale_type",
+    "text": "Cleansed self"
+  },
+  {
     "id": "morale_support",
     "type": "morale_type",
     "text": "Supported"
@@ -412,6 +427,24 @@
     "id": "morale_nicotine",
     "type": "morale_type",
     "text": "Nicotine",
+    "permanent": true
+  },
+  {
+    "id": "morale_indoor_misery",
+    "type": "morale_type",
+    "text": "Claustrophobic",
+    "permanent": true
+  },
+  {
+    "id": "morale_outdoor_misery",
+    "type": "morale_type",
+    "text": "Agoraphobic",
+    "permanent": true
+  },
+  {
+    "id": "morale_clutter_intolerant",
+    "type": "morale_type",
+    "text": "Messy surroundings",
     "permanent": true
   },
   {

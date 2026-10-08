@@ -40,7 +40,7 @@
     "type": "MAGAZINE",
     "category": "battery",
     "name": { "str": "ultra-light plutonium battery", "str_pl": "ultra-light plutonium batteries" },
-    "description": "This battery uses a thin plutonium-244 rod to stabilize an exotic nanocompound, manufactured from repurposed plutonium fission cells.  It is universally compatible with small devices.  Although it stores a huge amount of power, it cannot be recharged.",
+    "description": "This battery uses a thin plutonium-244 and exotic nanocompound from repurposed plutonium fission cells.  It is universally compatible with small devices.  It stores a huge amount of power, but cannot be recharged by external means, instead it steadily self-charges over time.",
     "ascii_picture": "ultra_light_battery_plut",
     "weight": "75 g",
     "volume": "50 ml",
@@ -50,9 +50,11 @@
     "symbol": "=",
     "color": "green",
     "ammo_type": "battery",
-    "count": 500,
     "capacity": 500,
     "looks_like": "battery",
+    "//": "1% per hour, or ~1.39 watts",
+    "reloads_like": "light_minus_battery_cell",
+    "relic_data": { "recharge_scheme": [ { "type": "time", "interval": "12 m", "rate": 1 } ] },
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "LEAK_DAM", "RADIOACTIVE" ]
   },
   {
@@ -72,6 +74,7 @@
     "count": 150,
     "capacity": 150,
     "looks_like": "battery",
+    "reloads_like": "light_minus_battery_cell",
     "flags": [ "NO_SALVAGE", "NO_UNLOAD" ]
   },
   {
@@ -109,6 +112,7 @@
     "ammo_type": "battery",
     "capacity": 150,
     "looks_like": "battery",
+    "reloads_like": "light_battery_cell",
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "RECHARGE", "MAG_COMPACT" ]
   },
   {
@@ -116,7 +120,7 @@
     "type": "MAGAZINE",
     "category": "battery",
     "name": { "str": "light plutonium battery", "str_pl": "light plutonium batteries" },
-    "description": "This battery uses a thin plutonium-244 rod to stabilize an exotic nanocompound, manufactured from repurposed plutonium fission cells.  It is universally compatible with all kinds of personal electronic devices.  Although it stores a huge amount of power, it cannot be recharged.",
+    "description": "This battery uses a thin plutonium-244 and exotic nanocompound from repurposed plutonium fission cells.  It is universally compatible with all kinds of personal electronic devices.  It stores a huge amount of power, but cannot be recharged by external means, instead it steadily self-charges over time.",
     "ascii_picture": "light_battery_plut",
     "weight": "150 g",
     "volume": "100 ml",
@@ -126,9 +130,11 @@
     "symbol": "=",
     "color": "green",
     "ammo_type": "battery",
-    "count": 1000,
     "capacity": 1000,
     "looks_like": "battery",
+    "//": "1% per hour, or ~2.78 watts",
+    "reloads_like": "light_battery_cell",
+    "relic_data": { "recharge_scheme": [ { "type": "time", "interval": "12 m", "rate": 2 } ] },
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "LEAK_DAM", "RADIOACTIVE", "MAG_COMPACT" ]
   },
   {
@@ -148,6 +154,7 @@
     "count": 300,
     "capacity": 300,
     "looks_like": "battery",
+    "reloads_like": "light_battery_cell",
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "MAG_COMPACT" ]
   },
   {
@@ -185,6 +192,7 @@
     "ammo_type": "battery",
     "capacity": 750,
     "looks_like": "battery",
+    "reloads_like": "medium_battery_cell",
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "RECHARGE", "MAG_COMPACT" ]
   },
   {
@@ -192,7 +200,7 @@
     "type": "MAGAZINE",
     "category": "battery",
     "name": { "str": "medium plutonium battery", "str_pl": "medium plutonium batteries" },
-    "description": "This battery uses a thin plutonium-244 rod to stabilize an exotic nanocompound, manufactured from repurposed plutonium fission cells.  It is universally compatible with all kinds of appliances and power tools.  Although it stores a huge amount of power, it cannot be recharged.",
+    "description": "This battery uses a thin plutonium-244 and exotic nanocompound from repurposed plutonium fission cells.  It is universally compatible with all kinds of appliances and power tools.  It stores a huge amount of power, but cannot be recharged by external means, instead it steadily self-charges over time.",
     "ascii_picture": "medium_battery_plut",
     "weight": "750 g",
     "volume": "500 ml",
@@ -202,9 +210,11 @@
     "symbol": "=",
     "color": "green",
     "ammo_type": "battery",
-    "count": 5000,
     "capacity": 5000,
     "looks_like": "battery",
+    "reloads_like": "medium_battery_cell",
+    "//": "1% per hour, or ~13.89 watts",
+    "relic_data": { "recharge_scheme": [ { "type": "time", "interval": "12 m", "rate": 10 } ] },
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "LEAK_DAM", "RADIOACTIVE", "MAG_COMPACT" ]
   },
   {
@@ -224,6 +234,7 @@
     "count": 1500,
     "capacity": 1500,
     "looks_like": "battery",
+    "reloads_like": "medium_battery_cell",
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "MAG_COMPACT" ]
   },
   {
@@ -261,6 +272,7 @@
     "ammo_type": "battery",
     "capacity": 1500,
     "looks_like": "battery",
+    "reloads_like": "heavy_battery_cell",
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "RECHARGE", "MAG_BULKY" ]
   },
   {
@@ -268,7 +280,7 @@
     "type": "MAGAZINE",
     "category": "battery",
     "name": { "str": "heavy plutonium battery", "str_pl": "heavy plutonium batteries" },
-    "description": "This battery uses a thin plutonium-244 rod to stabilize an exotic nanocompound, manufactured from repurposed plutonium fission cells.  It is universally compatible with all kinds of industrial-grade equipment and large tools.  Although it stores a huge amount of power, it cannot be recharged.",
+    "description": "This battery uses a thin plutonium-244 and exotic nanocompound from repurposed plutonium fission cells.  It is universally compatible with all kinds of industrial-grade equipment and large tools.  It stores a huge amount of power, but cannot be recharged by external means, instead it steadily self-charges over time.",
     "ascii_picture": "heavy_battery_plut",
     "weight": "1500 g",
     "volume": "1 L",
@@ -278,9 +290,11 @@
     "symbol": "=",
     "color": "green",
     "ammo_type": "battery",
-    "count": 10000,
     "capacity": 10000,
     "looks_like": "battery",
+    "reloads_like": "heavy_battery_cell",
+    "//": "1% per hour, or ~27.78 watts",
+    "relic_data": { "recharge_scheme": [ { "type": "time", "interval": "12 m", "rate": 20 } ] },
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "LEAK_DAM", "RADIOACTIVE", "MAG_BULKY" ]
   },
   {
@@ -288,7 +302,7 @@
     "type": "MAGAZINE",
     "category": "battery",
     "name": { "str": "military plutonium fuel cell" },
-    "description": "This battery uses a huge plutonium-244 rod to stabilize an exotic nanocompound, manufactured from repurposed plutonium fission cells.  It was used in military mech-suits, was highly experimental, and had no civilian applications.  Although it stores a stupendous amount of power, it cannot be recharged.",
+    "description": "This battery uses a thin plutonium-244 and exotic nanocompound from repurposed plutonium fission cells.  It was used in military mech-suits, was highly experimental, and had no civilian applications.  It stores a stupendous amount of power, but cannot be recharged by external means, instead it steadily self-charges over time.",
     "weight": "15 kg",
     "volume": "10 L",
     "price": "1 kUSD",
@@ -297,9 +311,10 @@
     "symbol": "=",
     "color": "red",
     "ammo_type": "battery",
-    "count": 100000,
     "capacity": 100000,
     "looks_like": "battery",
+    "//": "1% per hour, or ~277.78 watts",
+    "relic_data": { "recharge_scheme": [ { "type": "time", "interval": "12 m", "rate": 200 } ] },
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "MECH_BAT", "LEAK_DAM", "RADIOACTIVE" ]
   },
   {
@@ -319,6 +334,7 @@
     "count": 3000,
     "capacity": 3000,
     "looks_like": "battery",
+    "reloads_like": "heavy_battery_cell",
     "flags": [ "NO_SALVAGE", "NO_UNLOAD", "MAG_BULKY" ]
   }
 ]

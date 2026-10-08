@@ -64,7 +64,7 @@
     "range": 5,
     "dispersion": 75,
     "durability": 6,
-    "loudness": 5
+    "loudness": 40
   },
   {
     "id": "wristrocket",
@@ -84,7 +84,7 @@
     "range": 8,
     "dispersion": 45,
     "durability": 7,
-    "loudness": 5
+    "loudness": 45
   },
   {
     "id": "slingshot_cannon",
@@ -110,6 +110,28 @@
     "clip_size": 1,
     "valid_mod_locations": [ [ "accessories", 2 ], [ "sights", 1 ], [ "sling", 1 ] ],
     "delete": { "flags": [ "WATERPROOF_GUN", "UNDERWATER_GUN" ] },
-    "loudness": 15
+    "extend": { "flags": [ "PRIMITIVE_RANGED_WEAPON" ] },
+    "loudness": 60
+  },
+  {
+    "id": "atlatl",
+    "copy-from": "sling_base",
+    "type": "GUN",
+    "name": { "str": "atlatl" },
+    "description": "A wooden tool for supporting a javelin, to throw it more effectively than by hand.",
+    "weight": "116 g",
+    "volume": "250 ml",
+    "price": "5 USD",
+    "to_hit": -1,
+    "bashing": 1,
+    "material": [ "wood" ],
+    "ammo": "atlatl",
+    "skill": "throw",
+    "ranged_damage": { "damage_type": "stab", "amount": 20 },
+    "range": 15,
+    "dispersion": 1000,
+    "durability": 6,
+    "reload": 100,
+    "extend": { "flags": [ "BELT_CLIP" ] }
   }
 ]

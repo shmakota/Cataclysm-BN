@@ -249,70 +249,76 @@ void JsonObject::throw_error( const std::string &err ) const
     jsin->error( err );
 }
 
-void JsonObject::show_warning( const std::string &err ) const
+void JsonObject::show_warning( const std::string &err, bool debug ) const
 {
 #ifndef CATA_IN_TOOL
     try {
         throw_error( err );
     } catch( const std::exception &e ) {
-        debugmsg( "%s", e.what() );
+        debugmsg_of( debug ? DL::Debug : DL::Error, "%s", e.what() );
     }
 #else
     ( void )err;
+    ( void )debug;
 #endif // CATA_IN_TOOL
 }
 
-void JsonObject::show_warning( const std::string &err, const std::string &name ) const
+void JsonObject::show_warning( const std::string &err, const std::string &name,
+                               const bool debug ) const
 {
 #ifndef CATA_IN_TOOL
     try {
         throw_error( err, name );
     } catch( const std::exception &e ) {
-        debugmsg( "%s", e.what() );
+        debugmsg_of( debug ? DL::Debug : DL::Error, "%s", e.what() );
     }
 #else
     ( void )err;
     ( void )name;
+    ( void )debug;
 #endif // CATA_IN_TOOL
 }
 
-void JsonArray::show_warning( const std::string &err )
+void JsonArray::show_warning( const std::string &err, const bool debug )
 {
 #ifndef CATA_IN_TOOL
     try {
         throw_error( err );
     } catch( const std::exception &e ) {
-        debugmsg( "%s", e.what() );
+        debugmsg_of( debug ? DL::Debug : DL::Error, "%s", e.what() );
     }
 #else
     ( void )err;
+    ( void )debug;
 #endif // CATA_IN_TOOL
 }
 
-void JsonArray::show_warning( const std::string &err, int idx )
+void JsonArray::show_warning( const std::string &err, int idx, const bool debug )
 {
 #ifndef CATA_IN_TOOL
     try {
         throw_error( err, idx );
     } catch( const std::exception &e ) {
-        debugmsg( "%s", e.what() );
+        debugmsg_of( debug ? DL::Debug : DL::Error, "%s", e.what() );
     }
 #else
     ( void )err;
     ( void )idx;
+    ( void )debug;
 #endif // CATA_IN_TOOL
 }
 
-void JsonValue::show_warning( const std::string &err ) const
+void JsonValue::show_warning( const std::string &err, const bool debug ) const
 {
 #ifndef CATA_IN_TOOL
     try {
         throw_error( err );
     } catch( const std::exception &e ) {
-        debugmsg( "%s", e.what() );
+        debugmsg_of( debug ? DL::Debug : DL::Error, "%s", e.what() );
     }
 #else
     ( void )err;
+    ( void )debug;
 #endif // CATA_IN_TOOL
 }
 
@@ -1782,6 +1788,26 @@ bool JsonIn::read( JsonDeserializer &j, bool throw_on_error )
         return false;
     }
 }
+
+#if defined(_MSC_VER)
+bool JsonIn::read( long &i, bool throw_on_error )
+{
+    if( !test_number() ) {
+        return error_or_false( throw_on_error, "Expected number" );
+    }
+    i = static_cast<long>( get_int64() );
+    return true;
+}
+
+bool JsonIn::read( unsigned long &u, bool throw_on_error )
+{
+    if( !test_number() ) {
+        return error_or_false( throw_on_error, "Expected number" );
+    }
+    u = static_cast<unsigned long>( get_uint64() );
+    return true;
+}
+#endif
 
 /**
  * Get the normal form of a relative path. Does not work on absolute paths.

@@ -45,7 +45,8 @@
       { "group": "newspaper_recent", "prob": 15 },
       { "item": "survnote", "prob": 2 },
       { "item": "eclipse_glasses", "prob": 1 },
-      { "item": "thermos", "prob": 10 }
+      { "item": "thermos", "prob": 10 },
+      { "item": "delivery_drone_item", "prob": 5 }
     ]
   },
   {
@@ -246,6 +247,7 @@
       [ "goggles_ir", 1 ],
       [ "glasses_monocle", 2 ],
       [ "fancy_sunglasses", 15 ],
+      [ "aviators", 15 ],
       [ "fc_hairpin", 5 ],
       [ "barrette", 5 ],
       [ "pearl_collar", 1 ],
@@ -332,6 +334,8 @@
       [ "sweater", 75 ],
       [ "blazer", 35 ],
       [ "jacket_leather", 30 ],
+      [ "jacket_leather_red", 10 ],
+      [ "jeans_red", 10 ],
       [ "coat_fur", 5 ],
       [ "coat_faux_fur", 10 ],
       [ "coat_fur_sf", 1 ],
@@ -351,6 +355,7 @@
       [ "baldric_holster", 3 ],
       [ "holster", 8 ],
       [ "shoulder_holster", 4 ],
+      [ "shoulder_pouch", 4 ],
       [ "bootstrap", 2 ],
       [ "wristholster", 1 ],
       [ "bholster", 5 ],
@@ -424,6 +429,7 @@
       [ "dehydrator", 15 ],
       [ "soda_machine", 15 ],
       [ "pickelhaube", 50 ],
+      [ "helmet_steel", 50 ],
       [ "well_pump", 2 ],
       [ "firehelmet", 10 ],
       [ "bunker_coat", 5 ],
@@ -558,6 +564,8 @@
       [ "survnote", 5 ],
       [ "radio_car_box", 1 ],
       [ "radiocontrol", 3 ],
+      [ "delivery_drone_item", 1 ],
+      [ "remotevehcontrol", 1 ],
       [ "peephole", 1 ],
       [ "magnifying_glass", 2 ],
       [ "ear_spool", 30 ],
@@ -608,7 +616,9 @@
       { "group": "tinware", "prob": 10 },
       [ "shield_riot", 5 ],
       [ "pirate_flag", 5 ],
-      [ "professional_chemical_thrower", 5 ]
+      [ "professional_chemical_thrower", 5 ],
+      [ "chestrig", 5 ],
+      [ "belt_magazine", 5 ]
     ]
   },
   {
@@ -637,6 +647,7 @@
     "id": "mil_surplus",
     "items": [
       { "group": "mags_surplus", "prob": 400 },
+      [ "helmet_steel", 50 ],
       [ "knife_combat", 14 ],
       [ "knife_rm42", 1 ],
       [ "kukri", 2 ],
@@ -723,13 +734,18 @@
       [ "bfipowder", 20 ],
       [ "sheath", 10 ],
       [ "bootsheath", 10 ],
+      [ "chestrig", 10 ],
+      [ "belt_magazine", 10 ],
       [ "survnote", 1 ],
       [ "solarpack", 1 ],
       [ "tourist_table", 5 ],
       [ "chem_hexamine", 5 ],
       [ "esbit_stove", 10 ],
       [ "mess_tin", 10 ],
-      [ "angle_grinder", 4 ]
+      [ "angle_grinder", 4 ],
+      [ "textbook_launcher", 2 ],
+      [ "105mm_casing", 12 ],
+      [ "120mm_case_base", 4 ]
     ]
   },
   {
@@ -833,6 +849,8 @@
       { "group": "softdrinks_canned", "prob": 244 },
       { "item": "bbgun", "prob": 30 },
       { "item": "bb", "prob": 30 },
+      { "item": "paintballgun", "prob": 15 },
+      { "item": "paintball", "prob": 15 },
       { "item": "portable_game", "prob": 60 },
       { "item": "game_watch", "prob": 15 },
       { "item": "deck_of_cards", "prob": 25 },
@@ -982,7 +1000,7 @@
       { "item": "mayonnaise", "prob": 3 },
       { "group": "ketchup_sealed_rng", "prob": 3 },
       { "group": "mustard_sealed_rng", "prob": 3 },
-      { "item": "pickle", "prob": 5, "charges": 6, "container-item": "jar_glass_sealed" },
+      { "item": "pickle", "prob": 5, "charges": 2, "container-item": "jar_glass_sealed" },
       { "item": "cheeseburger", "prob": 10 },
       { "item": "hamburger", "prob": 8 },
       { "item": "sloppyjoe", "prob": 6 },
@@ -1038,7 +1056,8 @@
       { "item": "box_small", "prob": 30 },
       { "item": "rag", "prob": 20 },
       { "item": "bag_plastic", "prob": 15 },
-      { "item": "bag_zipper", "prob": 5 },
+      { "item": "bag_zipper_small", "prob": 5 },
+      { "item": "bag_zipper", "prob": 2 },
       { "item": "news_regional", "prob": 15 },
       { "item": "mag_news", "prob": 15 }
     ]
@@ -1127,6 +1146,7 @@
           { "item": "sunglasses", "prob": 25 },
           { "item": "fitover_sunglasses", "prob": 20 },
           { "item": "fancy_sunglasses", "prob": 20 },
+          { "item": "aviators", "prob": 20 },
           { "item": "canteen", "prob": 20 },
           { "item": "camelbak", "prob": 20 }
         ]
@@ -1656,7 +1676,7 @@
     "//": "For s_electronics shops",
     "ammo": 75,
     "magazine": 100,
-    "items": [ [ "television", 50 ], [ "eink_tablet_pc", 50 ], [ "stereo", 30 ], [ "microwave", 40 ] ]
+    "items": [ [ "television", 50 ], [ "eink_tablet_pc", 50 ], [ "stereo", 30 ], [ "microwave", 40 ], [ "delivery_drone_item", 25 ] ]
   },
   {
     "id": "elecsto_books",
@@ -1717,7 +1737,8 @@
       [ "backpack", 5 ],
       [ "plastic_shopping_bag", 10 ],
       [ "bag_plastic", 15 ],
-      [ "bag_zipper", 5 ],
+      [ "bag_zipper_small", 5 ],
+      [ "bag_zipper", 2 ],
       [ "basket_laundry", 30 ]
     ]
   },
@@ -1771,7 +1792,8 @@
     "type": "item_group",
     "items": [
       [ "bandages", 50 ],
-      [ "1st_aid", 10 ],
+      [ "1st_aid", 8 ],
+      [ "1st_aid_deluxe", 2 ],
       [ "saline", 20 ],
       [ "vitamins", 15 ],
       [ "calcium_tablet", 15 ],
@@ -1800,7 +1822,8 @@
       [ "gloves_rubber", 25 ],
       [ "rag_bloody", 10 ],
       [ "bag_plastic", 10 ],
-      [ "bag_zipper", 10 ],
+      [ "bag_zipper_small", 10 ],
+      [ "bag_zipper", 5 ],
       [ "string_6", 5 ]
     ]
   },
@@ -1822,7 +1845,8 @@
       [ "rag", 15 ],
       [ "rag_bloody", 2 ],
       [ "bag_plastic", 10 ],
-      [ "bag_zipper", 10 ],
+      [ "bag_zipper_small", 10 ],
+      [ "bag_zipper", 5 ],
       [ "jerky", 40 ]
     ]
   },
@@ -1841,7 +1865,8 @@
       [ "codeine", 15 ],
       [ "saline", 15 ],
       [ "smoxygen_tank", 10 ],
-      [ "1st_aid", 30 ],
+      [ "1st_aid", 24 ],
+      [ "1st_aid_deluxe", 6 ],
       [ "medical_tape", 35 ],
       [ "blood", 5 ],
       [ "vaccine_shot", 15 ],
@@ -1956,5 +1981,29 @@
     "type": "item_group",
     "//": "only this for now, but when we get more clothing we should probably add some more flavor",
     "items": [ [ "hoodie_drugrug", 100 ], [ "tshirt_tour", 20 ] ]
+  },
+  {
+    "id": "sporting_vehicle_items",
+    "//": "Deployable vehicles and parts kit items.  1/3 bikes and other wheeled items, 1/3 boats and other deployable watercraft, 1/3 drones and aircraft parts kits.",
+    "type": "item_group",
+    "items": [
+      [ "folding_bicycle", 50 ],
+      [ "folding_skateboard", 25 ],
+      [ "folding_wagon", 25 ],
+      [ "inflatable_boat", 75 ],
+      [ "sea_scooter", 25 ],
+      { "collection": [ { "item": "delivery_drone_item" }, { "item": "remotevehcontrol", "prob": 50 } ], "prob": 50 },
+      [ "wooden_plane_kit", 50 ]
+    ]
+  },
+  {
+    "id": "delivery_drones",
+    "//": "Deployable drones and controllers for spawning them specifically.",
+    "type": "item_group",
+    "items": [
+      [ "remotevehcontrol", 75 ],
+      [ "delivery_drone_item", 20 ],
+      { "collection": [ { "item": "delivery_drone_item" }, { "item": "remotevehcontrol" } ], "prob": 5 }
+    ]
   }
 ]

@@ -1,9 +1,4 @@
-#include "player.h" // IWYU pragma: associated
-
-#include <array>
-#include <cstdlib>
-#include <memory>
-
+#include "action_time_scale.h"
 #include "activity_handlers.h"
 #include "avatar.h"
 #include "character.h"
@@ -14,18 +9,20 @@
 #include "enums.h"
 #include "event.h"
 #include "event_bus.h"
-#include "field_type.h"
 #include "game.h"
 #include "int_id.h"
-#include "map.h"
+#include "map/field_type.h"
+#include "map/map.h"
+#include "map/mapdata.h"
 #include "map_iterator.h"
-#include "mapdata.h"
 #include "martialarts.h"
 #include "messages.h"
-#include "morale_types.h"
 #include "mongroup.h"
 #include "monster.h"
+#include "morale_types.h"
 #include "mutation_data.h"
+#include "profile.h"
+#include "player.h" // IWYU pragma: associated
 #include "player_activity.h"
 #include "pldata.h"
 #include "rng.h"
@@ -36,10 +33,15 @@
 #include "teleport.h"
 #include "text_snippets.h"
 #include "translations.h"
-#include "weather.h"
+#include "type_id.h"
 #include "vitamin.h"
+#include "weather/weather.h"
+
 #include <algorithm>
+#include <array>
+#include <cstdlib>
 #include <functional>
+#include <memory>
 
 static const activity_id ACT_FIRSTAID( "ACT_FIRSTAID" );
 
@@ -98,8 +100,6 @@ static const mongroup_id GROUP_NETHER( "GROUP_NETHER" );
 
 static const mtype_id mon_dermatik_larva( "mon_dermatik_larva" );
 
-static const bionic_id bio_infolink( "bio_infolink" );
-
 static const trait_id trait_CHLOROMORPH( "CHLOROMORPH" );
 static const trait_id trait_HEAVYSLEEPER2( "HEAVYSLEEPER2" );
 static const trait_id trait_HIBERNATE( "HIBERNATE" );
@@ -107,10 +107,13 @@ static const trait_id trait_INFRESIST( "INFRESIST" );
 static const trait_id trait_M_IMMUNE( "M_IMMUNE" );
 static const trait_id trait_M_SKIN3( "M_SKIN3" );
 static const trait_id trait_NOPAIN( "NOPAIN" );
-static const trait_id trait_SEESLEEP( "SEESLEEP" );
 static const trait_id trait_SCHIZOPHRENIC( "SCHIZOPHRENIC" );
 static const trait_id trait_THRESH_MYCUS( "THRESH_MYCUS" );
 static const trait_id trait_WATERSLEEP( "WATERSLEEP" );
+
+static const enchantment_flag_id ench_flag_INTERNAL_ALARMCLOCK( "INTERNAL_ALARMCLOCK" );
+static const enchantment_flag_id ench_flag_SLEEP_SIGHT( "SLEEP_SIGHT" );
+static const enchantment_flag_id ench_flag_NO_LIGHT_WAKE( "NO_LIGHT_WAKE" );
 
 static void eff_fun_onfire( player &u, effect &it )
 {
@@ -141,7 +144,7 @@ static void eff_fun_fungus( player &u, effect &it )
             if( one_in( 600 ) ) {
                 u.add_msg_if_player( m_warning, _( "You feel nauseous." ) );
             }
-            if( calendar::once_every( 10_minutes ) ) {
+            if( action_time_scale::once_every_this_tick( 10_minutes ) ) {
                 u.add_msg_if_player( m_warning, _( "You smell and taste mushrooms." ) );
             }
             it.mod_duration( 1_turns );
@@ -174,7 +177,7 @@ static void eff_fun_fungus( player &u, effect &it )
             break;
         case 3: {
             // Permanent symptoms
-            bool is_fungal_ter = g->m.has_flag_ter( "FUNGUS", u.pos() );
+            bool is_fungal_ter = g->m.has_flag_ter( "FUNGUS", u.bub_pos() );
             if( !is_fungal_ter && one_in( 600 + 4 * bonus ) ) {
                 u.add_effect( effect_nausea, 5_minutes );
             }
@@ -222,14 +225,20 @@ static void eff_fun_bleed( player &u, effect &it )
 }
 static void eff_fun_hallu( player &u, effect &it )
 {
-    // TODO: Redo this to allow for variable durations
-    // Time intervals are drawn from the old ones based on 3600 (6-hour) duration.
-    constexpr int maxDuration = 21600;
-    constexpr int comeupTime = static_cast<int>( maxDuration * 0.9 );
-    constexpr int noticeTime = static_cast<int>( comeupTime + ( maxDuration - comeupTime ) / 2 );
-    constexpr int peakTime = static_cast<int>( maxDuration * 0.8 );
-    constexpr int comedownTime = static_cast<int>( maxDuration * 0.3 );
-    const int dur = to_turns<int>( it.get_duration() );
+    // Scale thresholds to the actual duration this instance was added with so
+    // that short doses (pink tablets) still go through the full lifecycle and
+    // longer ones (spells / monster attacks) aren't cut off early.
+    const time_duration remaining = it.get_duration();
+    const time_duration total = ( calendar::turn - it.get_start_time() ) + remaining;
+    if( total <= 0_turns ) {
+        return;
+    }
+    const int totalTurns = to_turns<int>( total );
+    const int comeupTime = static_cast<int>( totalTurns * 0.9 );
+    const int noticeTime = static_cast<int>( comeupTime + ( totalTurns - comeupTime ) / 2 );
+    const int peakTime = static_cast<int>( totalTurns * 0.8 );
+    const int comedownTime = static_cast<int>( totalTurns * 0.3 );
+    const int dur = to_turns<int>( remaining );
     // Baseline
     if( dur == noticeTime ) {
         u.add_msg_if_player( m_warning, _( "You feel a little strange." ) );
@@ -265,12 +274,18 @@ static void eff_fun_hallu( player &u, effect &it )
             ///\EFFECT_STR_NPC increases volume of hallucination sounds (NEGATIVE)
 
             ///\EFFECT_INT_NPC decreases volume of hallucination sounds
-            int loudness = 20 + u.str_cur - u.int_cur;
-            loudness = ( loudness > 5 ? loudness : 5 );
-            loudness = ( loudness < 30 ? loudness : 30 );
-            sounds::sound( u.pos(), loudness, sounds::sound_t::speech, _( random_entry_ref( npc_hallu ) ),
-                           false, "speech",
-                           loudness < 15 ? ( u.male ? "NPC_m" : "NPC_f" ) : ( u.male ? "NPC_m_loud" : "NPC_f_loud" ) );
+            int loudness = 60 + u.str_cur - u.int_cur;
+            loudness = std::min( 90, std::max( 30, loudness ) );
+
+            sound_event se;
+            se.origin = u.bub_pos();
+            se.volume = loudness;
+            se.category = sounds::sound_t::speech;
+            se.description = _( random_entry_ref( npc_hallu ) );
+            se.id = "speech";
+            se.variant = loudness < 70 ? ( u.male ? "NPC_m" : "NPC_f" ) : ( u.male ? "NPC_m_loud" :
+                         "NPC_f_loud" );
+            sounds::sound( se );
         }
     } else if( dur == peakTime ) {
         // Visuals start
@@ -278,13 +293,13 @@ static void eff_fun_hallu( player &u, effect &it )
         u.add_effect( effect_visuals, time_duration::from_turns( peakTime - comedownTime ) );
     } else if( dur > comedownTime && dur < peakTime ) {
         // Full symptoms
-        u.mod_per_bonus( -2 );
-        u.mod_int_bonus( -1 );
-        u.mod_dex_bonus( -2 );
+        u.mod_per_bonus( -2, true );
+        u.mod_int_bonus( -1, true );
+        u.mod_dex_bonus( -2, true );
         u.add_miss_reason( _( "Dancing fractals distract you." ), 2 );
-        u.mod_str_bonus( -1 );
+        u.mod_str_bonus( -1, true );
         if( u.is_player() && one_in( 50 ) ) {
-            g->spawn_hallucination( u.pos() + tripoint( rng( -10, 10 ), rng( -10, 10 ), 0 ) );
+            g->spawn_hallucination( u.bub_pos() + tripoint_rel_ms( rng( -10, 10 ), rng( -10, 10 ), 0 ) );
         }
     } else if( dur == comedownTime ) {
         if( one_in( 42 ) ) {
@@ -315,17 +330,17 @@ struct temperature_effect {
 
     void apply( player &u ) const {
         if( str_pen > 0 ) {
-            u.mod_str_bonus( -str_pen );
+            u.mod_str_bonus( -str_pen, true );
         }
         if( dex_pen > 0 ) {
-            u.mod_dex_bonus( -dex_pen );
+            u.mod_dex_bonus( -dex_pen, true );
             u.add_miss_reason( _( miss_msg ), dex_pen );
         }
         if( int_pen > 0 ) {
-            u.mod_int_bonus( -int_pen );
+            u.mod_int_bonus( -int_pen, true );
         }
         if( per_pen > 0 ) {
-            u.mod_per_bonus( -per_pen );
+            u.mod_per_bonus( -per_pen, true );
         }
         if( !msg.empty() && !u.has_effect( effect_sleep ) && one_in( msg_chance ) ) {
             u.add_msg_if_player( m_warning, "%s", _( msg ) );
@@ -403,7 +418,7 @@ static void eff_fun_hot( player &u, effect &it )
             debugmsg( "%s has no head(?!)", u.disp_name() );
             return;
         }
-        int temp_cur = iter->second.get_temp_cur();
+        const auto temp_cur = units::to_legacy_bodypart_temp( iter->second.get_temp_cur() );
         if( one_in( std::max( 25, std::min( 89500, 90000 - temp_cur ) ) ) ) {
             u.vomit();
         }
@@ -476,6 +491,7 @@ static void eff_fun_mutating( player &u, effect &it )
 
 void Character::hardcoded_effects( effect &it )
 {
+    ZoneScoped;
     if( auto buff = ma_buff::from_effect( it ) ) {
         if( buff->is_valid_character( *this ) ) {
             buff->apply_character( *this );
@@ -534,7 +550,7 @@ void Character::hardcoded_effects( effect &it )
                                    _( "Your flesh crawls; insects tear through the flesh and begin to emerge!" ),
                                    _( "Insects begin to emerge from <npcname>'s skin!" ) );
             for( ; num_insects > 0; num_insects-- ) {
-                if( monster *const grub = g->place_critter_around( mon_dermatik_larva, pos(), 1 ) ) {
+                if( monster *const grub = g->place_critter_around( mon_dermatik_larva, bub_pos(), 1 ) ) {
                     if( one_in( 3 ) ) {
                         grub->friendly = -1;
                     }
@@ -559,7 +575,7 @@ void Character::hardcoded_effects( effect &it )
                 //~ %s is bodypart in accusative.
                 add_msg( m_warning, _( "You start scratching your %s!" ), body_part_name_accusative( bp ) );
                 g->u.cancel_activity();
-            } else if( g->u.sees( pos() ) ) {
+            } else if( g->u.sees( bub_pos() ) ) {
                 //~ 1$s is NPC name, 2$s is bodypart in accusative.
                 add_msg( _( "%1$s starts scratching their %2$s!" ), name, body_part_name_accusative( bp ) );
             }
@@ -578,24 +594,24 @@ void Character::hardcoded_effects( effect &it )
         }
         if( lesserEvil ) {
             // Only minor effects, some even good!
-            mod_str_bonus( dur > 450_minutes ? 10.0 : dur / 45_minutes );
+            mod_str_bonus( dur > 450_minutes ? 10.0 : dur / 45_minutes, true );
             if( dur < 1_hours ) {
-                mod_dex_bonus( 1 );
+                mod_dex_bonus( 1, true );
             } else {
                 int dex_mod = -( dur > 360_minutes ? 10.0 : ( dur - 1_hours ) / 30_minutes );
-                mod_dex_bonus( dex_mod );
+                mod_dex_bonus( dex_mod, true );
                 add_miss_reason( _( "Why waste your time on that insignificant speck?" ), -dex_mod );
             }
-            mod_int_bonus( -( dur > 300_minutes ? 10.0 : ( dur - 50_minutes ) / 25_minutes ) );
-            mod_per_bonus( -( dur > 480_minutes ? 10.0 : ( dur - 80_minutes ) / 40_minutes ) );
+            mod_int_bonus( -( dur > 300_minutes ? 10.0 : ( dur - 50_minutes ) / 25_minutes ), true );
+            mod_per_bonus( -( dur > 480_minutes ? 10.0 : ( dur - 80_minutes ) / 40_minutes ), true );
         } else {
             // Major effects, all bad.
-            mod_str_bonus( -( dur > 500_minutes ? 10.0 : dur / 50_minutes ) );
+            mod_str_bonus( -( dur > 500_minutes ? 10.0 : dur / 50_minutes ), true );
             int dex_mod = -( dur > 600_minutes ? 10.0 : dur / 60_minutes );
-            mod_dex_bonus( dex_mod );
+            mod_dex_bonus( dex_mod, true );
             add_miss_reason( _( "Why waste your time on that insignificant speck?" ), -dex_mod );
-            mod_int_bonus( -( dur > 450_minutes ? 10.0 : dur / 45_minutes ) );
-            mod_per_bonus( -( dur > 400_minutes ? 10.0 : dur / 40_minutes ) );
+            mod_int_bonus( -( dur > 450_minutes ? 10.0 : dur / 45_minutes ), true );
+            mod_per_bonus( -( dur > 400_minutes ? 10.0 : dur / 40_minutes ), true );
         }
     } else if( id == effect_attention ) {
         if( intense > 6 ) {
@@ -628,7 +644,7 @@ void Character::hardcoded_effects( effect &it )
                 if( has_psy_protection( *this, 4 ) ) {
                     add_msg_if_player( m_bad, _( "You feel something probing your mind, but it is rebuffed!" ) );
                 } else {
-                    add_msg_if_player( m_bad, _( "A terrifying image in the back out your mind paralyzes you." ) );
+                    add_msg_if_player( m_bad, _( "A terrifying image in the back of your mind paralyzes you." ) );
                     add_effect( effect_fearparalyze, 5_turns );
                     moves -= 4 * get_speed();
                 }
@@ -705,7 +721,7 @@ void Character::hardcoded_effects( effect &it )
             }
             if( one_in( 7200 - ( intense * 250 ) ) ) {
                 add_msg_if_player( m_bad, _( "You are beset with a vision of a prowling beast." ) );
-                for( const tripoint &dest : g->m.points_in_radius( pos(), 6 ) ) {
+                for( const tripoint_bub_ms &dest : g->m.points_in_radius( bub_pos(), 6 ) ) {
                     if( g->m.is_cornerfloor( dest ) ) {
                         g->m.add_field( dest, fd_tindalos_rift, 3 );
                         add_msg_if_player( m_info, _( "Your surroundings are permeated with a foul scent." ) );
@@ -722,13 +738,13 @@ void Character::hardcoded_effects( effect &it )
         if( intense > 4 ) {
             // Once every 4 hours baseline, once every 2 hours max
             if( one_turn_in( 14_hours - ( intense * 90_minutes ) ) ) {
-                tripoint dest( 0, 0, posz() );
-                int &x = dest.x;
-                int &y = dest.y;
+                tripoint_bub_ms dest( 0, 0, bub_pos().z() );
+                int &x = dest.x();
+                int &y = dest.y();
                 int tries = 0;
                 do {
-                    x = posx() + rng( -4, 4 );
-                    y = posy() + rng( -4, 4 );
+                    x = bub_pos().x() + rng( -4, 4 );
+                    y = bub_pos().y() + rng( -4, 4 );
                     tries++;
                     if( tries >= 10 ) {
                         break;
@@ -788,16 +804,24 @@ void Character::hardcoded_effects( effect &it )
         if( one_in( 5000 ) ) {
             add_msg_if_player( m_bad, _( "A strange sound reverberates around the edges of reality." ) );
             // Comparable to the humming anomaly trap, with a narrower range
-            int volume = rng( 25, 150 );
+            int volume = rng( 40, 125 );
             std::string sfx;
-            if( volume <= 50 ) {
+            if( volume <= 60 ) {
                 sfx = _( "hrmmm" );
             } else if( volume <= 100 ) {
                 sfx = _( "HRMMM" );
             } else {
                 sfx = _( "VRMMMMMM" );
             }
-            sounds::sound( pos(), volume, sounds::sound_t::activity, sfx, false, "humming", "machinery" );
+            sound_event se;
+            se.origin = bub_pos();
+            se.volume = volume;
+            se.category = sounds::sound_t::activity;
+            se.description = sfx;
+            se.id = "humming";
+            se.variant = "machinery";
+
+            sounds::sound( se );
         }
     } else if( id == effect_asthma ) {
         if( has_effect( effect_adrenaline ) || has_effect( effect_datura ) ) {
@@ -917,7 +941,7 @@ void Character::hardcoded_effects( effect &it )
     } else if( id == effect_grabbed ) {
         set_num_blocks_bonus( get_num_blocks_bonus() - 1 );
         int zed_number = 0;
-        for( auto &dest : g->m.points_in_radius( pos(), 1, 0 ) ) {
+        for( auto &dest : g->m.points_in_radius( bub_pos(), 1, 0 ) ) {
             const monster *const mon = g->critter_at<monster>( dest );
             if( mon && mon->has_effect( effect_grabbing ) ) {
                 zed_number += mon->get_grab_strength();
@@ -993,7 +1017,7 @@ void Character::hardcoded_effects( effect &it )
             } else if( has_effect( effect_antibiotic ) ) {
                 // Normal antibiotic prevents progression
             } else if( has_effect( effect_weak_antibiotic ) ) {
-                if( calendar::once_every( 4_turns ) ) {
+                if( action_time_scale::once_every_this_tick( 4_turns ) ) {
                     // Weak antibiotic slows down to a quarter
                     it.mod_duration( 1_turns );
                 }
@@ -1041,7 +1065,7 @@ void Character::hardcoded_effects( effect &it )
             } else if( has_effect( effect_antibiotic ) ) {
                 // No progression
             } else if( has_effect( effect_weak_antibiotic ) ) {
-                if( calendar::once_every( 4_turns ) ) {
+                if( action_time_scale::once_every_this_tick( 4_turns ) ) {
                     it.mod_duration( 1_turns );
                 }
             } else if( dur > 1_days ) {
@@ -1072,7 +1096,7 @@ void Character::hardcoded_effects( effect &it )
             set_fatigue( 25 ); //Prevent us from waking up naturally while under anesthesia
         }
 
-        if( get_fatigue() <= 10 && !has_effect( effect_narcosis ) && !is_hibernating() ) {
+        if( get_fatigue() <= 25 && !has_effect( effect_narcosis ) && !is_hibernating() ) {
             // Mycus folks upgrade once per night of sleep.
             if( has_trait( trait_THRESH_MYCUS ) ) {
                 mutate_category( mutation_category_id( "MYCUS" ) );
@@ -1113,12 +1137,12 @@ void Character::hardcoded_effects( effect &it )
         }
 
         // TODO: Move this to update_needs when NPCs can mutate
-        if( calendar::once_every( 10_minutes ) && ( has_trait( trait_CHLOROMORPH ) ||
+        if( action_time_scale::once_every_this_tick( 10_minutes ) && ( has_trait( trait_CHLOROMORPH ) ||
                 has_trait( trait_M_SKIN3 ) || has_trait( trait_WATERSLEEP ) ) &&
-            g->m.is_outside( pos() ) ) {
+            g->m.is_outside( bub_pos() ) ) {
             if( has_trait( trait_CHLOROMORPH ) ) {
                 // Hunger and thirst fall before your Chloromorphic physiology!
-                if( g->natural_light_level( posz() ) >= 12 &&
+                if( g->natural_light_level( bub_pos().z() ) >= 12 &&
                     get_weather().weather_id->sun_intensity >= sun_intensity_type::light ) {
                     if( get_stored_kcal() < max_stored_kcal() - 50 ) {
                         mod_stored_kcal( 50 );
@@ -1130,11 +1154,11 @@ void Character::hardcoded_effects( effect &it )
             }
             if( has_trait( trait_M_SKIN3 ) ) {
                 // Spores happen!
-                if( g->m.has_flag_ter_or_furn( "FUNGUS", pos() ) ) {
+                if( g->m.has_flag_ter_or_furn( "FUNGUS", bub_pos() ) ) {
                     if( get_fatigue() >= 0 ) {
                         mod_fatigue( -5 ); // Local guides need less sleep on fungal soil
                     }
-                    if( calendar::once_every( 1_hours ) ) {
+                    if( action_time_scale::once_every_this_tick( 1_hours ) ) {
                         spores(); // spawn some P O O F Y   B O I S
                     }
                 }
@@ -1147,11 +1171,12 @@ void Character::hardcoded_effects( effect &it )
         bool woke_up = false;
         int tirednessVal = rng( 5, 200 ) + rng( 0, std::abs( get_fatigue() * 2 * 5 ) );
         if( !is_blind() && !has_effect( effect_narcosis ) ) {
-            if( !has_trait(
-                    trait_SEESLEEP ) ) { // People who can see while sleeping are acclimated to the light.
+            // If you can see while sleeping light probably doesn't bother you
+            if( !has_enchantment_flag( ench_flag_SLEEP_SIGHT ) &&
+                !has_enchantment_flag( ench_flag_NO_LIGHT_WAKE ) ) {
                 if( has_trait( trait_HEAVYSLEEPER2 ) && !has_trait( trait_HIBERNATE ) ) {
                     // So you can too sleep through noon
-                    if( ( tirednessVal * 1.25 ) < g->m.ambient_light_at( pos() ) && ( get_fatigue() < 10 ||
+                    if( ( tirednessVal * 1.25 ) < g->m.ambient_light_at( bub_pos() ) && ( get_fatigue() < 10 ||
                             one_in( get_fatigue() / 2 ) ) ) {
                         add_msg_if_player( _( "It's too bright to sleep." ) );
                         // Set ourselves up for removal
@@ -1160,21 +1185,21 @@ void Character::hardcoded_effects( effect &it )
                     }
                     // Ursine hibernators would likely do so indoors.  Plants, though, might be in the sun.
                 } else if( has_trait( trait_HIBERNATE ) ) {
-                    if( ( tirednessVal * 5 ) < g->m.ambient_light_at( pos() ) && ( get_fatigue() < 10 ||
+                    if( ( tirednessVal * 5 ) < g->m.ambient_light_at( bub_pos() ) && ( get_fatigue() < 10 ||
                             one_in( get_fatigue() / 2 ) ) ) {
                         add_msg_if_player( _( "It's too bright to sleep." ) );
                         // Set ourselves up for removal
                         it.set_duration( 0_turns );
                         woke_up = true;
                     }
-                } else if( tirednessVal < g->m.ambient_light_at( pos() ) && ( get_fatigue() < 10 ||
+                } else if( tirednessVal < g->m.ambient_light_at( bub_pos() ) && ( get_fatigue() < 10 ||
                            one_in( get_fatigue() / 2 ) ) ) {
                     add_msg_if_player( _( "It's too bright to sleep." ) );
                     // Set ourselves up for removal
                     it.set_duration( 0_turns );
                     woke_up = true;
                 }
-            } else if( has_active_mutation( trait_SEESLEEP ) ) {
+            } else if( has_enchantment_flag( ench_flag_SLEEP_SIGHT ) ) {
                 Creature *hostile_critter = g->is_hostile_very_close();
                 if( hostile_critter != nullptr ) {
                     add_msg_if_player( _( "You see %s approaching!" ),
@@ -1190,12 +1215,12 @@ void Character::hardcoded_effects( effect &it )
             // Cold or heat may wake you up.
             // Player will sleep through cold or heat if fatigued enough
             for( const auto &pr : get_body() ) {
-                int temp_cur = pr.second.get_temp_cur();
-                if( temp_cur < BODYTEMP_VERY_COLD - get_fatigue() / 2 ) {
+                const auto temp_cur = units::to_legacy_bodypart_temp( pr.second.get_temp_cur() );
+                if( temp_cur < units::to_legacy_bodypart_temp( BODYTEMP_VERY_COLD ) - get_fatigue() / 2 ) {
                     if( one_in( 30000 ) ) {
                         add_msg_if_player( _( "You toss and turn trying to keep warm." ) );
                     }
-                    if( temp_cur < BODYTEMP_FREEZING - get_fatigue() / 2 ||
+                    if( temp_cur < units::to_legacy_bodypart_temp( BODYTEMP_FREEZING ) - get_fatigue() / 2 ||
                         one_in( temp_cur * 6 + 30000 ) ) {
                         add_msg_if_player( m_bad, _( "It's too cold to sleep." ) );
                         // Set ourselves up for removal
@@ -1203,11 +1228,11 @@ void Character::hardcoded_effects( effect &it )
                         woke_up = true;
                         break;
                     }
-                } else if( temp_cur > BODYTEMP_VERY_HOT + get_fatigue() / 2 ) {
+                } else if( temp_cur > units::to_legacy_bodypart_temp( BODYTEMP_VERY_HOT ) + get_fatigue() / 2 ) {
                     if( one_in( 30000 ) ) {
                         add_msg_if_player( _( "You toss and turn in the heat." ) );
                     }
-                    if( temp_cur > BODYTEMP_SCORCHING + get_fatigue() / 2 ||
+                    if( temp_cur > units::to_legacy_bodypart_temp( BODYTEMP_SCORCHING ) + get_fatigue() / 2 ||
                         one_in( 90000 - temp_cur ) ) {
                         add_msg_if_player( m_bad, _( "It's too hot to sleep." ) );
                         // Set ourselves up for removal
@@ -1224,8 +1249,8 @@ void Character::hardcoded_effects( effect &it )
                 } else {
                     int max_count = rng( 1, 3 );
                     int count = 0;
-                    for( const tripoint &mp : g->m.points_in_radius( pos(), 1 ) ) {
-                        if( mp == pos() ) {
+                    for( const tripoint_bub_ms &mp : g->m.points_in_radius( bub_pos(), 1 ) ) {
+                        if( mp == bub_pos() ) {
                             continue;
                         }
                         if( g->m.has_flag( "FLAT", mp ) &&
@@ -1250,7 +1275,7 @@ void Character::hardcoded_effects( effect &it )
     } else if( id == effect_alarm_clock ) {
         if( in_sleep_state() ) {
             const bool asleep = has_effect( effect_sleep );
-            if( has_bionic( bio_infolink ) ) {
+            if( has_enchantment_flag( ench_flag_INTERNAL_ALARMCLOCK ) ) {
                 if( dur == 1_turns ) {
                     if( !asleep ) {
                         add_msg_if_player( _( "Your internal chronometer went off and you haven't slept a wink." ) );
@@ -1275,15 +1300,27 @@ void Character::hardcoded_effects( effect &it )
                     it.mod_duration( 10_minutes );
                 } else if( dur == 2_turns ) {
                     // let the sound code handle the wake-up part
-                    sounds::sound( pos(), 16, sounds::sound_t::alarm, _( "beep-beep-beep!" ), false, "tool",
-                                   "alarm_clock" );
+                    sound_event se;
+                    se.origin = bub_pos();
+                    se.volume = 70;
+                    se.category = sounds::sound_t::alarm;
+                    se.description = _( "beep-beep-beep!" );
+                    se.id = "tool";
+                    se.variant = "alarm_clock";
+                    sounds::sound( se );
                 }
             }
         } else {
             if( dur == 1_turns ) {
                 if( is_avatar() && has_alarm_clock() ) {
-                    sounds::sound( pos(), 16, sounds::sound_t::alarm, _( "beep-beep-beep!" ), false, "tool",
-                                   "alarm_clock" );
+                    sound_event se;
+                    se.origin = bub_pos();
+                    se.volume = 70;
+                    se.category = sounds::sound_t::alarm;
+                    se.description = _( "beep-beep-beep!" );
+                    se.id = "tool";
+                    se.variant = "alarm_clock";
+                    sounds::sound( se );
                     const std::string alarm = _( "Your alarm is going off." );
                     g->cancel_activity_or_ignore_query( distraction_type::alert, alarm );
                     add_msg( _( "Your alarm went off." ) );

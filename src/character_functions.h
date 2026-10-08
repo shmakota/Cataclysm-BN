@@ -5,18 +5,18 @@
 #include <optional>
 #include <string>
 
+#include "coordinates.h"
+
 enum body_part : int;
 class player;
 class Character;
 class Creature;
 class item;
-class item_reload_option;
 class item_location;
 class npc;
 class time_duration;
 class vehicle;
 struct damage_unit;
-struct tripoint;
 
 template<typename T>
 class detached_ptr;
@@ -74,7 +74,7 @@ constexpr float FINE_VISION_PERFECT = 1.0f;
  * @{
  */
 float fine_detail_vision_mod( const Character &who );
-float fine_detail_vision_mod( const Character &who, const tripoint &p );
+float fine_detail_vision_mod( const Character &who, const tripoint_bub_ms &p );
 /** @} */
 
 /**
@@ -88,7 +88,7 @@ float fine_detail_vision_mod( const Character &who, const tripoint &p );
  * @{
  */
 bool can_see_fine_details( const Character &who );
-bool can_see_fine_details( const Character &who, const tripoint &p );
+bool can_see_fine_details( const Character &who, const tripoint_bub_ms &p );
 /** @} */
 
 enum class comfort_level {
@@ -106,10 +106,10 @@ struct comfort_response_t {
 };
 
 /** Rate point's ability to serve as a bed. Only takes certain mutations into account, and not fatigue nor stimulants. */
-comfort_response_t base_comfort_value( const Character &who, const tripoint &p );
+comfort_response_t base_comfort_value( const Character &who, const tripoint_bub_ms &p );
 
 /** Rate point's ability to serve as a bed. Takes all mutations, fatigue and stimulants into account. */
-int rate_sleep_spot( const Character &who, const tripoint &p );
+int rate_sleep_spot( const Character &who, const tripoint_bub_ms &p );
 
 /** Checked each turn during "lying_down", returns true if the avatar falls asleep */
 bool roll_can_sleep( Character &who );
@@ -160,7 +160,7 @@ bool try_wield_contents( Character &who, item &container, item *internal_item, b
 bool try_uncanny_dodge( Character &who );
 
 /** Returns an unoccupied, safe adjacent point. */
-std::optional<tripoint> pick_safe_adjacent_tile( const Character &who );
+std::optional<tripoint_bub_ms> pick_safe_adjacent_tile( const Character &who );
 
 /**
  * Check if character's body part is immune to given damage.
@@ -191,31 +191,6 @@ int get_lift_strength_with_helpers( const Character &who );
 /** Returns whether character can lift given value (includes bonus from helpers). */
 bool can_lift_with_helpers( const Character &who, int lift_required );
 
-/**
- * List ammo suitable for given item.
- * @param who Character who looks for ammo
- * @param base Item to select ammo for
- * @param[out] ammo_list Output
- * @param include_empty_mags Whether to include empty magazines
- * @param include_potential Include ammo that can potentially be used, but not right now
- */
-bool list_ammo( const Character &who, item &base, std::vector<item_reload_option> &ammo_list,
-                bool include_empty_mags, bool include_potential );
-
-/**
- * Select suitable ammo with which to reload the item
- * @param who Character who looks for ammo
- * @param base Item to select ammo for
- * @param prompt Force display of the menu even if only one choice
- * @param include_empty_mags Allow selection of empty magazines
- * @param include_potential Include ammo that can potentially be used, but not right now
- */
-item_reload_option select_ammo( const player &who, item &base, bool prompt = false,
-                                bool include_empty_mags = true, bool include_potential = false );
-
-/** Select ammo from the provided options */
-item_reload_option select_ammo( const player &who, item &base,
-                                std::vector<item_reload_option> opts );
 
 /** Returns character's items that are ammo and have the matching ammo type. */
 std::vector<item *> get_ammo_items( const Character &who, const ammotype &at );

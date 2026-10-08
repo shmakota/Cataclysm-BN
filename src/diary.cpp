@@ -1,13 +1,5 @@
 #include "diary.h"
 
-#include <string>
-#include <list>
-#include <iostream>
-#include <fstream>
-#include <algorithm>
-#include <string_view>
-#include <utility>
-
 #include "avatar.h"
 #include "bionics.h"
 #include "calendar.h"
@@ -17,18 +9,26 @@
 #include "fstream_utils.h"
 #include "game.h"
 #include "json.h"
-#include "magic.h"
+#include "magic/magic.h"
 #include "mission.h"
 #include "mtype.h"
 #include "mutation.h"
 #include "output.h"
+#include "overmap/overmap_ui.h"
 #include "path_info.h"
 #include "skill.h"
 #include "string_formatter.h"
 #include "type_id.h"
-#include "overmap_ui.h"
 #include "units.h"
 #include "world.h"
+
+#include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <list>
+#include <string>
+#include <string_view>
+#include <utility>
 
 diary_page::diary_page() = default;
 
@@ -363,8 +363,7 @@ void diary::kill_changes()
             bool flag = true;
             for( const std::string &npc_name : curr_page->npc_kills ) {
 
-                if( ( std::find( prev_npc_kills.begin(), prev_npc_kills.end(),
-                                 npc_name ) == prev_npc_kills.end() ) ) {
+                if( !std::ranges::contains( prev_npc_kills, npc_name ) ) {
                     if( flag ) {
                         add_to_change_list( _( "NPC killed:" ) );
                         flag = false;
@@ -711,7 +710,7 @@ void diary::new_page()
     page->npc_kills = g->get_kill_tracker().npc_kills;
     avatar *u = &get_avatar();
 
-    page->overmap_position_str = overmap_ui::fmt_omt_coords( u->global_omt_location() );
+    page->overmap_position_str = overmap_ui::fmt_omt_coords( u->abs_omt_pos() );
     page->mission_completed = mission::to_uid_vector( u->get_completed_missions() );
     page->mission_active = mission::to_uid_vector( u->get_active_missions() );
     page->mission_failed = mission::to_uid_vector( u->get_failed_missions() );
