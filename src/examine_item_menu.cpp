@@ -18,6 +18,7 @@
 #include "salvage.h"
 #include "ui_manager.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 //#include "handle_action.cpp"
@@ -233,6 +234,56 @@ bool run(
         add_entry( "FAVORITE_REMOVE",
         hint_rating::good, [&]() {
             itm.is_favorite = false;
+            return false;
+        } );
+    }
+
+    const auto can_drop_with_clothing = std::ranges::any_of( you.worn, [&itm]( const auto * worn ) {
+        return worn != &itm;
+    } );
+    if( can_drop_with_clothing || itm.has_var( "DROP_WITH_CLOTHING_TARGET" ) ) {
+        add_entry( "DROP_WITH_CLOTHING", hint_rating::good, [&]() {
+            auto clothing = std::vector<item *> {};
+            for( auto *worn : you.worn ) {
+                if( worn != &itm ) {
+                    clothing.push_back( worn );
+                }
+            }
+
+            uilist menu;
+            menu.text = _( "Always drop this item with which clothing?" );
+            menu.addentry( 0, true, 0, _( "No clothing item" ) );
+            for( size_t index = 0; index < clothing.size(); ++index ) {
+                menu.addentry( static_cast<int>( index + 1 ), true, 0, clothing[index]->tname() );
+            }
+            menu.query();
+            if( menu.ret < 0 ) {
+                return false;
+            }
+            if( menu.ret == 0 ) {
+                itm.erase_var( "DROP_WITH_CLOTHING_TARGET" );
+                itm.erase_var( "DROP_WITH_CLOTHING_NAME" );
+                return false;
+            }
+
+            auto &target = *clothing[static_cast<size_t>( menu.ret - 1 )];
+            auto clothing_id = target.get_var( "DROP_WITH_CLOTHING_ID", 0 );
+            const auto clothing_id_in_use = std::ranges::any_of( you.worn,
+            [&target, clothing_id]( const auto * worn ) {
+                return worn != &target && worn->get_var( "DROP_WITH_CLOTHING_ID", 0 ) == clothing_id;
+            } );
+            if( clothing_id <= 0 || clothing_id_in_use ) {
+                auto next_id = 1;
+                you.visit_items( [&next_id]( item * candidate ) {
+                    next_id = std::max( next_id, candidate->get_var( "DROP_WITH_CLOTHING_ID", 0 ) + 1 );
+                    next_id = std::max( next_id, candidate->get_var( "DROP_WITH_CLOTHING_TARGET", 0 ) + 1 );
+                    return VisitResponse::NEXT;
+                } );
+                clothing_id = next_id;
+                target.set_var( "DROP_WITH_CLOTHING_ID", clothing_id );
+            }
+            itm.set_var( "DROP_WITH_CLOTHING_TARGET", clothing_id );
+            itm.set_var( "DROP_WITH_CLOTHING_NAME", target.tname() );
             return false;
         } );
     }
