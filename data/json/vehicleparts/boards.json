@@ -556,8 +556,8 @@
       { "direction": "vertical_right", "symbol": "j" },
       { "direction": "vertical_2", "symbol": "H" }
     ]
-  }
-  ,{
+  },
+  {
     "id": "rc_car_body",
     "type": "vehicle_part",
     "name": { "str": "RC car body" },
