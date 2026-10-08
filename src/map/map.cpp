@@ -459,8 +459,18 @@ auto map::resize(int new_mapsize) -> void {
 }
 
 auto map::bind_dimension(const dimension_id& dim) -> void {
+    const auto changed = bound_dimension_ != dim;
     bound_dimension_ = dim;
     refresh_active_submap_view();
+    if (changed) {
+        // Cached vehicle pointers belong to the old buffer, which may now be unloaded.
+        dirty_vehicle_list.clear();
+        for (auto z = -OVERMAP_DEPTH; z <= OVERMAP_HEIGHT; ++z) { clear_vehicle_list(z); }
+        for (const auto p : bubble_submaps()) {
+            update_vehicle_list(get_submap_at(project_to<coords::ms>(p)), p.z());
+        }
+        reset_vehicle_cache();
+    }
 }
 
 auto map::refresh_active_submap_view() -> void {
@@ -2119,6 +2129,8 @@ auto map::displace_vehicle(vehicle& veh, const tripoint_rel_ms& dp) -> bool {
     if (remote) {
         // Has to be after update_map or coordinates won't be valid
         g->setremoteveh(&veh);
+        const auto cam_parts = veh.get_avail_parts("REMOTE_CONTROLS");
+        if (!cam_parts.empty()) { g->u.view_offset = cam_parts.begin()->pos() - g->u.bub_pos(); }
     }
     mark_vehicle_moved();
     return true;

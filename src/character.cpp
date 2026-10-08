@@ -9,6 +9,7 @@
 #include "avatar_action.h"
 #include "bionics.h"
 #include "bodypart.h"
+#include "cached_options.h"
 #include "calendar.h"
 #include "cata_utility.h"
 #include "catacharset.h"
@@ -1661,7 +1662,7 @@ bool Character::can_run()
     return ( get_stamina() > get_stamina_max() * 0.1f ) && get_working_leg_count() >= 2;
 }
 
-void static try_remove_downed( Character &c )
+void Character::try_remove_downed( Character &c )
 {
 
     /** @EFFECT_DEX increases chance to stand up when knocked down */
@@ -1954,6 +1955,17 @@ character_movemode Character::get_movement_mode() const
 bool Character::movement_mode_is( const character_movemode mode ) const
 {
     return move_mode == mode;
+}
+
+// Change movement mode without messages, normal movecost, or potential loops from calling Character::try_remove_downed
+void Character::force_movement_mode( character_movemode new_mode )
+{
+    if( move_mode == CMM_CROUCH || new_mode == CMM_CROUCH ||
+        move_mode == CMM_PRONE || new_mode == CMM_PRONE ) {
+        // crouching and prone affect visibility
+        get_map().set_seen_cache_dirty( bub_pos().z() );
+    }
+    move_mode = new_mode;
 }
 
 void Character::expose_to_disease( const diseasetype_id dis_type )
@@ -5190,6 +5202,39 @@ void Character::mod_int_bonus( int nint )
     int_cur = std::max( 0, int_max + int_bonus );
 }
 
+void Character::mod_str_bonus( int nstr, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_str_bonus( nstr );
+}
+void Character::mod_dex_bonus( int ndex, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_dex_bonus( ndex );
+}
+void Character::mod_per_bonus( int nper, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_per_bonus( nper );
+}
+void Character::mod_int_bonus( int nint, bool force_on_tick )
+{
+    if( force_on_tick && g->u.in_skip_state &&
+        !action_time_scale::once_every_this_tick( activity_skip_stat_update_ticks ) ) {
+        return;
+    }
+    mod_int_bonus( nint );
+}
+
 void Character::print_health() const
 {
     if( !is_player() ) {
@@ -7285,7 +7330,7 @@ nc_color Character::basic_symbol_color() const
     if( move_mode == CMM_RUN ) {
         return c_yellow;
     }
-    if( move_mode == CMM_CROUCH ) {
+    if( move_mode == CMM_CROUCH || move_mode == CMM_PRONE ) {
         return c_light_gray;
     }
     return c_white;
@@ -7372,6 +7417,20 @@ bool Character::is_immune_field( const field_type_id &fid ) const
                get_armor_type( DT_ACID, bodypart_id( "foot_r" ) ) >= 5 &&
                get_armor_type( DT_ACID, bodypart_id( "leg_l" ) ) >= 5 &&
                get_armor_type( DT_ACID, bodypart_id( "leg_r" ) ) >= 5;
+    }
+    // Check for if field has downed effect which means slipping
+    static const auto flag_NOSLIP = flag_id( "NOSLIP" );
+    static const auto ench_flag_NOSLIP = enchantment_flag_id( "NOSLIP" );
+    for( const field_intensity_level &lvl : ft.intensity_levels ) {
+        for( const field_effect &fe : lvl.field_effects ) {
+            if( fe.id == effect_downed ) {
+                if( has_enchantment_flag( ench_flag_NOSLIP )
+                    || worn_with_flag( flag_NOSLIP, body_part_foot_l )
+                    || worn_with_flag( flag_NOSLIP, body_part_foot_r ) ) {
+                    return true;
+                }
+            }
+        }
     }
     // If we haven't found immunity yet fall up to the next level
     return Creature::is_immune_field( fid );
