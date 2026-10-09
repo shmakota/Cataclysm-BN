@@ -3145,11 +3145,14 @@ float monster::fall_damage_mod() const
     return 0.0f;
 }
 
-int monster::impact( const int force, const tripoint_bub_ms &p )
+int monster::impact( int force, const tripoint_bub_ms &p )
 {
     if( force <= 0 ) {
         return force;
     }
+
+    // A zombie's only body part is torso, so multiply damage to it by 6 for parity with character::impact()
+    force *= 6;
 
     const float mod = fall_damage_mod();
     int total_dealt = 0;
@@ -3159,7 +3162,7 @@ int monster::impact( const int force, const tripoint_bub_ms &p )
         total_dealt += 10 * mod;
     }
 
-    const int bash_damage = std::max( 0.0f, force * mod - get_armor_bash( bodypart_id( "torso" ) ) );
+    const int bash_damage = std::max( 0.0f, force * mod - ( get_armor_bash( bodypart_id( "torso" ) ) / 2 ) );
     apply_damage( nullptr, bodypart_id( "torso" ), bash_damage );
     total_dealt += force * mod;
 
