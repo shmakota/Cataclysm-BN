@@ -187,7 +187,8 @@
     "color": "white",
     "covers": [ "torso" ],
     "coverage": 15,
-    "encumbrance": 1,
+    "encumbrance": 0,
+    "max_encumbrance": 1,
     "warmth": 5,
     "material_thickness": 1,
     "flags": [ "VARSIZE", "SKINTIGHT", "POWERARMOR_COMPATIBLE", "ALLOWS_WINGS" ]
