@@ -51,6 +51,7 @@
 #include <set>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 /** The maximum distance from the screen edge, to snap a window to it */
@@ -97,6 +98,13 @@ class selection_column_preset : public inventory_selector_preset
 {
     public:
         selection_column_preset() = default;
+
+        auto sort_compare( const inventory_entry &lhs, const inventory_entry &rhs ) const -> bool override {
+            if( lhs.drop_order != rhs.drop_order ) {
+                return lhs.drop_order < rhs.drop_order;
+            }
+            return inventory_selector_preset::sort_compare( lhs, rhs );
+        }
 
         std::string get_caption( const inventory_entry &entry ) const override {
             std::string res;
@@ -1132,10 +1140,12 @@ void selection_column::on_change( const inventory_entry &entry )
         add_entry( my_entry );
         last_changed = my_entry;
     } else if( iter->chosen_count != my_entry.chosen_count ||
-               iter->automatic_drop_count != my_entry.automatic_drop_count ) {
+               iter->automatic_drop_count != my_entry.automatic_drop_count ||
+               iter->drop_order != my_entry.drop_order ) {
         if( my_entry.chosen_count > 0 || my_entry.automatic_drop_count > 0 ) {
             iter->chosen_count = my_entry.chosen_count;
             iter->automatic_drop_count = my_entry.automatic_drop_count;
+            iter->drop_order = my_entry.drop_order;
             expand_to_fit( my_entry );
         } else {
             iter = entries.erase( iter );
@@ -2635,6 +2645,15 @@ auto inventory_drop_selector::update_drop_preview() -> void
     predicted_counts = std::move( preview.counts );
     preview_dirty = false;
 
+    auto drop_order = std::unordered_map<const item *, size_t> {};
+    for( const auto &drop : predicted_drops ) {
+        auto *target = &*drop.loc;
+        if( !u.is_worn( *target ) && !u.is_wielding( *target ) ) {
+            target = u.inv_const_stack( u.get_item_position( target ) ).front();
+        }
+        drop_order.try_emplace( target, drop_order.size() );
+    }
+
     for( auto *column : get_all_columns() ) {
         if( column == selection_col.get() ) {
             continue;
@@ -2644,9 +2663,14 @@ auto inventory_drop_selector::update_drop_preview() -> void
             const auto total = found == predicted_counts.end() ? size_t{ 0 } :
                                static_cast<size_t>( found->second );
             entry->automatic_drop_count = total > entry->chosen_count ? total - entry->chosen_count : 0;
+            const auto order = drop_order.find( entry->item_stack_on_character() );
+            entry->drop_order = order == drop_order.end() ? std::nullopt :
+                                std::optional<size_t> { order->second };
             on_change( *entry );
         }
     }
+    // Redraw does not prepare paging.  Sort after the entire selection batch has been updated.
+    selection_col->prepare_paging( get_filter() );
 }
 
 void inventory_drop_selector::set_chosen_count( inventory_entry &entry, size_t count )
