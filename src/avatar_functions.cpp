@@ -2,7 +2,6 @@
 
 #include "activity_handlers.h"
 #include "avatar.h"
-#include "catacharset.h"
 #include "character_functions.h"
 #include "consumption.h"
 #include "fault.h"
@@ -586,44 +585,6 @@ void use_item( avatar &you, item &used )
     }
 
     you.last_item = used.typeId();
-
-    const auto contents = used.contents.all_items_top();
-    if( used.is_container() && contents.size() > 1 ) {
-        auto actionable_contents = std::vector<item *>();
-        for( item *contained : contents ) {
-            if( you.can_consume_as_is( *contained ) || contained->type->has_use() ||
-                contained->has_flag( flag_SPLINT ) ) {
-                actionable_contents.push_back( contained );
-            }
-        }
-        if( actionable_contents.size() > 1 ) {
-            auto menu = uilist();
-            menu.text = string_format( _( "Select an item in %s" ), used.tname() );
-            auto action_names = std::vector<std::string>();
-            auto max_name_width = 0;
-            for( const item *contained : actionable_contents ) {
-                const auto &uses = contained->type->use_methods;
-                action_names.push_back( uses.size() == 1 ? uses.begin()->second.get_name() :
-                                        uses.size() > 1 ? _( "…" ) :
-                                        you.can_consume_as_is( *contained ) ? _( "Consume" ) : _( "Use" ) );
-                max_name_width = std::max( max_name_width,
-                                           utf8_width( contained->display_name(), true ) );
-            }
-            auto entry = 0;
-            for( const item *contained : actionable_contents ) {
-                const auto item_name = contained->display_name();
-                const auto spaces = max_name_width - utf8_width( item_name, true ) + 4;
-                menu.addentry( entry, true, -1, string_format( "%s%s<color_light_green>%s</color>",
-                               item_name, std::string( spaces, ' ' ), action_names[entry] ) );
-                ++entry;
-            }
-            menu.query();
-            if( menu.ret >= 0 && static_cast<size_t>( menu.ret ) < actionable_contents.size() ) {
-                use_item( you, *actionable_contents[menu.ret] );
-            }
-            return;
-        }
-    }
 
     if( used.is_tool() ) {
         if( !used.type->has_use() ) {
