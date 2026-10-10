@@ -7,9 +7,7 @@ artifact_compass.var_next_drain = "artifact_compass_next_drain"
 artifact_compass.scan_radius = 60
 artifact_compass.drain_interval_turns = 20
 
-artifact_compass.is_compass_on = function(item)
-  return item:get_var_str(artifact_compass.var_enabled, "0") == "1"
-end
+artifact_compass.is_compass_on = function(item) return item:get_var_str(artifact_compass.var_enabled, "0") == "1" end
 
 artifact_compass.set_compass_state = function(item, on)
   if on then
@@ -25,18 +23,12 @@ artifact_compass.use = function(who, item, pos)
     artifact_compass.set_compass_state(item, false)
     item:set_var_num(artifact_compass.var_next_beep, 0)
     item:set_var_num(artifact_compass.var_next_drain, 0)
-    gapi.add_msg(
-      MsgType.neutral,
-      string.format(locale.gettext("You switch off the %s."), item_name)
-    )
+    gapi.add_msg(MsgType.neutral, string.format(locale.gettext("You switch off the %s."), item_name))
   else
     local now = (gapi.current_turn() - gapi.turn_zero()):to_turns()
     artifact_compass.set_compass_state(item, true)
     item:set_var_num(artifact_compass.var_next_drain, now + artifact_compass.drain_interval_turns)
-    gapi.add_msg(
-      MsgType.neutral,
-      string.format(locale.gettext("You switch on the %s."), item_name)
-    )
+    gapi.add_msg(MsgType.neutral, string.format(locale.gettext("You switch on the %s."), item_name))
   end
   return 0
 end
@@ -70,9 +62,7 @@ artifact_compass.find_nearest_artifact_distance = function(map, origin)
             local dist = coords.rl_dist(origin, pos)
             if nearest == nil or dist < nearest then
               nearest = dist
-              if nearest <= 1 then
-                return nearest
-              end
+              if nearest <= 1 then return nearest end
             end
           end
         end
@@ -95,20 +85,14 @@ artifact_compass.get_beep_interval_turns = function(distance)
 end
 
 artifact_compass.get_beep_message = function(distance)
-  if distance <= 6 then
-    return locale.gettext("BEEP-BEEP-BEEP")
-  end
-  if distance <= 15 then
-    return locale.gettext("BEEP-BEEP")
-  end
+  if distance <= 6 then return locale.gettext("BEEP-BEEP-BEEP") end
+  if distance <= 15 then return locale.gettext("BEEP-BEEP") end
   return locale.gettext("BEEP")
 end
 
 artifact_compass.drain_compass = function(item, now, pos_ms)
   local next_drain = item:get_var_num(artifact_compass.var_next_drain, 0)
-  if now < next_drain then
-    return true
-  end
+  if now < next_drain then return true end
 
   if item:has_infinite_charges() then
     item:set_var_num(artifact_compass.var_next_drain, now + artifact_compass.drain_interval_turns)
@@ -147,28 +131,20 @@ end
 artifact_compass.on_every_x = function()
   local who = gapi.get_avatar()
   local active = artifact_compass.get_active_compasses(who)
-  if #active == 0 then
-    return
-  end
+  if #active == 0 then return end
 
   local now = (gapi.current_turn() - gapi.turn_zero()):to_turns()
   local pos_ms = who:get_pos_ms()
   local drained_active = {}
   for _, item in pairs(active) do
-    if artifact_compass.drain_compass(item, now, pos_ms) then
-      table.insert(drained_active, item)
-    end
+    if artifact_compass.drain_compass(item, now, pos_ms) then table.insert(drained_active, item) end
   end
-  if #drained_active == 0 then
-    return
-  end
+  if #drained_active == 0 then return end
 
   local map = gapi.get_map()
   local origin = who:get_pos_ms()
   local nearest = artifact_compass.find_nearest_artifact_distance(map, origin)
-  if nearest == nil then
-    return
-  end
+  if nearest == nil then return end
 
   local interval = artifact_compass.get_beep_interval_turns(nearest)
   local message = artifact_compass.get_beep_message(nearest)
@@ -176,10 +152,7 @@ artifact_compass.on_every_x = function()
     local next_beep = item:get_var_num(artifact_compass.var_next_beep, 0)
     if now >= next_beep then
       local item_name = item:tname(1, false, 0)
-      gapi.add_msg(
-        MsgType.neutral,
-        string.format(locale.gettext("You %s emits a %s!"), item_name, message)
-      )
+      gapi.add_msg(MsgType.neutral, string.format(locale.gettext("You %s emits a %s!"), item_name, message))
       item:set_var_num(artifact_compass.var_next_beep, now + interval)
     end
   end
