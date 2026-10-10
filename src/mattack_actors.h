@@ -9,10 +9,11 @@
 
 #include "bodypart.h"
 #include "damage.h"
-#include "magic.h"
+#include "magic/magic.h"
 #include "mattack_common.h"
 #include "translations.h"
 #include "type_id.h"
+#include "units.h"
 #include "weighted_list.h"
 
 class Creature;
@@ -131,8 +132,8 @@ class gun_actor : public mattack_actor
         // Item type of the gun we're using
         itype_id gun_type;
 
-        /** Specific ammo type to use or for gun default if unspecified */
-        itype_id ammo_type = itype_id::NULL_ID();
+        /** Specific ammo item ids to use, with the first entry as the default loaded ammo */
+        std::vector<itype_id> ammo_types;
 
         /*@{*/
         /** Balanced against player. If fake_skills unspecified defaults to GUN 4, WEAPON 8 */
@@ -176,7 +177,7 @@ class gun_actor : public mattack_actor
         int targeting_timeout_extend = 3; /** Increase timeout by this many turns after each shot */
 
         std::string targeting_sound;
-        int targeting_volume = 6; /** If set to zero don't emit any targeting sounds */
+        units::sound targeting_volume = 6_dB; /** If set to zero don't emit any targeting sounds */
 
         bool laser_lock = false; /** Does switching between targets incur further targeting penalty */
         bool no_crits =
@@ -186,7 +187,7 @@ class gun_actor : public mattack_actor
         /** If true then disable this attack completely if not brightly lit */
         bool require_sunlight = false;
         bool try_target( monster &z, Creature &target ) const;
-        void shoot( monster &z, const tripoint &target, const gun_mode_id &mode,
+        void shoot( monster &z, const tripoint_bub_ms &target, const gun_mode_id &mode,
                     int inital_recoil = 0 ) const;
         int get_max_range() const;
 
@@ -198,4 +199,26 @@ class gun_actor : public mattack_actor
         std::unique_ptr<mattack_actor> clone() const override;
 };
 
+class deployer_actor : public mattack_actor
+{
+    public:
+        struct deployer_helper_struct {
+            // Print this on deployment
+            std::string message;
+            // Chance from 0 to 100 of deployment
+            int chance = 1;
+            // At what percent of ammo remaining should this be considered
+            double ammo_percentage = 1;
+            // At what range can this be deployed ( 0 being in melee )
+            int range = 0;
 
+        };
+        std::map<itype_id, deployer_helper_struct> grenades;
+
+        deployer_actor() = default;
+        ~deployer_actor() override = default;
+
+        void load_internal( const JsonObject &obj, const std::string &src ) override;
+        bool call( monster & ) const override;
+        std::unique_ptr<mattack_actor> clone() const override;
+};

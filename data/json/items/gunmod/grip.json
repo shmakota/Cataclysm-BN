@@ -1,5 +1,26 @@
 [
   {
+    "id": "fluted_grip",
+    "type": "GUNMOD",
+    "name": { "str": "fluted large grip" },
+    "description": "Ring-like patterns made of rubber grooved into the thick handle of a greatbow. Helps maintain a stable grip and dampen vibrations with no downsides. Irremovable, as the grip of the bow must be carved in to install.",
+    "weight": "5 g",
+    "volume": "100 ml",
+    "integral_volume": "0 ml",
+    "price": "10 USD",
+    "price_postapoc": "20 cent",
+    "material": [ "plastic" ],
+    "symbol": ":",
+    "color": "dark_gray",
+    "location": "grip",
+    "mod_target_category": [ [ "BOWS" ] ],
+    "install_time": "20 m",
+    "handling_modifier": 3,
+    "dispersion_modifier": -25,
+    "loudness_modifier": -2,
+    "flags": [ "IRREMOVABLE" ]
+  },
+  {
     "id": "light_grip",
     "type": "GUNMOD",
     "name": { "str": "lightweight replacement furniture" },
@@ -92,5 +113,32 @@
     ],
     "handling_modifier": -10,
     "dispersion_modifier": 50
+  },
+  {
+    "id": "carbon_grip",
+    "type": "GUNMOD",
+    "name": { "str": "carbon fiber furniture" },
+    "description": "A set of carbon fiber replacement grips and furniture, 3D-printed for maximum weight savings.  Significantly lighter than polymer furniture at the cost of reduced handling and melee effectiveness.",
+    "weight": "140 g",
+    "volume": "250 ml",
+    "integral_volume": "0 ml",
+    "price": "800 USD",
+    "price_postapoc": "12 USD",
+    "material": [ "carbon_fiber" ],
+    "symbol": ":",
+    "color": "dark_gray",
+    "location": "grip",
+    "mod_target_category": [
+      [ "PISTOLS" ],
+      [ "REVOLVERS" ],
+      [ "SUBMACHINE_GUNS" ],
+      [ "RIFLES" ],
+      [ "MACHINE_GUNS" ],
+      [ "GATLING_GUNS" ],
+      [ "SHOTGUNS" ]
+    ],
+    "handling_modifier": -5,
+    "weight_multiplier": 0.7,
+    "flags": [ "REDUCED_BASHING" ]
   }
 ]

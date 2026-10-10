@@ -1,25 +1,25 @@
 #include "npctrade.h"
 
-#include <algorithm>
-#include <memory>
-#include <ranges>
-#include <string>
-#include <vector>
-
 #include "avatar.h"
 #include "faction.h"
 #include "game.h"
 #include "item.h"
 #include "item_category.h"
-#include "map_selector.h"
+#include "map/map_selector.h"
 #include "npc.h"
 #include "player.h"
 #include "skill.h"
 #include "string_utils.h"
 #include "trade_win.h"
 #include "type_id.h"
-#include "vehicle_selector.h"
+#include "vehicle/vehicle_selector.h"
 #include "visitable.h"
+
+#include <algorithm>
+#include <memory>
+#include <ranges>
+#include <string>
+#include <vector>
 
 static const skill_id skill_barter( "barter" );
 static const flag_id json_flag_NO_UNWIELD( "NO_UNWIELD" );
@@ -41,8 +41,9 @@ void npc_trading::transfer_items( std::vector<item_pricing> &stuff, Character &,
 
             receiver.i_add( std::move( to_give ) );
         } else {
+            const auto count = npc_gives ? ip.u_has : ip.npc_has;
             gift.set_owner( receiver );
-            std::ranges::for_each( ip.locs, [&]( auto * it ) {
+            std::ranges::for_each( std::views::take( ip.locs, count ), [&]( auto * it ) {
                 receiver.i_add( it->detach() );
             } );
         }
@@ -149,7 +150,7 @@ std::vector<item_pricing> npc_trading::init_buying( Character &buyer, Character 
     //nearby items owned by the NPC will only show up in
     //the trade window if the NPC is also a shopkeeper
     if( np.is_shopkeeper() ) {
-        std::ranges::for_each( map_selector( seller.pos(), PICKUP_RANGE ),
+        std::ranges::for_each( map_selector( seller.bub_pos(), PICKUP_RANGE ),
         [&]( auto & cursor ) {
             cursor.visit_items( [&check_item]( item * node ) {
                 check_item( {node}, 1 );
@@ -158,7 +159,7 @@ std::vector<item_pricing> npc_trading::init_buying( Character &buyer, Character 
         } );
     }
 
-    std::ranges::for_each( vehicle_selector( seller.pos(), 1 ), [&]( auto & cursor ) {
+    std::ranges::for_each( vehicle_selector( seller.bub_pos(), 1 ), [&]( auto & cursor ) {
         cursor.visit_items( [&check_item]( item * node ) {
             check_item( {node}, 1 );
             return VisitResponse::SKIP;
@@ -261,6 +262,7 @@ auto npc_trading::trade( npc &np, int cost, const std::string &deal ) -> bool
     }
     //np.drop_items( np.weight_carried() - np.weight_capacity(),
     //               np.volume_carried() - np.volume_capacity() );
+    // skip drop invalid inventory for merchants to avoid item dump on floor
     np.drop_invalid_inventory();
 
     auto state = trade_state{};

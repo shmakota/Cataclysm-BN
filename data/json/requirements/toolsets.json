@@ -1,5 +1,18 @@
 [
   {
+    "id": "fluid_grid_assign",
+    "type": "requirement",
+    "//": "Assigning a fluid-grid tank or fixture uses a rubber hose and requires a plumbing kit.",
+    "tools": [ [ [ "plumber_toolkit", -1 ] ] ],
+    "components": [ [ [ "hose", 1 ] ] ]
+  },
+  {
+    "id": "fluid_grid_unassign",
+    "type": "requirement",
+    "//": "Unassigning a fluid-grid tank or fixture requires a plumbing kit.",
+    "tools": [ [ [ "plumber_toolkit", -1 ] ] ]
+  },
+  {
     "id": "3d_printing_standard",
     "type": "requirement",
     "//": "For working with an printing items made from plastic using a 3D printer, per 50 grams material.",
@@ -16,9 +29,8 @@
   {
     "id": "magazine_standard",
     "type": "requirement",
-    "//": "Forging of steel items (per steel chunk), charcoal forge is already a substitute for forge",
-    "qualities": [ { "id": "ANVIL", "level": 2 } ],
-    "tools": [ [ [ "forging_standard", 2, "LIST" ] ], [ [ "large_repairkit", 5 ] ] ]
+    "//": "Forging of steel firearm magazines",
+    "tools": [ [ [ "blacksmithing_standard", 2, "LIST" ] ], [ [ "small_repairkit", 10 ], [ "large_repairkit", 5 ] ] ]
   },
   {
     "id": "shot_forming",
@@ -110,6 +122,13 @@
     "type": "requirement",
     "//": "Crafting or repair of fabric items",
     "qualities": [ { "id": "SEW", "level": 1 }, { "id": "CUT", "level": 1 } ],
+    "components": [ [ [ "filament", 1, "LIST" ] ] ]
+  },
+  {
+    "id": "sewing_advanced",
+    "type": "requirement",
+    "//": "Steel sewing needle and awl, for working with tougher materials like leather and kevlar",
+    "qualities": [ { "id": "SEW", "level": 3 }, { "id": "LEATHER_AWL", "level": 2 }, { "id": "CUT", "level": 1 } ],
     "components": [ [ [ "filament", 1, "LIST" ] ] ]
   },
   {

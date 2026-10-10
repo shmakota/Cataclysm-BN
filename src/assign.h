@@ -17,7 +17,7 @@
 #include "units.h"
 #include "units_serde.h"
 #include "concepts_utility.h"
-
+#include "data_vars.h"
 namespace detail
 {
 template<typename ...T>
@@ -342,6 +342,13 @@ bool assign( const JsonObject &jo,
              const units::energy lo = units::energy_min,
              const units::energy hi = units::energy_max );
 
+auto assign( const JsonObject &jo,
+             const std::string &name,
+             units::sound &val,
+             bool strict = false,
+             const units::sound lo = units::sound_min,
+             const units::sound hi = units::sound_max ) -> bool;
+
 // Kinda hacky way to avoid allowing multiplying temperature
 // For example, in 10 * 0 Fahrenheit, 10 * 0 Celsius - what's the expected result of those?
 template < typename lvt, typename ut, typename s>
@@ -422,6 +429,11 @@ bool assign( const JsonObject &jo,
 bool assign( const JsonObject &jo,
              const std::string &name,
              nc_color &val,
+             const bool strict = false );
+
+bool assign( const JsonObject &jo,
+             const std::string &name,
+             data_vars::data_set &val,
              const bool strict = false );
 
 class time_duration;

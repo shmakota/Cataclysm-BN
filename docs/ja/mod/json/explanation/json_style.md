@@ -13,7 +13,7 @@ sidebar:
 DDA は独自のJSONパーサーを記述しました。それは `tools/format/format.cpp` に存在し、
 `src/json.cpp`を利用してJSONをパースし、出力します。
 
-これは、既存のJSONフォーマッタ (例: `deno fmt`) の使用を不可能にするため、最適な解決策ではありませんが、[前回の試み](https://github.com/cataclysmbnteam/Cataclysm-BN/pull/3118)では、不利益が利益を上回ることが証明されました。
+これは、既存のJSONフォーマッタ (例: `deno fmt`) の使用を不可能にするため、最適な解決策ではありませんが、[前回の試み](https://github.com/cataclysmbn/Cataclysm-BN/pull/3118)では、不利益が利益を上回ることが証明されました。
 
 ## JSONの記述例
 
@@ -52,8 +52,7 @@ DDA は独自のJSONパーサーを記述しました。それは `tools/format/
 
 ## 整形ツール
 
-整形ツールは、Makefileを介して、または (`make style-json`でビルドされた)
-`tools/format/json_formatter.cgi`として直接、あるいはCGIとして
+整形ツールは、CMake の `style-json` ターゲット、`tools/format/json_formatter.cgi` として直接、あるいはCGIとして
 http://dev.narc.ro/cataclysm/format.html から呼び出すことができます。
 
 Visual Studioソリューションを使用している場合、プロジェクト内のすべてのJSONを整形するためのコマンドをVisual Studioに設定できます。
@@ -79,4 +78,4 @@ Visual Studioソリューションを使用している場合、プロジェク�
 
 ### *nix環境の場合
 
-メインのリポジトリディレクトリで `make style-json` を実行します。
+メインのリポジトリディレクトリで `just fmt-json` を実行します。`just` が利用できない場合は、代わりに `build-scripts/format-json.sh` を実行します。

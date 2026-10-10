@@ -14,6 +14,7 @@
 #include "filesystem.h"
 #include "fstream_utils.h"
 #include "json.h"
+#include "options.h"
 #include "path_info.h"
 #include "string_formatter.h"
 #include "string_id.h"
@@ -139,6 +140,15 @@ std::vector<mod_id> mod_manager::all_mods() const
     return result;
 }
 
+std::vector<MOD_INFORMATION> mod_manager::all_mod_objects() const
+{
+    std::vector<MOD_INFORMATION> result;
+    std::transform( mod_map.begin(), mod_map.end(),
+    std::back_inserter( result ), []( const decltype( mod_manager::mod_map )::value_type & pair ) {
+        return pair.second;
+    } );
+    return result;
+}
 dependency_tree &mod_manager::get_tree()
 {
     return *tree;
@@ -290,6 +300,7 @@ std::optional<MOD_INFORMATION> load_modfile( const JsonObject &jo, const std::st
     assign( jo, "license", modfile.license );
     assign( jo, "authors", modfile.authors );
     assign( jo, "maintainers", modfile.maintainers );
+    assign( jo, "loading_images", modfile.loading_images );
     assign( jo, "version", modfile.version );
     assign( jo, "lua_api_version", modfile.lua_api_version );
     assign( jo, "dependencies", modfile.dependencies );
@@ -312,6 +323,10 @@ std::optional<MOD_INFORMATION> load_modfile( const JsonObject &jo, const std::st
         }
     }
 
+    if( jo.has_string( "options_path" ) ) {
+        modfile.load_options = true;
+        modfile.options_path = modfile.path + "/" + jo.get_string( "options_path" );
+    }
     return { std::move( modfile ) };
 }
 
@@ -457,7 +472,7 @@ void mod_manager::load_mods_list( WORLDINFO *world ) const
     read_from_file_json( get_mods_list_file( world ), [&]( JsonIn & jsin ) {
         for( const std::string line : jsin.get_array() ) {
             const mod_id mod( line );
-            if( std::find( amo.begin(), amo.end(), mod ) != amo.end() ) {
+            if( std::ranges::contains( amo, mod ) ) {
                 continue;
             }
             const auto iter = mod_replacements.find( mod );

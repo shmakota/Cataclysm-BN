@@ -1,14 +1,18 @@
 require("docgen_common")
 
+---@param typename string?
+---@param membername string?
 local slug_for = function(typename, membername)
-  local typename = string.gsub(tostring(typename), "%s", "")
+  local clean_typename = string.gsub(tostring(typename), "%s", "")
   if membername == nil then
-    return ("#sol::%s"):format(typename)
+    return ("#sol::%s"):format(clean_typename)
   else
-    return ("#sol::%s::%s"):format(typename, membername)
+    return ("#sol::%s::%s"):format(clean_typename, membername)
   end
 end
 
+---@param tbl table<string|integer, any>
+---@param key string
 local table_contains = function(tbl, key)
   for k, v in pairs(tbl) do
     if tostring(k) == tostring(key) then return true end
@@ -16,6 +20,8 @@ local table_contains = function(tbl, key)
   return false
 end
 
+---@param str_ string
+---@param blockquote boolean
 local linkify_types = function(str_, blockquote)
   local dt = catadoc
   local types_table = dt["#types"]
@@ -31,14 +37,19 @@ local linkify_types = function(str_, blockquote)
       str = string.gsub(str, "<", "&lt;")
       str = string.gsub(str, ">", "&gt;")
     else
-      str = string.gsub(str, "[%a%d]+", function(k)
-        if table_contains(types_table, k) or table_contains(enums_table, k) then
-          local sub = ("[%s](#sol::%s)"):format(k, k)
-          if blockquote then sub = "<code>" .. sub .. "</code>" end
-          return sub
+      str = string.gsub(
+        str,
+        "[%a%d]+",
+        ---@param k string
+        function(k)
+          if table_contains(types_table, k) or table_contains(enums_table, k) then
+            local sub = ("[%s](#sol::%s)"):format(k, k)
+            if blockquote then sub = "<code>" .. sub .. "</code>" end
+            return sub
+          end
+          return k
         end
-        return k
-      end)
+      )
     end
     ret = ret .. str
   end
@@ -46,29 +57,36 @@ local linkify_types = function(str_, blockquote)
   return ret
 end
 
+---@param arg_list string[]
+---@param meta string?
 local fmt_arg_list = function(arg_list, meta)
   local ret = " "
-  local arg_list = remove_hidden_args(arg_list)
-  if #arg_list == 0 then return ret end
+  local visible_arg_list = remove_hidden_args(arg_list)
+  if #visible_arg_list == 0 then return ret end
 
-  local meta = get_meta_params(meta)
+  local meta_params = get_meta_param_specs(meta)
   local state
-  for i, v in pairs(arg_list) do
-    state, name = next(meta, state)
+  local param_spec
+  for i, value in pairs(visible_arg_list) do
+    state, param_spec = next(meta_params, state)
     if state ~= nil then
-      arg_list[i] = name .. ": " .. v
+      visible_arg_list[i] = param_spec.name .. ": " .. (param_spec.type or value)
     else
-      arg_list[i] = v
+      visible_arg_list[i] = value
     end
   end
 
-  ret = ret .. table.concat(arg_list, ", ")
+  ret = ret .. table.concat(visible_arg_list, ", ")
   return ret .. " "
 end
 
+---@param typename string
+---@param ctor string[]
 local fmt_one_constructor =
   function(typename, ctor) return typename .. ".new(" .. linkify_types(fmt_arg_list(ctor), false) .. ")" end
 
+---@param typename string
+---@param ctors string[][]
 local fmt_constructors = function(typename, ctors)
   if #ctors == 0 then
     return "  No constructors.\n"
@@ -81,6 +99,8 @@ local fmt_constructors = function(typename, ctors)
   end
 end
 
+---@param typename string?
+---@param member LuaDocVariableMember
 local function fmt_one_member_var(typename, member)
   local ret = ""
   local lua_rv = map_cpp_type_to_lua(member.vartype, true)
@@ -94,6 +114,8 @@ local function fmt_one_member_var(typename, member)
   return ret
 end
 
+---@param typename string?
+---@param member LuaDocFunctionMember
 local function fmt_one_member_func(typename, member)
   local ret = ""
   local name, state
@@ -121,38 +143,53 @@ local function fmt_one_member_func(typename, member)
   return ret
 end
 
+---@param typename string?
+---@param member LuaDocMember
 local fmt_one_member = function(typename, member)
   local ret = ("#### %s {%s}\n"):format(member.name, slug_for(typename, member.name))
   if member.type == "var" then
+    ---@cast member LuaDocVariableMember
     ret = ret .. fmt_one_member_var(typename, member)
   elseif member.type == "func" then
+    ---@cast member LuaDocFunctionMember
     ret = ret .. fmt_one_member_func(typename, member)
   else
     error("  Unknown member type " .. tostring(member.type))
   end
 
   if member.comment then
-    local com = string_concat_matches(member.comment, "[^\r\n]+", "\n", function(m)
-      if string.match(m, "^@param") then return nil end
-      return "> " .. linkify_types(m, true)
-    end)
+    local com = string_concat_matches(
+      member.comment,
+      "[^\r\n]+",
+      "\n",
+      ---@param m string
+      function(m)
+        if string.match(m, "^@param") or is_luals_metadata_line(m) then return nil end
+        return "> " .. linkify_types(m, true)
+      end
+    )
     ret = ret .. com
   end
 
   return ret
 end
 
+---@param typename string?
+---@param members LuaDocMember[]
 local fmt_members = function(typename, members)
   if #members == 0 then
     return "  No members.\n"
   else
     local ret = ""
 
-    local ss = function(a, b) return field_sort_order(a.v) < field_sort_order(b.v) end
+    ---@param a { k: string|integer, v: LuaDocMember }
+    ---@param b { k: string|integer, v: LuaDocMember }
+    local ss = function(a, b) return field_sort_less(a.v, b.v) end
 
     local members_sorted = sort_by(wrapped(members), ss)
 
     -- Hide operators and serialization methods
+    ---@param member LuaDocMember
     local is_hidden = function(member)
       if member.comment and member.comment:find("DEPRECATED") then return true end
       if member.name:find("^__") then return true end
@@ -168,6 +205,8 @@ local fmt_members = function(typename, members)
   end
 end
 
+---@param typename string
+---@param bases string[]
 local fmt_bases = function(typename, bases)
   if #bases == 0 then
     return "  No base classes.\n"
@@ -180,6 +219,8 @@ local fmt_bases = function(typename, bases)
   end
 end
 
+---@param typename string
+---@param entries table<string, integer>
 local fmt_enum_entries = function(typename, entries)
   if next(entries) == nil then
     return "  No entries.\n"
@@ -192,7 +233,12 @@ local fmt_enum_entries = function(typename, entries)
       if type(v) ~= "table" and type(v) ~= "function" then entries_filtered[k] = v end
     end
 
-    local entries_sorted = sort_by(wrapped(entries_filtered), function(a, b) return a.v < b.v end)
+    local entries_sorted = sort_by(
+      wrapped(entries_filtered),
+      ---@param a { k: string|integer, v: integer }
+      ---@param b { k: string|integer, v: integer }
+      function(a, b) return a.v < b.v end
+    )
     for _, it in pairs(entries_sorted) do
       ret = ret .. "- `" .. tostring(it.k) .. "` = `" .. tostring(it.v) .. "`\n"
     end
@@ -254,7 +300,7 @@ and should not be edited directly.
 
   local types_sorted = sort_by(wrapped(types_table))
   for _, it in pairs(types_sorted) do
-    local typename = it.k
+    local typename = tostring(it.k)
     local dt_type = it.v
     local type_comment = dt_type.type_comment
     ret = ret .. ("## %s {%s}\n"):format(typename, slug_for(typename))
@@ -265,6 +311,7 @@ and should not be edited directly.
           type_comment,
           "[^\r\n]+",
           "  \n",
+          ---@param m string
           function(m) return "> " .. linkify_types(m, true) end
         )
         .. "\n"
@@ -292,7 +339,7 @@ and should not be edited directly.
 
   local enums_sorted = sort_by(wrapped(enums_table))
   for _, it in pairs(enums_sorted) do
-    local typename = it.k
+    local typename = tostring(it.k)
     local dt_type = it.v
     ret = ret .. ("## %s {%s}\n"):format(typename, slug_for(typename))
 
@@ -307,7 +354,7 @@ and should not be edited directly.
 
   local libs_sorted = sort_by(wrapped(libs_table))
   for _, it in pairs(libs_sorted) do
-    local typename = it.k
+    local typename = tostring(it.k)
     local dt_lib = it.v
     local lib_comment = dt_lib.lib_comment
     ret = ret .. ("## %s {%s}\n"):format(typename, slug_for(typename))

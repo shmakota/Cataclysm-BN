@@ -16,9 +16,30 @@
 
 using namespace trait_group;
 
+static const trait_flag_str_id flag_MALE_EXCLUSIVE( "MALE_EXCLUSIVE" );
+static const trait_flag_str_id flag_FEMALE_EXCLUSIVE( "FEMALE_EXCLUSIVE" );
+static const trait_flag_str_id flag_MALE_PREFERRED( "MALE_PREFERRED" );
+static const trait_flag_str_id flag_FEMALE_PREFERRED( "FEMALE_PREFERRED" );
+
 Trait_list trait_group::traits_from( const Trait_group_tag &gid )
 {
     return mutation_branch::get_group( gid )->create();
+}
+
+Trait_list trait_group::traits_from( const Trait_group_tag &gid, bool male )
+{
+    Trait_list result = traits_from( gid );
+    std::erase_if( result, [male]( const trait_id & tid ) {
+        const auto &flags = tid.obj().flags;
+        if( male ) {
+            return flags.contains( flag_FEMALE_EXCLUSIVE ) ||
+                   flags.contains( flag_FEMALE_PREFERRED );
+        } else {
+            return flags.contains( flag_MALE_EXCLUSIVE ) ||
+                   flags.contains( flag_MALE_PREFERRED );
+        }
+    } );
+    return result;
 }
 
 bool trait_group::group_contains_trait( const Trait_group_tag &gid, const trait_id &tid )
@@ -139,10 +160,10 @@ Trait_list Single_trait_creator::create( RecursionList & /* rec */ ) const
     return Trait_list { id };
 }
 
-void Single_trait_creator::check_consistency() const
+void Single_trait_creator::check_consistency( const std::string &context ) const
 {
     if( !id.is_valid() ) {
-        debugmsg( "trait id %s is unknown", id.c_str() );
+        debugmsg( "trait id %s is unknown in %s", id.c_str(), context );
     }
 }
 
@@ -167,7 +188,7 @@ Trait_list Trait_group_creator::create( RecursionList &rec ) const
 {
 
     Trait_list result;
-    if( std::ranges::find( rec, id ) != rec.end() ) {
+    if( std::ranges::contains( rec, id ) ) {
         debugmsg( "recursion in trait creation list %s", id.c_str() );
         return result;
     }
@@ -186,10 +207,10 @@ Trait_list Trait_group_creator::create( RecursionList &rec ) const
     return result;
 }
 
-void Trait_group_creator::check_consistency() const
+void Trait_group_creator::check_consistency( const std::string &context ) const
 {
-    if( id.is_valid() ) {
-        debugmsg( "trait group id %s is unknown", id.c_str() );
+    if( !id.is_valid() ) {
+        debugmsg( "trait group id %s is unknown in %s", id.c_str(), context );
     }
 }
 
@@ -213,10 +234,10 @@ void Trait_group::add_group_entry( const Trait_group_tag &gid, int probability )
     add_entry( std::make_unique<Trait_group_creator>( gid, probability ) );
 }
 
-void Trait_group::check_consistency() const
+void Trait_group::check_consistency( const std::string &context ) const
 {
     for( const auto &creator : creators ) {
-        creator->check_consistency();
+        creator->check_consistency( context );
     }
 }
 

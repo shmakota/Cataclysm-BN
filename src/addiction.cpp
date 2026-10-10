@@ -5,6 +5,7 @@
 #include <map>
 #include <utility>
 
+#include "action_time_scale.h"
 #include "calendar.h"
 #include "character.h"
 #include "debug.h"
@@ -62,7 +63,7 @@ void addict_effect( Character &u, addiction &add )
 
     switch( add.type ) {
         case add_type::CIG:
-            u.mod_int_bonus( -1 );
+            u.mod_int_bonus( -1, true );
             if( !one_in( 2000 - 20 * in ) ) {
                 break;
             }
@@ -100,8 +101,8 @@ void addict_effect( Character &u, addiction &add )
             const auto morale_type = add.type == add_type::ALCOHOL ? MORALE_CRAVING_ALCOHOL :
                                      MORALE_CRAVING_DIAZEPAM;
 
-            u.mod_per_bonus( -1 );
-            u.mod_int_bonus( -1 );
+            u.mod_per_bonus( -1, true );
+            u.mod_int_bonus( -1, true );
             if( x_in_y( in, to_turns<int>( 2_hours ) ) ) {
                 u.mod_healthy_mod( -1, -in * 10 );
             }
@@ -123,7 +124,8 @@ void addict_effect( Character &u, addiction &add )
                     if( on_ghb && one_in( 5 ) ) {
                         u.add_msg_if_player( _( "The GHB makes it not so bad." ) );
                     }
-                } else if( calendar::once_every( 1_minutes ) && rng( 8, 300 ) < in && ( !on_ghb || one_in( 2 ) ) ) {
+                } else if( action_time_scale::once_every_this_tick( 1_minutes ) &&
+                           rng( 8, 300 ) < in && ( !on_ghb || one_in( 2 ) ) ) {
                     const std::string msg_2 = is_alcohol ?
                                               _( "Your hands start shaking… you need a drink bad!" ) :
                                               _( "You're shaking… you need some diazepam!" );
@@ -144,12 +146,12 @@ void addict_effect( Character &u, addiction &add )
             // No effects here--just in player::can_sleep()
             // EXCEPT!  Prolong this addiction longer than usual.
             if( one_in( 2 ) && add.sated < 0_turns ) {
-                add.sated += 1_turns;
+                add.sated += action_time_scale::calendar_duration_this_tick();
             }
             break;
 
         case add_type::PKILLER:
-            if( calendar::once_every( time_duration::from_turns( 100 - in * 4 ) ) &&
+            if( action_time_scale::once_every_this_tick( time_duration::from_turns( 100 - in * 4 ) ) &&
                 u.get_painkiller() > 20 - in ) {
                 // Tolerance increases!
                 u.mod_painkiller( -1 );
@@ -160,9 +162,9 @@ void addict_effect( Character &u, addiction &add )
                 break;
             }
 
-            u.mod_str_bonus( -1 );
-            u.mod_per_bonus( -1 );
-            u.mod_dex_bonus( -1 );
+            u.mod_str_bonus( -1, true );
+            u.mod_per_bonus( -1, true );
+            u.mod_dex_bonus( -1, true );
             if( u.get_pain() < in * 2 ) {
                 u.mod_pain( 1 );
             }
@@ -185,9 +187,9 @@ void addict_effect( Character &u, addiction &add )
             if( u.has_effect( effect_meth ) ) {
                 break;
             }
-            u.mod_int_bonus( -1 );
-            u.mod_str_bonus( -1 );
-            if( current_stim > -75 && calendar::once_every( 3_minutes ) ) {
+            u.mod_int_bonus( -1, true );
+            u.mod_str_bonus( -1, true );
+            if( current_stim > -75 && action_time_scale::once_every_this_tick( 3_minutes ) ) {
                 u.mod_stim( -1 );
             }
             if( rng( 0, 150 ) <= in ) {
@@ -195,10 +197,10 @@ void addict_effect( Character &u, addiction &add )
             }
             if( dice( 2, 100 ) < in ) {
                 u.add_msg_if_player( m_warning, _( "You feel depressed.  Speed would help." ) );
-                u.add_morale( MORALE_CRAVING_SPEED, -25, -20 * in );
+                u.add_morale( MORALE_CRAVING_SPEED, -25, -50 - 10 * in );
             } else if( one_in( 10 ) && dice( 2, 80 ) < in ) {
                 u.add_msg_if_player( m_bad, _( "Your hands start shaking… you need a pick-me-up." ) );
-                u.add_morale( MORALE_CRAVING_SPEED, -25, -20 * in );
+                u.add_morale( MORALE_CRAVING_SPEED, -25, -50 - 10 * in );
                 u.add_effect( effect_shakes, in * 2_minutes );
             } else if( one_in( 50 ) && dice( 2, 100 ) < in ) {
                 u.add_msg_if_player( m_bad, _( "You stop suddenly, feeling bewildered." ) );
@@ -216,15 +218,15 @@ void addict_effect( Character &u, addiction &add )
                                          _( "You're shivering, you need some crack." );
             const auto morale_type = add.type == add_type::COKE ? MORALE_CRAVING_COCAINE :
                                      MORALE_CRAVING_CRACK;
-            u.mod_int_bonus( -1 );
-            u.mod_per_bonus( -1 );
+            u.mod_int_bonus( -1, true );
+            u.mod_per_bonus( -1, true );
             if( one_in( 900 - 30 * in ) ) {
                 u.add_msg_if_player( m_warning, cur_msg );
-                u.add_morale( morale_type, -20, -15 * in );
+                u.add_morale( morale_type, -20, -50 - 10 * in );
             }
             if( dice( 2, 80 ) <= in ) {
                 u.add_msg_if_player( m_warning, cur_msg );
-                u.add_morale( morale_type, -20, -15 * in );
+                u.add_morale( morale_type, -20, -50 - 10 * in );
                 if( current_stim > -150 ) {
                     u.mod_stim( -3 );
                 }

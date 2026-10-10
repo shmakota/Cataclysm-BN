@@ -1,31 +1,287 @@
+#include "ammo.h"
+#include "ammo_effect.h"
+#include "artifact.h"
+#include "avatar.h"
 #include "catalua_bindings.h"
-
-#include <ranges>
-
 #include "catalua_bindings_utils.h"
 #include "catalua_luna.h"
 #include "catalua_luna_doc.h"
-
-#include "itype.h"
-#include "mtype.h"
-#include "material.h"
-#include "faction.h"
 #include "character.h"
-#include "martialarts.h"
-#include "relic.h"
-#include "vitamin.h"
-#include "gun_mode.h"
-#include "mod_manager.h"
-#include "ammo_effect.h"
-#include "mongroup.h"
 #include "disease.h"
-#include "skill.h"
-#include "ammo.h"
-#include "flag.h"
-#include "emit.h"
-#include "fault.h"
-#include "recipe.h"
+#include "enum_conversions.h"
 #include "explosion.h"
+#include "faction.h"
+#include "fault.h"
+#include "flag.h"
+#include "gun_mode.h"
+#include "hsv_color.h"
+#include "itype.h"
+#include "map/emit.h"
+#include "martialarts.h"
+#include "material.h"
+#include "mod_manager.h"
+#include "mongroup.h"
+#include "mtype.h"
+#include "recipe.h"
+#include "relic.h"
+#include "skill.h"
+#include "translations.h"
+#include "vitamin.h"
+
+#include <ranges>
+
+namespace
+{
+auto artifact_effect_names( const std::vector<art_effect_passive> &effects
+                          ) -> std::vector<std::string>
+{
+    return effects
+    | std::views::transform( []( const art_effect_passive effect ) {
+        return io::enum_to_string( effect );
+    } )
+    | std::ranges::to<std::vector>();
+}
+
+auto artifact_effect_names( const std::vector<art_effect_active> &effects
+                          ) -> std::vector<std::string>
+{
+    return effects
+    | std::views::transform( []( const art_effect_active effect ) {
+        return io::enum_to_string( effect );
+    } )
+    | std::ranges::to<std::vector>();
+}
+
+auto artifact_effect_description( const art_effect_passive effect ) -> std::string
+{
+    switch( effect ) {
+        case AEP_NULL:
+            return _( "No effect" );
+        case AEP_STR_UP:
+            return _( "Strength +4" );
+        case AEP_DEX_UP:
+            return _( "Dexterity +4" );
+        case AEP_PER_UP:
+            return _( "Perception +4" );
+        case AEP_INT_UP:
+            return _( "Intelligence +4" );
+        case AEP_ALL_UP:
+            return _( "All stats +2" );
+        case AEP_SPEED_UP:
+            return _( "Speed +20" );
+        case AEP_PBLUE:
+            return _( "Reduces radiation" );
+        case AEP_SNAKES:
+            return _( "Summons friendly snakes when you're hit" );
+        case AEP_INVISIBLE:
+            return _( "Makes you invisible" );
+        case AEP_CLAIRVOYANCE:
+            return _( "See through walls" );
+        case AEP_CLAIRVOYANCE_PLUS:
+            return _( "See through walls farther" );
+        case AEP_SUPER_CLAIRVOYANCE:
+            return _( "See through walls at great distance" );
+        case AEP_STEALTH:
+            return _( "Your steps are quieted" );
+        case AEP_EXTINGUISH:
+            return _( "May extinguish nearby flames" );
+        case AEP_GLOW:
+            return _( "Emits light" );
+        case AEP_PSYSHIELD:
+            return _( "Protects from fear and paralysis" );
+        case AEP_RESIST_ELECTRICITY:
+            return _( "Protection from electricity" );
+        case AEP_CARRY_MORE:
+            return _( "Increases carrying capacity" );
+        case AEP_SAP_LIFE:
+            return _( "Killing non-zombie monsters may heal you" );
+        case AEP_FUN:
+            return _( "Passive morale boost" );
+        case AEP_SPLIT:
+            return _( "No effect" );
+        case AEP_HUNGER:
+            return _( "Increases hunger" );
+        case AEP_THIRST:
+            return _( "Increases thirst" );
+        case AEP_SMOKE:
+            return _( "Emits smoke occasionally" );
+        case AEP_EVIL:
+            return _( "Adds an evil presence" );
+        case AEP_SCHIZO:
+            return _( "Mimics schizophrenia" );
+        case AEP_RADIOACTIVE:
+            return _( "Increases your radiation" );
+        case AEP_MUTAGENIC:
+            return _( "Mutates you slowly" );
+        case AEP_ATTENTION:
+            return _( "Draws netherworld attention" );
+        case AEP_STR_DOWN:
+            return _( "Strength -3" );
+        case AEP_DEX_DOWN:
+            return _( "Dexterity -3" );
+        case AEP_PER_DOWN:
+            return _( "Perception -3" );
+        case AEP_INT_DOWN:
+            return _( "Intelligence -3" );
+        case AEP_ALL_DOWN:
+            return _( "All stats -2" );
+        case AEP_SPEED_DOWN:
+            return _( "Speed -20" );
+        case AEP_FORCE_TELEPORT:
+            return _( "Occasionally forces a teleport" );
+        case AEP_MOVEMENT_NOISE:
+            return _( "Makes noise when you move" );
+        case AEP_BAD_WEATHER:
+            return _( "More likely to experience bad weather" );
+        case AEP_SICK:
+            return _( "Decreases health over time" );
+        case NUM_AEPS:
+            break;
+    }
+    return _( "Unknown effect" );
+}
+
+auto artifact_effect_description( const art_effect_active effect ) -> std::string
+{
+    switch( effect ) {
+        case AEA_NULL:
+            return _( "No effect" );
+        case AEA_STORM:
+            return _( "Emits shock fields" );
+        case AEA_FIREBALL:
+            return _( "Launches fireballs" );
+        case AEA_ADRENALINE:
+            return _( "Adrenaline rush" );
+        case AEA_MAP:
+            return _( "Reveals the area around you" );
+        case AEA_BLOOD:
+            return _( "Shoots blood all over" );
+        case AEA_FATIGUE:
+            return _( "Creates interdimensional fatigue" );
+        case AEA_ACIDBALL:
+            return _( "Launches acid" );
+        case AEA_PULSE:
+            return _( "Destroys adjacent terrain" );
+        case AEA_HEAL:
+            return _( "Heals minor damage" );
+        case AEA_CONFUSED:
+            return _( "Confuses nearby monsters" );
+        case AEA_ENTRANCE:
+            return _( "May make nearby monsters friendly" );
+        case AEA_BUGS:
+            return _( "May summon friendly insects" );
+        case AEA_TELEPORT:
+            return _( "Teleports you" );
+        case AEA_LIGHT:
+            return _( "Temporary light source" );
+        case AEA_GROWTH:
+            return _( "Rapid plant growth" );
+        case AEA_HURTALL:
+            return _( "Hurts all monsters" );
+        case AEA_FUN:
+            return _( "Temporary morale bonus" );
+        case AEA_SPLIT:
+            return _( "No effect" );
+        case AEA_RADIATION:
+            return _( "Spews radioactive gas" );
+        case AEA_PAIN:
+            return _( "Increases pain" );
+        case AEA_MUTATE:
+            return _( "Chance of mutation" );
+        case AEA_PARALYZE:
+            return _( "Paralyzes you" );
+        case AEA_FIRESTORM:
+            return _( "Spreads fire around you" );
+        case AEA_ATTENTION:
+            return _( "Draws attention from sub-prime denizens" );
+        case AEA_TELEGLOW:
+            return _( "Causes teleglow" );
+        case AEA_NOISE:
+            return _( "Loud noise" );
+        case AEA_SCREAM:
+            return _( "Noise and morale penalty" );
+        case AEA_DIM:
+            return _( "Darkens the sky" );
+        case AEA_FLASH:
+            return _( "Flashbang" );
+        case AEA_VOMIT:
+            return _( "User vomits" );
+        case AEA_SHADOWS:
+            return _( "Summons shadow creatures" );
+        case AEA_STAMINA_EMPTY:
+            return _( "Empties most of your stamina" );
+        case NUM_AEAS:
+            break;
+    }
+    return _( "Unknown effect" );
+}
+
+auto artifact_effect_descriptions( const std::vector<art_effect_passive> &effects
+                                 ) -> std::vector<std::string>
+{
+    return effects
+    | std::views::transform( []( const art_effect_passive effect ) {
+        return artifact_effect_description( effect );
+    } )
+    | std::ranges::to<std::vector>();
+}
+
+auto artifact_effect_descriptions( const std::vector<art_effect_active> &effects
+                                 ) -> std::vector<std::string>
+{
+    return effects
+    | std::views::transform( []( const art_effect_active effect ) {
+        return artifact_effect_description( effect );
+    } )
+    | std::ranges::to<std::vector>();
+}
+
+auto artifact_charge_description( const art_charge charge ) -> std::string
+{
+    switch( charge ) {
+        case ARTC_NULL:
+            return _( "No charges" );
+        case ARTC_TIME:
+            return _( "Recharges over time" );
+        case ARTC_SOLAR:
+            return _( "Recharges in sunlight" );
+        case ARTC_PAIN:
+            return _( "Recharges from pain" );
+        case ARTC_HP:
+            return _( "Recharges from health loss" );
+        case ARTC_FATIGUE:
+            return _( "Recharges from fatigue" );
+        case ARTC_PORTAL:
+            return _( "Recharges near portals" );
+        case NUM_ARTCS:
+            break;
+    }
+    return _( "Unknown charge type" );
+}
+
+auto artifact_charge_req_description( const art_charge_req charge_req ) -> std::string
+{
+    switch( charge_req ) {
+        case ACR_NULL:
+            return _( "No special requirement" );
+        case ACR_EQUIP:
+            return _( "Must be equipped" );
+        case ACR_SKIN:
+            return _( "Must be worn against bare skin" );
+        case ACR_SLEEP:
+            return _( "Charges while sleeping" );
+        case ACR_RAD:
+            return _( "Charges in radiation" );
+        case ACR_WET:
+            return _( "Charges while wet" );
+        case ACR_SKY:
+            return _( "Charges under open sky" );
+        case NUM_ACRS:
+            break;
+    }
+    return _( "Unknown charge requirement" );
+}
+} // namespace
 
 static void reg_explosion_data( sol::state &lua );
 static void reg_islot( sol::state &lua );
@@ -77,8 +333,20 @@ void reg_item( sol::state &lua )
         SET_FX( erase_var );
         DOC( "Erase all variables" );
         SET_FX( clear_vars );
+        DOC( "Returns all stored item vars as a table" );
+        luna::set_fx( ut, "vars_table", []( const item & it, sol::this_state state )
+        {
+            sol::state_view lua( state );
+            sol::table vars = lua.create_table();
+            std::ranges::for_each( it.item_vars(), [&]( const auto & entry ) {
+                vars[entry.first] = entry.second;
+            } );
+            return vars;
+        } );
 
         DOC( "Spawns a new item. Same as gapi.create_item " );
+        DOC( "`count` sets the item's charges, not the number of items: exactly one item is created." );
+        DOC( "For stackable (count-by-charges) items such as ammo, `count` is the stack size. For non-stackable items, pass a negative value (e.g. -1), since a positive one is still applied as charges. Tools spawned with a negative value get their default charges." );
         luna::set_fx( ut, "spawn", []( const itype_id & itype, int count )
         {
             return item::spawn( itype, calendar::turn, count );
@@ -134,6 +402,7 @@ void reg_item( sol::state &lua )
         SET_FX( is_tainted );
         SET_FX( is_soft );
         SET_FX( is_reloadable );
+        luna::set_fx( ut, "has_use", []( item & it, std::string use ) { return it.get_use( use ); } );
         DOC( "DEPRECATED: Items are no longer filthy" );
         luna::set_fx( ut, "is_filthy", []() { return false; } );
         SET_FX( is_active );
@@ -141,6 +410,10 @@ void reg_item( sol::state &lua )
 
         SET_FX( activate );
         SET_FX( deactivate );
+        DOC( "Immediately invokes this item's use action at the given map-square position. Returns the charges consumed by the use action." );
+        luna::set_fx( ut, "invoke_at", []( item & it, const tripoint_bub_ms & pos ) -> int {
+            return it.type->invoke( get_avatar(), it, pos );
+        } );
         SET_FX( set_charges );
 
         SET_FX( set_counter );
@@ -188,15 +461,11 @@ void reg_item( sol::state &lua )
         DOC( "Gets the faction id that owns this item" );
         SET_FX( get_owner );
 
-        DOC( "Sets the ownership of this item to a faction" );
-        luna::set_fx( ut, "set_owner",
-                      sol::resolve<void( const faction_id & )>
-                      ( &item::set_owner ) );
-
-        DOC( "Sets the ownership of this item to a character" );
-        luna::set_fx( ut, "set_owner",
-                      sol::resolve<void( const Character & )>
-                      ( &item::set_owner ) );
+        DOC( "Sets the ownership of this item to a faction or character" );
+        luna::set_fx( ut, "set_owner", sol::overload(
+                          sol::resolve<void( const faction_id & )>( &item::set_owner ),
+                          sol::resolve<void( const Character & )>( &item::set_owner )
+                      ) );
 
         SET_FX( get_owner_name );
 
@@ -215,6 +484,12 @@ void reg_item( sol::state &lua )
         DOC( "Removes the additional technique. Doesn't affect originial techniques." );
         luna::set_fx( ut, "remove_technique",
                       sol::resolve<void( const matec_id & )> ( &item::remove_technique ) );
+
+        DOC( "Adds an enchantment to this item" );
+        luna::set_fx( ut, "add_enchantment", sol::overload(
+                          sol::resolve<bool( const enchantment_id & )>( &item::add_enchantment ),
+                          sol::resolve<bool( const enchantment & )>( &item::add_enchantment )
+                      ) );
 
         DOC( "Checks if this item can contain another" );
         luna::set_fx( ut, "can_contain",
@@ -249,7 +524,9 @@ void reg_item( sol::state &lua )
 
         SET_FX( get_reload_time );
 
-        DOC( "Adds an item(s) to contents" );
+        DOC( "Creates an item with the given id and adds it to contents." );
+        DOC( "`count` sets the item's charges, not the number of items: exactly one item is created." );
+        DOC( "For stackable (count-by-charges) items such as ammo, `count` is the stack size. For non-stackable items, pass a negative value (e.g. -1), since a positive one is still applied as charges. Tools spawned with a negative value get their default charges." );
         SET_FX( add_item_with_id );
 
         DOC( "Checks item contents for a given item id" );
@@ -269,24 +546,37 @@ void reg_item( sol::state &lua )
         SET_FX( convert );
 
         DOC( "Get variable as string" );
-        luna::set_fx( ut, "get_var_str",
-                      sol::resolve<std::string( const std::string &, const std::string & ) const>
-                      ( &item::get_var ) );
+        luna::set_fx( ut, "get_var_str", []( const UT_CLASS & c, const std::string & name, const std::string & def_val )
+        {
+            return c.get_var( name, def_val );
+        } );
         DOC( "Get variable as float number" );
-        luna::set_fx( ut, "get_var_num",
-                      sol::resolve<double( const std::string &, double ) const>( &item::get_var ) );
+        luna::set_fx( ut, "get_var_num", []( const UT_CLASS & c, const std::string & name, const double & def_val )
+        {
+            return c.get_var( name, def_val );
+        } );
         DOC( "Get variable as tripoint" );
-        luna::set_fx( ut, "get_var_tri",
-                      sol::resolve<tripoint( const std::string &, const tripoint & ) const>
-                      ( &item::get_var ) );
+        luna::set_fx( ut, "get_var_tri", []( const UT_CLASS & c, const std::string & name, const tripoint & def_val )
+        {
+            return c.get_var( name, def_val );
+        } );
 
-        luna::set_fx( ut, "set_var_str", sol::resolve<void( const std::string &, const std::string & )>
-                      ( &item::set_var ) );
-        luna::set_fx( ut, "set_var_num",
-                      sol::resolve<void( const std::string &, double )>( &item::set_var ) );
-        luna::set_fx( ut, "set_var_tri",
-                      sol::resolve<void( const std::string &, const tripoint & )>( &item::set_var ) );
-
+        luna::set_fx( ut, "set_var_str", []( UT_CLASS & c, const std::string & name, const std::string & val )
+        {
+            c.set_var( name, val );
+        } );
+        luna::set_fx( ut, "set_var_num", []( UT_CLASS & c, const std::string & name, const double & val )
+        {
+            c.set_var( name, val );
+        } );
+        luna::set_fx( ut, "set_var_tri", []( UT_CLASS & c, const std::string & name, const tripoint & val )
+        {
+            c.set_var( name, val );
+        } );
+        luna::set_fx( ut, "set_var_col", []( UT_CLASS & c, const std::string & name, const RGBColor & val )
+        {
+            c.set_var<RGBColor>( name, val );
+        } );
         SET_FX( attack_cost );
         SET_FX( stamina_cost );
 
@@ -717,10 +1007,10 @@ void reg_islot( sol::state &lua )
     {
         sol::usertype<UT_CLASS> ut = luna::new_usertype<UT_CLASS>( lua, luna::no_bases, luna::no_constructor );
 
-        DOC( "Diameter of wheel in inches" );
+        DOC( "Diameter of wheel in millimeters.  Integer JSON values are legacy inches." );
         SET_MEMB_RO( diameter );
 
-        DOC( "Width of wheel in inches" );
+        DOC( "Width of wheel in millimeters.  Integer JSON values are legacy inches." );
         SET_MEMB_RO( width );
     }
 #undef UT_CLASS
@@ -768,6 +1058,9 @@ void reg_islot( sol::state &lua )
 
         DOC( "Modifies base loudness as provided by the currently loaded ammo" );
         SET_MEMB_RO( loudness );
+
+        DOC( "Modifies projectile speed as provided by the currently loaded ammo" );
+        SET_MEMB_RO( speed );
 
         DOC( "If this uses UPS charges, how many (per shoot), 0 for no UPS charges at all" );
         SET_MEMB_RO( ups_charges );
@@ -856,6 +1149,9 @@ void reg_islot( sol::state &lua )
         DOC( "Modifies base loudness as provided by the currently loaded ammo" );
         SET_MEMB_RO( loudness );
 
+        DOC( "Modifies projectile speed as provided by the currently loaded ammo" );
+        SET_MEMB_RO( speed );
+
         DOC( "How many moves does this gunmod take to install?" );
         SET_MEMB_RO( install_time );
 
@@ -873,6 +1169,9 @@ void reg_islot( sol::state &lua )
 
         DOC( "Increases gun weight by this many times" );
         SET_MEMB_RO( weight_multiplier );
+
+        DOC( "Increases gun volume by this many times" );
+        SET_MEMB_RO( volume_multiplier );
 
         DOC( "Firing modes added to or replacing those of the base gun" );
         luna::set_fx( ut, "get_mode_modifiers", []( const UT_CLASS & c )
@@ -1011,6 +1310,9 @@ void reg_islot( sol::state &lua )
         DOC( "Base loudness of ammo (possibly modified by gun/gunmods)" );
         SET_MEMB_RO( loudness );
 
+        DOC( "Base speed of ammo (possibly modified by gun/gunmods)" );
+        SET_MEMB_RO( speed );
+
         DOC( "Recoil (per shot), roughly equivalent to kinetic energy (in Joules)" );
         SET_MEMB_RO( recoil );
 
@@ -1059,6 +1361,49 @@ void reg_islot( sol::state &lua )
         SET_MEMB_RO( effects_carried );
         SET_MEMB_RO( effects_wielded );
         SET_MEMB_RO( effects_worn );
+
+        luna::set_fx( ut, "effects_activated_names",
+        []( const islot_artifact & slot ) -> std::vector<std::string> {
+            return artifact_effect_names( slot.effects_activated );
+        } );
+        luna::set_fx( ut, "effects_carried_names",
+        []( const islot_artifact & slot ) -> std::vector<std::string> {
+            return artifact_effect_names( slot.effects_carried );
+        } );
+        luna::set_fx( ut, "effects_wielded_names",
+        []( const islot_artifact & slot ) -> std::vector<std::string> {
+            return artifact_effect_names( slot.effects_wielded );
+        } );
+        luna::set_fx( ut, "effects_worn_names",
+        []( const islot_artifact & slot ) -> std::vector<std::string> {
+            return artifact_effect_names( slot.effects_worn );
+        } );
+
+        luna::set_fx( ut, "effects_activated_descriptions",
+        []( const islot_artifact & slot ) -> std::vector<std::string> {
+            return artifact_effect_descriptions( slot.effects_activated );
+        } );
+        luna::set_fx( ut, "effects_carried_descriptions",
+        []( const islot_artifact & slot ) -> std::vector<std::string> {
+            return artifact_effect_descriptions( slot.effects_carried );
+        } );
+        luna::set_fx( ut, "effects_wielded_descriptions",
+        []( const islot_artifact & slot ) -> std::vector<std::string> {
+            return artifact_effect_descriptions( slot.effects_wielded );
+        } );
+        luna::set_fx( ut, "effects_worn_descriptions",
+        []( const islot_artifact & slot ) -> std::vector<std::string> {
+            return artifact_effect_descriptions( slot.effects_worn );
+        } );
+
+        luna::set_fx( ut, "charge_type_description",
+        []( const islot_artifact & slot ) -> std::string {
+            return artifact_charge_description( slot.charge_type );
+        } );
+        luna::set_fx( ut, "charge_req_description",
+        []( const islot_artifact & slot ) -> std::string {
+            return artifact_charge_req_description( slot.charge_req );
+        } );
     }
 #undef UT_CLASS
 
@@ -1080,7 +1425,6 @@ void reg_islot( sol::state &lua )
         SET_MEMB_RO( damage );
         SET_MEMB_RO( dispersion );
         SET_MEMB_RO( range );
-        SET_MEMB_RO( speed );
     }
 #undef UT_CLASS
 

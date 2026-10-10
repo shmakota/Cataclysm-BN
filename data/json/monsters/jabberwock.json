@@ -82,7 +82,7 @@
     "melee_dice_sides": 8,
     "melee_cut": 3,
     "dodge": 3,
-    "armor_bash": 12,
+    "armor_bash": 24,
     "armor_cut": 8,
     "armor_bullet": 6,
     "vision_day": 50,
@@ -90,6 +90,6 @@
     "special_attacks": [ [ "FLESH_GOLEM", 5 ] ],
     "death_function": [ "JABBERWOCKY" ],
     "harvest": "jabberwock",
-    "flags": [ "SEES", "HEARS", "SMELLS", "STUMBLES", "WARM", "BASHES", "DESTROYS", "ATTACKMON", "POISON" ]
+    "flags": [ "SEES", "HEARS", "SMELLS", "STUMBLES", "WARM", "BASHES", "DESTROYS", "ATTACKMON", "POISON", "NO_SLIP" ]
   }
 ]

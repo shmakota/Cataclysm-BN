@@ -1,8 +1,10 @@
 #include "mongroup.h"
 
 #include <algorithm>
+#include <ranges>
 #include <utility>
 
+#include "action_time_scale.h"
 #include "assign.h"
 #include "calendar.h"
 #include "debug.h"
@@ -77,7 +79,7 @@ float mongroup::avg_speed() const
         }
         avg_speed /= monsters.size();
     }
-    return avg_speed;
+    return static_cast<float>( action_time_scale::scaled_overmap_horde_speed( avg_speed ) );
 }
 
 const MonsterGroup &MonsterGroupManager::GetUpgradedMonsterGroup( const mongroup_id &group )
@@ -102,6 +104,26 @@ MonsterGroupResult MonsterGroupManager::GetResultFromGroup(
     int spawn_chance = rng( 1, group.freq_total ); //Default 1000 unless specified
     //Our spawn details specify, by default, a single instance of the default monster
     MonsterGroupResult spawn_details = MonsterGroupResult( group.defaultMonster, 1 );
+
+    if( group.defaultMonster != mtype_id::NULL_ID() ) {
+        int count = 0;
+        auto montype = group.defaultMonster;
+        while( count < group.evolve_repeat ) {
+            if( rng( 0, 100 ) < group.evolve_chance ) {
+                if( montype->upgrade_into ) {
+                    //If we upgrade into a blacklisted monster, treat it as though we are non-upgradeable
+                    if( MonsterGroupManager::monster_is_blacklisted( montype->upgrade_into ) ) {
+                        count = group.evolve_repeat;
+                    }
+                    montype = montype->upgrade_into;
+                } else {
+                    montype = MonsterGroupManager::GetRandomMonsterFromGroup( montype->upgrade_group );
+                }
+            }
+            count++;
+        }
+        spawn_details = MonsterGroupResult( montype, 1 );
+    }
 
     bool monster_found = false;
     // Loop invariant values
@@ -177,7 +199,23 @@ MonsterGroupResult MonsterGroupManager::GetResultFromGroup(
                 if( use_pack_size || it->pack_maximum > 1 ) {
                     pack_size = rng( it->pack_minimum, it->pack_maximum );
                 }
-                spawn_details = MonsterGroupResult( it->name, pack_size );
+                int count = 0;
+                auto montype = it->name;
+                while( count < group.evolve_repeat ) {
+                    if( rng( 0, 100 ) < group.evolve_chance ) {
+                        if( montype->upgrade_into ) {
+                            //If we upgrade into a blacklisted monster, treat it as though we are non-upgradeable
+                            if( MonsterGroupManager::monster_is_blacklisted( montype->upgrade_into ) ) {
+                                count = group.evolve_repeat;
+                            }
+                            montype = montype->upgrade_into;
+                        } else {
+                            montype = MonsterGroupManager::GetRandomMonsterFromGroup( montype->upgrade_group );
+                        }
+                    }
+                    count++;
+                }
+                spawn_details = MonsterGroupResult( montype, pack_size );
                 //And if a quantity pointer with remaining value was passed, will modify the external value as a side effect
                 //We will reduce it by the spawn rule's cost multiplier
                 if( quantity ) {
@@ -260,6 +298,14 @@ const MonsterGroup &MonsterGroupManager::GetMonsterGroup( const mongroup_id &gro
     } else {
         return it->second;
     }
+}
+
+auto MonsterGroupManager::get_all_group_ids() -> std::vector<mongroup_id>
+{
+    namespace views = std::views;
+    return monsterGroupMap
+           | views::keys
+           | std::ranges::to<std::vector<mongroup_id>>();
 }
 
 void MonsterGroupManager::LoadMonsterBlacklist( const JsonObject &jo )
@@ -384,6 +430,8 @@ void MonsterGroupManager::LoadMonsterGroup( const JsonObject &jo )
     g.new_monster_group = mongroup_id( jo.get_string( "new_monster_group_id",
                                        mongroup_id::NULL_ID().str() ) );
     assign( jo, "replacement_time", g.monster_group_time, false, 1_days );
+    assign( jo, "evolve_chance", g.evolve_chance, false, 0 );
+    assign( jo, "evolve_repeat", g.evolve_repeat, false, 0 );
     g.is_safe = jo.get_bool( "is_safe", false );
 
     g.freq_total = jo.get_int( "freq_total", ( extending ? g.freq_total : 1000 ) );

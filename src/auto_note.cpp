@@ -1,8 +1,5 @@
 #include "auto_note.h"
 
-#include <iostream>
-#include <memory>
-
 #include "cata_utility.h"
 #include "color.h"
 #include "cursesdef.h"
@@ -12,13 +9,16 @@
 #include "generic_factory.h"
 #include "input.h"
 #include "json.h"
-#include "map_extras.h"
+#include "mapgen/map_extras.h"
 #include "options.h"
 #include "output.h"
 #include "point.h"
 #include "translations.h"
 #include "ui_manager.h"
 #include "world.h"
+
+#include <iostream>
+#include <memory>
 
 namespace auto_notes
 {
@@ -290,7 +290,9 @@ void auto_note_manager_gui::show()
 
                 const auto lineColor = ( i == currentLine ) ? hilite( c_white ) : c_white;
                 const auto statusColor = cacheEntry.second ? c_green : c_red;
-                const auto statusString = cacheEntry.second ? _( "yes" ) : _( "no" );
+                const auto statusString = cacheEntry.second ?
+                                          pgettext( "auto notes status value", "yes" ) :
+                                          pgettext( "auto notes status value", "no" );
                 const auto charColor = cacheEntry.first.color;
                 const auto displayChar = cacheEntry.first.get_symbol();
 

@@ -29,6 +29,10 @@ class profession
     public:
         using StartingSkill = std::pair<skill_id, int>;
         using StartingSkillList = std::vector<StartingSkill>;
+        struct age_range {
+            int min;
+            int max;
+        };
         struct itypedec {
             itype_id type_id;
             /** Snippet id, @see snippet_library. */
@@ -60,16 +64,19 @@ class profession
         item_group_id _starting_items = item_group_id( "EMPTY_GROUP" );
         item_group_id _starting_items_male = item_group_id( "EMPTY_GROUP" );
         item_group_id _starting_items_female = item_group_id( "EMPTY_GROUP" );
-        itype_id no_bonus; // See profession::items and class json_item_substitution in profession.cpp
+        std::set<itype_id> no_bonus;
 
         std::vector<addiction> _starting_addictions;
         std::vector<bionic_id> _starting_CBMs;
         std::vector<trait_id> _starting_traits;
         std::set<trait_id> _forbidden_traits;
         std::set<bionic_id> _forbidden_bionics;
+        std::set<spell_id> _forbidden_spells;
         std::set<trait_id> _allowed_traits;
         std::set<bionic_id> _allowed_bionics;
+        std::set<spell_id> _allowed_spells;
         bool _forbids_bionics;
+        bool _forbids_spells;
         std::vector<mtype_id> _starting_pets;
         std::vector<npc_class_id> _starting_npcs;
         vproto_id _starting_vehicle = vproto_id::NULL_ID();
@@ -84,6 +91,8 @@ class profession
         void load( const JsonObject &jo, const std::string &src );
 
     public:
+        static constexpr auto min_age = 16;
+        static constexpr auto max_age = 55;
         //these three aren't meant for external use, but had to be made public regardless
         profession();
 
@@ -119,6 +128,8 @@ class profession
         std::map<spell_id, int> spells() const;
 
         std::optional<signed int> _starting_cash = std::nullopt;
+        std::optional<age_range> _starting_age_range;
+        auto starting_age_range() const -> std::optional<age_range>;
 
         /**
          * Check if this type of profession has a certain flag set.
@@ -141,6 +152,10 @@ class profession
         std::vector<bionic_id> get_locked_bionics() const;
         std::set<bionic_id> get_forbidden_bionics() const;
         std::set<bionic_id> get_allowed_bionics() const;
+
+        bool is_forbidden_spell( const spell_id &spell ) const;
+        bool is_allowed_spell( const spell_id &spell ) const;
+        bool forbids_spells() const;
+        std::set<spell_id> get_forbidden_spells() const;
+        std::set<spell_id> get_allowed_spells() const;
 };
-
-

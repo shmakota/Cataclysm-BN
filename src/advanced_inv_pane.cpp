@@ -1,3 +1,20 @@
+#include "advanced_inv_pane.h"
+
+#include "advanced_inv_area.h"
+#include "avatar.h"
+#include "inventory.h"
+#include "item.h"
+#include "item_contents.h"
+#include "item_search.h"
+#include "make_static.h"
+#include "map/map.h"
+#include "options.h"
+#include "player.h"
+#include "uistate.h"
+#include "units.h"
+#include "vehicle/vehicle.h"
+#include "vehicle/vehicle_part.h"
+
 #include <algorithm>
 #include <cassert>
 #include <list>
@@ -5,24 +22,8 @@
 #include <string>
 #include <vector>
 
-#include "advanced_inv_area.h"
-#include "advanced_inv_pane.h"
-#include "avatar.h"
-#include "inventory.h"
-#include "item.h"
-#include "item_contents.h"
-#include "item_search.h"
-#include "make_static.h"
-#include "map.h"
-#include "options.h"
-#include "player.h"
-#include "uistate.h"
-#include "units.h"
-#include "vehicle.h"
-#include "vehicle_part.h"
-
 #if defined(__ANDROID__)
-#   include <SDL_keyboard.h>
+#   include <SDL3/SDL.h>
 #endif
 void advanced_inventory_pane::save_settings()
 {
