@@ -7966,6 +7966,9 @@ bool item::is_reloadable_helper( const itype_id &ammo, bool now ) const
         if( ammo.is_empty() ) {
             return now ? !is_container_full() : true;
         }
+        if( !can_contain( *ammo ) ) {
+            return false;
+        }
         if( ammo->phase == LIQUID ) {
             return now ? ( !is_container_full() &&
                            ( is_container_empty() || contents.front().typeId() == ammo ) ) : true;
@@ -8175,13 +8178,13 @@ const std::vector<relic_recharge> &item::get_relic_recharge_scheme() const
     return recharge_schemes;
 }
 
-bool item::can_contain( const item &it ) const
+auto item::can_contain( const item &it ) const -> bool
 {
     // TODO: Volume check
     return can_contain( *it.type );
 }
 
-bool item::can_contain( const itype &tp ) const
+auto item::can_contain( const itype &tp ) const -> bool
 {
     if( !type->container ) {
         // TODO: Tools etc.
@@ -8189,6 +8192,11 @@ bool item::can_contain( const itype &tp ) const
     }
 
     if( tp.phase == LIQUID && !type->container->watertight ) {
+        return false;
+    }
+
+    namespace ranges = std::ranges;
+    if( ranges::any_of( contents.all_items_top(), [&tp]( const auto * contained ) { return contained->made_of( LIQUID ) != ( tp.phase == LIQUID ); } ) ) {
         return false;
     }
 
@@ -9661,9 +9669,9 @@ int item::get_remaining_capacity_for_liquid( const item &liquid, bool allow_buck
 
         if( is_liquid && !type->container->watertight ) {
             return error( string_format( _( "That %s isn't water-tight." ), tname() ) );
-        } else if( contents_are_liquid && contents.front().typeId() != liquid.typeId() ) {
+        } else if( !can_contain( liquid ) ) {
             return error( string_format( _( "You can't mix loads in your %s." ), tname() ) );
-        } else if( contents_are_liquid && !is_liquid ) {
+        } else if( contents_are_liquid && contents.front().typeId() != liquid.typeId() ) {
             return error( string_format( _( "You can't mix loads in your %s." ), tname() ) );
         } else if( !type->container->seals && ( !allow_bucket || !is_bucket() ) ) {
             return error( string_format( is_bucket() ?

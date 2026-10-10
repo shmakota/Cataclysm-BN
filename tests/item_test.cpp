@@ -23,6 +23,68 @@
 
 static_assert(std::is_same_v<units::volume::value_type, std::int64_t>);
 
+TEST_CASE("containers_do_not_mix_liquids_and_solids", "[item][container][liquid]") {
+    auto container = item::spawn("test_jug_plastic");
+    const auto& liquid = *item::spawn_temporary("test_item_group_water");
+    const auto& solid = *item::spawn_temporary("test_rock");
+    const auto& single_solid = *item::spawn_temporary("test_amputator");
+
+    REQUIRE(liquid.made_of(LIQUID));
+    REQUIRE(solid.made_of(SOLID));
+    REQUIRE(solid.count_by_charges());
+    REQUIRE_FALSE(single_solid.count_by_charges());
+
+    SECTION("empty containers accept either kind") {
+        CHECK(container->can_contain(liquid));
+        CHECK(container->can_contain(solid));
+        CHECK(container->get_remaining_capacity_for_liquid(liquid) > 0);
+        CHECK(container->get_remaining_capacity_for_liquid(solid) > 0);
+        CHECK(container->is_reloadable_with(liquid.typeId()));
+        CHECK(container->is_reloadable_with(solid.typeId()));
+    }
+
+    SECTION("solids prevent adding liquids") {
+        container->put_in(item::spawn(solid.typeId(), calendar::turn, 1));
+        CHECK_FALSE(container->can_contain(liquid));
+        CHECK_FALSE(container->can_contain(*liquid.type));
+        CHECK(container->get_remaining_capacity_for_liquid(liquid) == 0);
+        CHECK_FALSE(container->can_reload_with(liquid.typeId()));
+        CHECK_FALSE(container->is_reloadable_with(liquid.typeId()));
+        auto rejected = container->fill_with(item::spawn(liquid.typeId(), calendar::turn, 1));
+        REQUIRE(rejected);
+        CHECK(rejected->charges == 1);
+        CHECK(container->contents.num_item_stacks() == 1);
+        CHECK(container->can_contain(single_solid));
+        CHECK(container->is_reloadable_with(single_solid.typeId()));
+    }
+
+    SECTION("liquids prevent adding both kinds of solids") {
+        container->put_in(item::spawn(liquid.typeId(), calendar::turn, 1));
+        CHECK_FALSE(container->can_contain(solid));
+        CHECK_FALSE(container->can_contain(*single_solid.type));
+        CHECK(container->get_remaining_capacity_for_liquid(solid) == 0);
+        CHECK_FALSE(container->can_reload_with(solid.typeId()));
+        CHECK_FALSE(container->is_reloadable_with(single_solid.typeId()));
+        auto rejected = container->fill_with(item::spawn(solid.typeId(), calendar::turn, 1));
+        REQUIRE(rejected);
+        CHECK(rejected->charges == 1);
+        CHECK(container->contents.num_item_stacks() == 1);
+        CHECK(container->can_contain(liquid));
+        CHECK(container->get_remaining_capacity_for_liquid(liquid) > 0);
+        CHECK(container->is_reloadable_with(liquid.typeId()));
+    }
+
+    SECTION("emptying the container allows changing kinds") {
+        container->put_in(item::spawn(solid.typeId(), calendar::turn, 1));
+        container->contents.clear_items();
+        CHECK(container->get_remaining_capacity_for_liquid(liquid) > 0);
+        container->put_in(item::spawn(liquid.typeId(), calendar::turn, 1));
+        container->contents.clear_items();
+        CHECK(container->can_contain(single_solid));
+        CHECK(container->is_reloadable_with(single_solid.typeId()));
+    }
+}
+
 TEST_CASE("item_volume", "[item]") {
     // Need to pick some item here which is count_by_charges and for which each
     // charge is at least 1_ml.  Battery works for now.
