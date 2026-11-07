@@ -76,6 +76,7 @@ harvest_entry harvest_entry::load( const JsonObject &jo, const std::string &src 
     assign( jo, "max", ret.max, strict, 1 );
     assign( jo, "type", ret.type, strict );
     assign( jo, "mass_ratio", ret.mass_ratio, strict, 0.00f );
+    assign( jo, "digital_content", ret.digital_content, strict );
     assign( jo, "flags", ret.flags );
     assign( jo, "faults", ret.faults );
     assign( jo, "no_auto_pickup", ret.no_auto_pickup, strict );
@@ -147,6 +148,14 @@ void harvest_list::check_consistency()
                     item_group::group_is_defined( item_group_id( entry.drop ) ) ) ) ) {
                 item_valid = false;
                 errorlist += entry.drop;
+            }
+            if( !entry.digital_content.empty() &&
+                !item_group::group_is_defined( item_group_id( entry.digital_content ) ) ) {
+                if( !errorlist.empty() ) {
+                    errorlist += ", ";
+                }
+                errorlist += string_format( "invalid digital content group %s",
+                                            entry.digital_content.c_str() );
             }
 
             // non butchery harvests need to be excluded

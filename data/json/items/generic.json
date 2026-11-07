@@ -1185,7 +1185,8 @@
     "bashing": 6,
     "cutting": 6,
     "to_hit": -3,
-    "flags": [ "TRADER_AVOID", "NO_REPAIR" ]
+    "flags": [ "TRADER_AVOID", "NO_REPAIR" ],
+    "item_vars": { "digital_robot_memory": "digital_content_nursebot_memories" }
   },
   {
     "type": "GENERIC",
@@ -1203,7 +1204,8 @@
     "bashing": 6,
     "cutting": 6,
     "to_hit": -3,
-    "flags": [ "TRADER_AVOID", "NO_REPAIR" ]
+    "flags": [ "TRADER_AVOID", "NO_REPAIR" ],
+    "item_vars": { "digital_robot_memory": "digital_content_grocerybot_memories" }
   },
   {
     "type": "GENERIC",
@@ -1221,7 +1223,8 @@
     "bashing": 6,
     "cutting": 6,
     "to_hit": -3,
-    "flags": [ "TRADER_AVOID", "NO_REPAIR" ]
+    "flags": [ "TRADER_AVOID", "NO_REPAIR" ],
+    "item_vars": { "digital_robot_memory": "digital_content_grocerybot_memories" }
   },
   {
     "type": "GENERIC",
@@ -1263,7 +1266,8 @@
     "bashing": 6,
     "cutting": 6,
     "to_hit": -3,
-    "flags": [ "TRADER_AVOID", "NO_REPAIR" ]
+    "flags": [ "TRADER_AVOID", "NO_REPAIR" ],
+    "item_vars": { "digital_robot_memory": "digital_content_riotbot_memories" }
   },
   {
     "type": "GENERIC",
@@ -3267,7 +3271,8 @@
     "bashing": 20,
     "cutting": 15,
     "to_hit": -3,
-    "flags": [ "TRADER_AVOID", "NO_REPAIR" ]
+    "flags": [ "TRADER_AVOID", "NO_REPAIR" ],
+    "item_vars": { "digital_robot_memory": "digital_content_combatbot_memories" }
   },
   {
     "type": "GENERIC",
@@ -3285,7 +3290,8 @@
     "bashing": 20,
     "cutting": 15,
     "to_hit": -3,
-    "flags": [ "TRADER_AVOID", "NO_REPAIR" ]
+    "flags": [ "TRADER_AVOID", "NO_REPAIR" ],
+    "item_vars": { "digital_robot_memory": "digital_content_combatbot_memories" }
   },
   {
     "type": "GENERIC",

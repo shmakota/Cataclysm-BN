@@ -1,5 +1,41 @@
 [
   {
+    "id": "digital_content_nursebot_memories",
+    "type": "item_group",
+    "subtype": "collection",
+    "entries": [ { "item": "digital_nursebot_memory", "count": [ 2, 5 ] } ]
+  },
+  {
+    "id": "digital_content_grocerybot_memories",
+    "type": "item_group",
+    "subtype": "collection",
+    "entries": [ { "item": "digital_grocerybot_memory", "count": [ 2, 5 ] } ]
+  },
+  {
+    "id": "digital_content_broken_cyborg_memories",
+    "type": "item_group",
+    "subtype": "collection",
+    "entries": [ { "item": "digital_broken_cyborg_memory", "count": [ 2, 5 ] } ]
+  },
+  {
+    "id": "digital_content_prototype_cyborg_memories",
+    "type": "item_group",
+    "subtype": "collection",
+    "entries": [ { "item": "digital_prototype_cyborg_memory", "count": [ 2, 5 ] } ]
+  },
+  {
+    "id": "digital_content_riotbot_memories",
+    "type": "item_group",
+    "subtype": "collection",
+    "entries": [ { "item": "digital_riotbot_memory", "count": [ 2, 5 ] } ]
+  },
+  {
+    "id": "digital_content_combatbot_memories",
+    "type": "item_group",
+    "subtype": "collection",
+    "entries": [ { "item": "digital_combatbot_memory", "count": [ 2, 5 ] } ]
+  },
+  {
     "id": "ghost_in_the_machine",
     "type": "item_group",
     "subtype": "collection",

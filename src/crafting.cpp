@@ -17,6 +17,7 @@
 #include "crafting_gui.h"
 #include "crafting_quality.h"
 #include "debug.h"
+#include "digital_media.h"
 #include "enchantments/enchantment.h"
 #include "enums.h"
 #include "faction.h"
@@ -2389,7 +2390,22 @@ void crafting::complete_disassemble( Character &who, const iuse_location &target
 
     std::vector<detached_ptr<item>> drop_items;
 
+    const auto memory_group = dis_item.get_var( "digital_robot_memory" );
+    if( !memory_group.empty() ) {
+        for( auto count = 0; count < target.count; ++count ) {
+            auto drive = item::spawn( "usb_drive", calendar::turn );
+            drive->set_var( "digital_content", memory_group );
+            initialize_digital_media( *drive );
+            drop_items.push_back( std::move( drive ) );
+        }
+    }
+
     for( detached_ptr<item> &newit : components.clear() ) {
+        if( !memory_group.empty() && ( newit->typeId() == itype_id( "usb_drive" ) ||
+                                       newit->typeId() == itype_id( "sd_memory_card" ) ) ) {
+            // The android's storage has been recovered as the memory drive above.
+            continue;
+        }
         const bool comp_success = ( dice( skill_dice, skill_sides ) > dice( diff_dice,  diff_sides ) );
         if( dis.difficulty != 0 && !comp_success ) {
             add_msg( m_bad, _( "You fail to recover %s." ), newit->tname() );

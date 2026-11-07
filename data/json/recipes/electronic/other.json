@@ -292,7 +292,8 @@
       [ [ "android_legs", 1 ] ],
       [ [ "android_chassis", 1 ] ],
       [ [ "android_arms", 2 ] ],
-      [ [ "medium_storage_battery", 1 ] ]
+      [ [ "medium_storage_battery", 1 ] ],
+      [ [ "usb_drive", 1, "NO_RECOVER" ], [ "sd_memory_card", 1, "NO_RECOVER" ] ]
     ]
   },
   {
@@ -324,7 +325,8 @@
       [ [ "android_legs", 1 ] ],
       [ [ "android_chassis", 1 ] ],
       [ [ "android_arms", 1 ] ],
-      [ [ "medium_storage_battery", 1 ] ]
+      [ [ "medium_storage_battery", 1 ] ],
+      [ [ "usb_drive", 1, "NO_RECOVER" ], [ "sd_memory_card", 1, "NO_RECOVER" ] ]
     ]
   },
   {

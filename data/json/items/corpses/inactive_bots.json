@@ -358,7 +358,8 @@
       "moves": 150,
       "skills": [ "electronics", "computer" ]
     },
-    "flags": [ "ALLOWS_REMOTE_USE" ]
+    "flags": [ "ALLOWS_REMOTE_USE" ],
+    "item_vars": { "digital_robot_memory": "digital_content_nursebot_memories" }
   },
   {
     "id": "bot_grocerybot",
@@ -383,7 +384,8 @@
       "moves": 150,
       "skills": [ "electronics", "computer" ]
     },
-    "flags": [ "ALLOWS_REMOTE_USE" ]
+    "flags": [ "ALLOWS_REMOTE_USE" ],
+    "item_vars": { "digital_robot_memory": "digital_content_grocerybot_memories" }
   },
   {
     "id": "bot_grocerybot_busted",
@@ -408,7 +410,8 @@
       "moves": 150,
       "skills": [ "electronics", "computer" ]
     },
-    "flags": [ "ALLOWS_REMOTE_USE" ]
+    "flags": [ "ALLOWS_REMOTE_USE" ],
+    "item_vars": { "digital_robot_memory": "digital_content_grocerybot_memories" }
   },
   {
     "id": "bot_broken_cyborg",
@@ -435,7 +438,8 @@
       "moves": 250,
       "skills": [ "electronics", "computer" ]
     },
-    "flags": [ "ALLOWS_REMOTE_USE" ]
+    "flags": [ "ALLOWS_REMOTE_USE" ],
+    "item_vars": { "digital_robot_memory": "digital_content_broken_cyborg_memories" }
   },
   {
     "id": "bot_prototype_cyborg",
@@ -462,7 +466,8 @@
       "moves": 250,
       "skills": [ "electronics", "computer" ]
     },
-    "flags": [ "ALLOWS_REMOTE_USE" ]
+    "flags": [ "ALLOWS_REMOTE_USE" ],
+    "item_vars": { "digital_robot_memory": "digital_content_prototype_cyborg_memories" }
   },
   {
     "id": "bot_copbot",
@@ -626,7 +631,8 @@
       "moves": 150,
       "skills": [ "electronics", "computer" ]
     },
-    "flags": [ "ALLOWS_REMOTE_USE" ]
+    "flags": [ "ALLOWS_REMOTE_USE" ],
+    "item_vars": { "digital_robot_memory": "digital_content_riotbot_memories" }
   },
   {
     "id": "bot_skitterbot",
@@ -971,7 +977,8 @@
       "moves": 500,
       "skills": [ "electronics", "computer" ]
     },
-    "flags": [ "ALLOWS_REMOTE_USE" ]
+    "flags": [ "ALLOWS_REMOTE_USE" ],
+    "item_vars": { "digital_robot_memory": "digital_content_combatbot_memories" }
   },
   {
     "id": "bot_chickenbot",
@@ -997,7 +1004,8 @@
       "moves": 250,
       "skills": [ "electronics", "computer" ]
     },
-    "flags": [ "ALLOWS_REMOTE_USE" ]
+    "flags": [ "ALLOWS_REMOTE_USE" ],
+    "item_vars": { "digital_robot_memory": "digital_content_combatbot_memories" }
   },
   {
     "id": "bot_tripod",

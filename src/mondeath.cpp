@@ -1010,7 +1010,8 @@ void make_mon_corpse( monster &z, int damageLvl )
     if( !z.no_extra_death_drops ) {
         // Pre-gen bionic on death rather than on butcher
         for( const harvest_entry &entry : *z.type->harvest ) {
-            if( entry.type == "bionic" || entry.type == "bionic_group" ) {
+            if( ( entry.type == "bionic" || entry.type == "bionic_group" ) &&
+                entry.digital_content.empty() ) {
                 std::vector<detached_ptr<item>> contained_bionics =
                                                  entry.type == "bionic"
                                                  ? butcher_cbm_item( itype_id( entry.drop ), calendar::turn, entry.flags, entry.faults )

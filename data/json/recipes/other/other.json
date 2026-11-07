@@ -998,5 +998,21 @@
     ],
     "tools": [ [ [ "surface_heat", 30, "LIST" ] ] ],
     "components": [ [ [ "meat_red", 1, "LIST" ] ], [ [ "veggy_any", 1, "LIST" ] ], [ [ "saline", 7 ] ], [ [ "chem_peptone_broth", 1 ] ] ]
+  },
+  {
+    "type": "uncraft",
+    "result": "bot_broken_cyborg",
+    "skill_used": "electronics",
+    "difficulty": 2,
+    "time": "30 m",
+    "components": [ [ [ "scrap", 8 ] ], [ [ "circuit", 2 ] ], [ [ "cable", 4 ] ] ]
+  },
+  {
+    "type": "uncraft",
+    "result": "bot_prototype_cyborg",
+    "skill_used": "electronics",
+    "difficulty": 3,
+    "time": "45 m",
+    "components": [ [ [ "scrap", 10 ] ], [ [ "circuit", 3 ] ], [ [ "cable", 6 ] ] ]
   }
 ]

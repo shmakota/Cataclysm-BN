@@ -1,5 +1,53 @@
 [
   {
+    "id": "digital_grocerybot_memory",
+    "copy-from": "digital_text",
+    "type": "GENERIC",
+    "name": { "str": "grocery bot memory fragment" },
+    "description": "A recovered grocery bot service log, recording shopping trips, customer requests, and store routines.",
+    "snippet_category": "digital_grocerybot_memory"
+  },
+  {
+    "id": "digital_nursebot_memory",
+    "copy-from": "digital_text",
+    "type": "GENERIC",
+    "name": { "str": "nurse bot memory fragment" },
+    "description": "A recovered nurse bot care log, recording ward rounds, patient interactions, and hospital routines.",
+    "snippet_category": "digital_nursebot_memory"
+  },
+  {
+    "id": "digital_broken_cyborg_memory",
+    "copy-from": "digital_text",
+    "type": "GENERIC",
+    "name": { "str": "broken cyborg memory fragment" },
+    "description": "A damaged memory fragment from a broken cyborg, mixing scraps of ordinary human life with confused combat responses.",
+    "snippet_category": "digital_broken_cyborg_memory"
+  },
+  {
+    "id": "digital_prototype_cyborg_memory",
+    "copy-from": "digital_text",
+    "type": "GENERIC",
+    "name": { "str": "prototype cyborg memory fragment" },
+    "description": "A recovered prototype cyborg log, preserving fragments of a test subject's life alongside clinical augmentation and control records.",
+    "snippet_category": "digital_prototype_cyborg_memory"
+  },
+  {
+    "id": "digital_riotbot_memory",
+    "copy-from": "digital_text",
+    "type": "GENERIC",
+    "name": { "str": "riot control bot memory fragment" },
+    "description": "A recovered riot control bot log, recording crowd-control patrols, public safety announcements, and escalation decisions.",
+    "snippet_category": "digital_riotbot_memory"
+  },
+  {
+    "id": "digital_combatbot_memory",
+    "copy-from": "digital_text",
+    "type": "GENERIC",
+    "name": { "str": "combat robot memory fragment" },
+    "description": "A recovered combat robot log, recording patrols, target identification, weapons checks, and battlefield reports.",
+    "snippet_category": "digital_combatbot_memory"
+  },
+  {
     "id": "digital_genome_sample",
     "copy-from": "software",
     "type": "GENERIC",

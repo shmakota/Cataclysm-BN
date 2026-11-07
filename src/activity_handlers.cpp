@@ -943,6 +943,15 @@ static void butchery_drops_harvest( item *corpse_item, const mtype &mt, player &
             drop = &*itype_id( entry.drop );
         }
 
+        if( action == DISSECT && !entry.digital_content.empty() ) {
+            auto drive = item::spawn( itype_id( entry.drop ), calendar::turn );
+            drive->set_var( "digital_content", entry.digital_content );
+            initialize_digital_media( *drive );
+            here.add_item( p.bub_pos(), std::move( drive ) );
+            p.add_msg_if_player( m_good, _( "You recover a USB drive containing digital files." ) );
+            continue;
+        }
+
         // BIONIC handling - no code for DISSECT to let the bionic drop fall through
         if( entry.type == "bionic" || entry.type == "bionic_group" ) {
             if( action == F_DRESS ) {

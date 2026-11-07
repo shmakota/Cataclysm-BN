@@ -1,0 +1,230 @@
+[
+  {
+    "type": "snippet",
+    "category": "digital_grocerybot_memory",
+    "text": [
+      {
+        "id": "grocerybot_memory_apples",
+        "text": "A shopper apologizes for taking so long to choose apples.  The grocery bot replies that it is happy to help.  She chooses three, changes her mind, and puts two back.  The cart's contents are recalculated seven times before she leaves the produce aisle."
+      },
+      {
+        "id": "grocerybot_memory_soup",
+        "text": "CUSTOMER ASSISTANCE LOG: Requested item: the soup my husband likes.  Brand unspecified.  Flavor unspecified.  The grocery bot follows an elderly customer past the same shelf four times.  She finally points to a can and says, 'That's the one.'  The product image is marked for future reference."
+      },
+      {
+        "id": "grocerybot_memory_child",
+        "text": "A child riding in the shopping cart announces that every floor tile is lava.  The grocery bot pauses at the edge of the aisle.  A staff member tells it the floor is safe.  The child's delighted shout is tagged as positive customer feedback."
+      },
+      {
+        "id": "grocerybot_memory_closing",
+        "text": "CLOSING ROUTINE: Escort remaining customers to checkout.  Return abandoned carts.  Check aisles for misplaced perishables.  A cashier tapes a hand-lettered THANK YOU onto the grocery bot's chest before turning out the lights.  The sign is still visible in its next morning's self-inspection."
+      },
+      {
+        "id": "grocerybot_memory_spill",
+        "text": "HAZARD RESPONSE: Broken jar detected in aisle four.  The grocery bot diverts customers around the spill while repeatedly announcing, 'Watch your step!'  A cleaner says it has already warned him six times.  The seventh warning is delivered at a lower volume."
+      },
+      {
+        "id": "grocerybot_memory_birthday",
+        "text": "A regular customer tells the grocery bot that her husband has died.  Her shopping list still includes his favorite birthday cake.  The bot offers directions to the bakery, then asks whether she needs help carrying it.  The recorded silence lasts fourteen seconds."
+      },
+      {
+        "id": "grocerybot_memory_shortage",
+        "text": "STOCK QUERY: Bottled water unavailable.  Canned food unavailable.  Infant formula unavailable.  Each failed search triggers the same cheerful apology.  The queue of waiting customers extends beyond the front doors.  A manager disables the customer-satisfaction alerts."
+      },
+      {
+        "id": "grocerybot_memory_last_customer",
+        "text": "A bloodied customer asks where the emergency exit is.  The grocery bot offers to carry her bags.  She screams that she has no bags.  The response is marked inappropriate, but the store's correction server does not answer.  The bot asks whether she would like to speak to a manager."
+      }
+    ]
+  },
+  {
+    "type": "snippet",
+    "category": "digital_nursebot_memory",
+    "text": [
+      {
+        "id": "nursebot_memory_hand",
+        "text": "A patient grips the nurse bot's hand and asks whether someone will stay until she falls asleep.  The log marks this as an unscheduled bedside task.  Three hours of motionless footage follow.  The final entry records a sleeping patient and an overdue ward round."
+      },
+      {
+        "id": "nursebot_memory_blanket",
+        "text": "COMFORT ROUND: Patient reports being cold.  The nurse bot retrieves a blanket, then another when the patient says the first is too thin.  A third request produces a warning that the linen cart is empty.  An orderly arrives with a warm blanket and tells the bot where the spare cart is kept."
+      },
+      {
+        "id": "nursebot_memory_child",
+        "text": "A child in a hospital bed asks whether injections hurt robots too.  The nurse bot checks its approved reassurance scripts.  Before it can answer, the child sticks a brightly colored bandage onto its arm.  The bandage remains visible in seven subsequent hygiene inspections."
+      },
+      {
+        "id": "nursebot_memory_name",
+        "text": "A ward nurse covers the android's serial number with a handwritten label: 'SAM.'  The identification system flags the label as an obstruction.  At the next bedside, a patient calls it Sam.  The bot turns toward him before its speech-recognition module has finished processing the request."
+      },
+      {
+        "id": "nursebot_memory_pump",
+        "text": "EQUIPMENT ROUND: Infusion pump alarm detected.  The nurse bot summons a registered nurse and waits beside the bed.  The patient asks it to silence the noise.  It apologizes each time the alarm repeats.  When the nurse arrives, the apology counter stands at twenty-three."
+      },
+      {
+        "id": "nursebot_memory_visitors",
+        "text": "VISITING HOURS: A patient asks whether her daughter has arrived.  The nurse bot checks the reception desk.  No visitor is registered.  It checks again on the next round, and the next.  On the fourth round, reception reports that a young woman is running down the corridor."
+      },
+      {
+        "id": "nursebot_memory_evacuation",
+        "text": "EVACUATION LOG: Transfer assigned patients to the ambulance bay.  The nurse bot reaches the loading area with a wheelchair and two bags of belongings.  Every ambulance has left.  Dispatch does not answer.  The bot returns the wheelchair to the shelter of the entrance and requests further instructions."
+      },
+      {
+        "id": "nursebot_memory_empty_ward",
+        "text": "The nurse bot moves between empty beds, announcing medication times.  At one bed it pauses and repeats a patient's name.  Its ward roster reports no discharge order and no response.  It smooths the blanket, logs a missed appointment, and continues its round."
+      }
+    ]
+  },
+  {
+    "type": "snippet",
+    "category": "digital_broken_cyborg_memory",
+    "text": [
+      {
+        "id": "broken_cyborg_memory_kitchen",
+        "text": "The smell of burnt toast. A hand reaching for the kettle. A voice says, 'You promised to be careful with that arm.' The cyborg's combat routine marks the voice as an unknown threat, then clears the alert without firing."
+      },
+      {
+        "id": "broken_cyborg_memory_bus",
+        "text": "BUS ROUTE 14: The bus is late again. Rain on the window. Someone offers a seat to an older passenger. The memory ends with a targeting reticle snapping over the driver's face and a string of corrupted restraint commands."
+      },
+      {
+        "id": "broken_cyborg_memory_dog",
+        "text": "A dog noses a metal hand and wags its tail. The subject laughs. A diagnostic overlay identifies the sound as involuntary and recommends suppressing it during patrol. The recommendation is ignored."
+      },
+      {
+        "id": "broken_cyborg_memory_name",
+        "text": "A voice asks the subject's name. The answer begins with 'Mara' before an automated identification routine cuts in: UNIT 04, COMBAT AUGMENTATION ACTIVE."
+      },
+      {
+        "id": "broken_cyborg_memory_alarm",
+        "text": "The fire alarm rings. A child cries in the hall. The subject tries to move toward the sound, but the legs turn toward the armory. The command repeats until the recording breaks into static."
+      },
+      {
+        "id": "broken_cyborg_memory_photo",
+        "text": "A faded photograph is held up to the cyborg's camera. Two people grin beside a fishing boat. Facial recognition labels one as the current operator, then the weapon system reports that no operator is present."
+      },
+      {
+        "id": "broken_cyborg_memory_sleep",
+        "text": "Goodnight, Dad. The room goes dark. The subject's eyes close; the implanted optics stay awake, counting movement in the empty hallway until morning."
+      },
+      {
+        "id": "broken_cyborg_memory_orders",
+        "text": "An officer orders the subject to stand down. The subject repeats the words 'stand down' in a familiar voice. The motor controller does not obey either one."
+      }
+    ]
+  },
+  {
+    "type": "snippet",
+    "category": "digital_prototype_cyborg_memory",
+    "text": [
+      {
+        "id": "prototype_cyborg_memory_consent",
+        "text": "TRIAL INTAKE: The subject asks whether the procedure is reversible. The researcher says the team will discuss that after baseline testing. The subject signs the consent form, then asks again when the cameras turn off."
+      },
+      {
+        "id": "prototype_cyborg_memory_gait",
+        "text": "GAIT TEST 12: Walk to the end of the corridor and return. The subject asks for a cane. The technician says the new leg assembly should be enough. The subject completes the test and requests the cane again."
+      },
+      {
+        "id": "prototype_cyborg_memory_family",
+        "text": "VISITOR LOG: A sister brings a paperback and an orange. The subject cannot hold either with the new hands. Staff place them on the bedside table and record the visit as successful."
+      },
+      {
+        "id": "prototype_cyborg_memory_mirror",
+        "text": "The subject asks for a mirror. The technician hesitates before handing one over. For several seconds the only recorded sound is the cooling fan in the cranial interface."
+      },
+      {
+        "id": "prototype_cyborg_memory_pain",
+        "text": "PAIN CALIBRATION: The subject reports pain in the left shoulder. The sensor array returns zero. The clinician asks the subject to rate it again. The answer is still eight."
+      },
+      {
+        "id": "prototype_cyborg_memory_voice",
+        "text": "VOICE SYNTHESIS REVIEW: The generated voice is clear and correctly calibrated. The subject listens to it say 'I am fine' and asks for the old voice back."
+      },
+      {
+        "id": "prototype_cyborg_memory_exit",
+        "text": "A security door opens at the end of the hall. The subject reaches it before the escorts do. The recording contains one question: 'If I can leave, why do I need permission?'"
+      },
+      {
+        "id": "prototype_cyborg_memory_shutdown",
+        "text": "FINAL SYSTEM CHECK: Motor response nominal. Interface stable. Subject requests shutdown. The technician asks for confirmation. The subject repeats the request, slowly, while the test continues."
+      }
+    ]
+  },
+  {
+    "type": "snippet",
+    "category": "digital_riotbot_memory",
+    "text": [
+      {
+        "id": "riotbot_memory_parade",
+        "text": "CROWD CONTROL DRILL: Parade route clear. A little girl waves at the riot bot from her father's shoulders. The unit raises one armored hand in return. The gesture is not in the approved response library, but the crowd cheers."
+      },
+      {
+        "id": "riotbot_memory_lost_child",
+        "text": "A child is separated from her family near the station. The riot bot forms a protective perimeter, broadcasts her description, and waits beside her until a transit officer arrives. The child asks if it can come home with her."
+      },
+      {
+        "id": "riotbot_memory_protest",
+        "text": "PROTEST DETAIL: The crowd chants slogans and holds cardboard signs. Threat assessment remains low. A supervisor orders dispersal. The bot's public address system asks everyone to remain calm, including the supervisor."
+      },
+      {
+        "id": "riotbot_memory_directions",
+        "text": "An elderly man asks for directions to the clinic. The riot bot checks its patrol map and escorts him three blocks, walking slowly enough for him to keep pace. The patrol report lists the delay as an unexplained route deviation."
+      },
+      {
+        "id": "riotbot_memory_shield",
+        "text": "A bottle shatters against the bot's shield. Behind it, a shopkeeper and two customers crouch in the doorway. The bot holds position until they reach cover, then records the shield damage as mission critical."
+      },
+      {
+        "id": "riotbot_memory_arrest",
+        "text": "DETENTION RECORD: A young person is handcuffed for spray-painting a wall. The riot bot scans the fresh letters: 'WE ARE STILL HERE.' Its damage estimate for the wall is negligible. The arrest report takes longer to complete."
+      },
+      {
+        "id": "riotbot_memory_curfew",
+        "text": "CURFEW PATROL: The streets are empty except for a street cleaner pushing a cart. The bot warns him to return home. He points at the pile of leaves and asks who will clean them otherwise. The patrol continues at reduced speed."
+      },
+      {
+        "id": "riotbot_memory_last_call",
+        "text": "A bar owner asks the riot bot to help a drunk patron find a taxi. The patron leans against its leg armor and says it looks like a very large friend. The bot waits with him until a cab arrives."
+      }
+    ]
+  },
+  {
+    "type": "snippet",
+    "category": "digital_combatbot_memory",
+    "text": [
+      {
+        "id": "combatbot_memory_startup",
+        "text": "COMBAT UNIT STARTUP: Crew link unavailable. Remote operator unavailable. Mission parameters loaded from local storage. The vehicle moves forward while its radio repeats a request for authorization."
+      },
+      {
+        "id": "combatbot_memory_training",
+        "text": "RANGE EXERCISE: Target silhouette acquired. Fire command received. The round strikes the center of the paper target. A technician congratulates the operator; the drone stores the exchange as a successful mission."
+      },
+      {
+        "id": "combatbot_memory_supply",
+        "text": "SUPPLY CONVOY ESCORT: The truck stops beside the road. The combat unit circles it, scanning the treeline. A driver offers it a thermos out of habit, then laughs and puts it back in the cab."
+      },
+      {
+        "id": "combatbot_memory_sheep",
+        "text": "OPTICAL IDENTIFICATION ERROR: Flock of sheep detected. Threat confidence 0.91. Operator says, 'Those are sheep.' Confidence falls to 0.04. The next report labels the flock as suspicious livestock."
+      },
+      {
+        "id": "combatbot_memory_maintenance",
+        "text": "MAINTENANCE BAY: A mechanic crawls under the chassis and taps the armor twice. The combat unit asks whether it is operational. The mechanic answers, 'After lunch.' The answer is saved as an indefinite maintenance window."
+      },
+      {
+        "id": "combatbot_memory_snow",
+        "text": "MOBILITY TEST: Snow depth exceeds expected limit. Treads slip and a walking unit's footing sensors report instability. A soldier clears a path and pats the armor before the unit moves again."
+      },
+      {
+        "id": "combatbot_memory_ceasefire",
+        "text": "CEASEFIRE UPDATE: Weapons safe. Hold position. The order arrives while the targeting system is tracking a vehicle that has stopped in the road. The unit maintains aim until a second confirmation arrives."
+      },
+      {
+        "id": "combatbot_memory_home",
+        "text": "RETURN TO BASE: Route marker unavailable. The combat unit follows a familiar road past an empty school and a row of dark houses. At the final waypoint, no operator is waiting to unload the mission recorder."
+      }
+    ]
+  }
+]

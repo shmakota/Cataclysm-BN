@@ -72,7 +72,7 @@
     "revert_to_itype": "bot_prototype_cyborg",
     "special_attacks": [ [ "PARROT", 80 ] ],
     "death_function": [ "NORMAL" ],
-    "harvest": "mon_broken_cyborg",
+    "harvest": "mon_prototype_cyborg",
     "flags": [
       "SEES",
       "HEARS",

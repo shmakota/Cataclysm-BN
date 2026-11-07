@@ -24,6 +24,7 @@ struct harvest_entry {
     int max = 1000;
     std::string type = "null";
     float mass_ratio = 0.00f;
+    std::string digital_content;
 
     bool no_auto_pickup = false;
 
