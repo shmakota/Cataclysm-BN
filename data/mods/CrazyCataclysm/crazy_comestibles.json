@@ -29,29 +29,5 @@
     "time": 1000,
     "qualities": [ { "id": "COOK", "level": 2 } ],
     "components": [ [ [ "cookies", 4 ] ], [ [ "marloss_berry", 1 ], [ "marloss_seed", 1 ], [ "mycus_fruit", 1 ] ] ]
-  },
-  {
-    "type": "COMESTIBLE",
-    "copy-from": "cola",
-    "id": "pilk",
-    "name": "pilk",
-    "container": "bottle_plastic",
-    "weight": "250 g",
-    "volume": "250 ml",
-    "spoils_in": "1 day",
-    "material": [ "milk", "junk" ],
-    "primary_material": "milk",
-    "description": "A questionable blend of cola and milk.  It looks worse than it tastes, which is not saying much."
-  },
-  {
-    "type": "recipe",
-    "result": "pilk",
-    "category": "CC_FOOD",
-    "subcategory": "CSC_FOOD_DRINKS",
-    "skill_used": "cooking",
-    "difficulty": 0,
-    "autolearn": true,
-    "time": 1000,
-    "components": [ [ [ "cola", 1 ] ], [ [ "milk", 1 ] ] ]
   }
 ]
