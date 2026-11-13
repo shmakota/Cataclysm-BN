@@ -947,6 +947,31 @@
   },
   {
     "type": "furniture",
+    "id": "f_dead_drop_boulder_harvest",
+    "copy-from": "f_boulder_small",
+    "name": "small boulder",
+    "transforms_into": "f_dead_drop_boulder_harvested",
+    "harvest_by_season": [
+      {
+        "seasons": [ "spring", "summer", "autumn", "winter" ],
+        "entries": [
+          { "drop": "assorted_bugs", "base_num": [ 1, 4 ], "scale_num": [ 0, 0.001 ] },
+          { "drop": "boulder_dead_drop_note", "type": "item_group", "base_num": 1, "max": 1 },
+          { "drop": "boulder_dead_drop", "type": "item_group", "base_num": [ 2, 3 ], "max": 3 }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "furniture",
+    "id": "f_dead_drop_boulder_harvested",
+    "copy-from": "f_boulder_small_harvested",
+    "name": "upturned small boulder",
+    "transforms_into": "f_dead_drop_boulder_harvest",
+    "harvest_by_season": [  ]
+  },
+  {
+    "type": "furniture",
     "id": "f_boulder_small_underwater",
     "copy-from": "f_boulder_small",
     "symbol": "o",

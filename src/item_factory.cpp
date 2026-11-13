@@ -39,6 +39,7 @@
 #include "item_contents.h"
 #include "digital_recipes.h"
 #include "item_group.h"
+#include "item/treasure_map_actor.h"
 #include "iuse_actor.h"
 #include "json.h"
 #include "sounds.h"
@@ -1147,6 +1148,7 @@ void Item_factory::init()
     add_actor( std::make_unique<dna_editor_iuse>() );
     add_actor( std::make_unique<place_npc_iuse>() );
     add_actor( std::make_unique<reveal_map_actor>() );
+    add_actor( std::make_unique<treasure_map_actor>() );
     add_actor( std::make_unique<unfold_vehicle_iuse>() );
     add_actor( std::make_unique<place_trap_actor>() );
     add_actor( std::make_unique<emit_actor>() );

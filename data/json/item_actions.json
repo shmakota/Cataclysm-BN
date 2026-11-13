@@ -976,6 +976,11 @@
   },
   {
     "type": "item_action",
+    "id": "treasure_map",
+    "name": { "str": "Read" }
+  },
+  {
+    "type": "item_action",
     "id": "sonar_scan",
     "name": { "str": "Scan with sonar" }
   },

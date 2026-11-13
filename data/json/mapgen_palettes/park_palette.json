@@ -67,7 +67,12 @@
       "I": "f_region_water_plant",
       "i": "f_region_water_plant",
       "L": "f_table",
-      "O": [ [ "f_boulder_small", 2 ], [ "f_boulder_medium", 4 ], "f_boulder_large" ],
+      "O": [
+        [ "f_boulder_small", 20 ],
+        [ "f_boulder_medium", 40 ],
+        [ "f_boulder_large", 10 ],
+        [ "f_dead_drop_boulder_harvest", 1 ]
+      ],
       "T": "f_table",
       "v": "f_vending_c",
       "x": "f_toilet",

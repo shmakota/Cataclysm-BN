@@ -463,6 +463,34 @@ TEST_CASE("exporting_a_selected_file_preserves_identity_and_metadata", "[digital
     CHECK(card->contents.num_item_stacks() == 1);
 }
 
+TEST_CASE("dead_drop_location_copies_keep_one_file_identity", "[digital_media]") {
+    auto dummy = avatar{};
+    auto device = item::spawn("wrist_comp_budget");
+    auto& reader = *device;
+    reader.ammo_set(itype_id("battery"), 10);
+    dummy.i_add(std::move(device));
+
+    auto media = item::spawn("usb_drive");
+    media->put_in(item::spawn("digital_dead_drop_location"));
+    REQUIRE(download_digital_files(reader, *media, dummy) == 1);
+    REQUIRE(media->contents.num_item_stacks() == 1);
+    REQUIRE(reader.contents.num_item_stacks() == 1);
+    CHECK(reader.contents.front().typeId() == itype_id("digital_dead_drop_location"));
+    const auto identity = reader.contents.front().get_var("DIGITAL_FILE_ID");
+    REQUIRE_FALSE(identity.empty());
+    CHECK(media->contents.front().get_var("DIGITAL_FILE_ID") == identity);
+
+    auto destination = item::spawn("sd_memory_card");
+    REQUIRE(
+        upload_digital_files(
+            dummy,
+            {.source = reader, .destination = *destination, .file = &reader.contents.front()})
+        == 1);
+    REQUIRE(destination->contents.num_item_stacks() == 1);
+    CHECK(destination->contents.front().get_var("DIGITAL_FILE_ID") == identity);
+    CHECK(reader.contents.num_item_stacks() == 1);
+}
+
 TEST_CASE(
     "removable_storage_encryption_preserves_files_and_blocks_transfers",
     "[digital_media][savegame]") {

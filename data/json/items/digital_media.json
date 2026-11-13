@@ -97,6 +97,20 @@
     }
   },
   {
+    "id": "digital_dead_drop_location",
+    "copy-from": "digital_urbex_map",
+    "type": "GENERIC",
+    "name": { "str": "dead drop location file" },
+    "description": "A location file for a hidden dead drop.  Opening it marks the exact boulder tile on your map, then erases that copy.  Other copies of the file cannot reveal the same location again.",
+    "use_action": {
+      "type": "treasure_map",
+      "radius": 30,
+      "overmap_terrain": [ "park" ],
+      "furniture": "f_dead_drop_boulder_harvest",
+      "one_time": true
+    }
+  },
+  {
     "id": "digital_3d_printing_guide",
     "copy-from": "digital_collection",
     "type": "GENERIC",

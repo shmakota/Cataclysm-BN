@@ -1,6 +1,31 @@
 [
   {
     "type": "item_group",
+    "id": "boulder_treasure_map",
+    "subtype": "distribution",
+    "entries": [ { "item": "treasure_map" } ]
+  },
+  {
+    "type": "item_group",
+    "id": "boulder_dead_drop_note",
+    "subtype": "distribution",
+    "entries": [ { "item": "survnote" } ]
+  },
+  {
+    "type": "item_group",
+    "id": "boulder_dead_drop",
+    "subtype": "distribution",
+    "entries": [
+      { "group": "banknotes", "prob": 20 },
+      { "group": "smokedrugs", "prob": 14 },
+      { "group": "baddrugs", "prob": 44 },
+      { "group": "ammo_common", "prob": 20 },
+      { "group": "digital_storage_media_encrypted", "prob": 10 },
+      { "group": "boulder_treasure_map", "prob": 5 }
+    ]
+  },
+  {
+    "type": "item_group",
     "id": "stash_food",
     "items": [
       [ "water_clean", 90 ],

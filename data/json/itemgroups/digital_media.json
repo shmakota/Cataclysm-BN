@@ -130,6 +130,7 @@
       { "item": "software_cryptow", "prob": 5 },
       { "group": "digital_content_maps", "prob": 10 },
       { "item": "digital_saved_email", "prob": 10 },
+      { "item": "digital_dead_drop_location", "prob": 5 },
       { "group": "digital_content_recipe_archives", "prob": 10 },
       { "item": "digital_electronic_blueprints", "prob": 15 },
       { "item": "digital_chemical_synthesis_sheet", "prob": 20 },

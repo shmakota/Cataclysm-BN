@@ -4,6 +4,7 @@
 #include "debug.h"
 #include "item.h"
 #include "item_group.h"
+#include "itype.h"
 #include "json.h"
 #include "output.h"
 #include "string_formatter.h"
@@ -89,10 +90,15 @@ auto harvest_list::load(const JsonObject& jo, const std::string& src, const std:
 }
 
 void harvest_list::finalize() {
-    std::ranges::
-        transform(entries_, std::inserter(names_, names_.begin()), [](const harvest_entry& entry) {
-            return itype_id(entry.drop).is_valid() ? item::nname(itype_id(entry.drop)) : "";
-        });
+    std::ranges::for_each(entries_, [this](const auto& entry) {
+        if (entry.type == "item_group") {
+            std::ranges::for_each(
+                item_group::every_possible_item_from(item_group_id(entry.drop)),
+                [this](const auto* type) { names_.insert(item::nname(type->get_id())); });
+        } else if (itype_id(entry.drop).is_valid()) {
+            names_.insert(item::nname(itype_id(entry.drop)));
+        }
+    });
 }
 
 void harvest_list::finalize_all() {
@@ -116,7 +122,7 @@ void harvest_list::check_consistency() {
                     string_format("\"mass_ratio\" != 0.0, but type %s", entry.type.c_str());
             }
             if (!(itype_id(entry.drop).is_valid()
-                  || (entry.type == "bionic_group"
+                  || ((entry.type == "bionic_group" || entry.type == "item_group")
                       && item_group::group_is_defined(item_group_id(entry.drop))))) {
                 item_valid = false;
                 errorlist += entry.drop;
@@ -127,9 +133,10 @@ void harvest_list::check_consistency() {
                 if (entry.type == "null") {
                     if (!item_valid) { errorlist += ", "; }
                     errorlist += "null type";
-                } else if (!(entry.type == "flesh" || entry.type == "bone" || entry.type == "skin"
-                             || entry.type == "blood" || entry.type == "offal"
-                             || entry.type == "bionic" || entry.type == "bionic_group")) {
+                } else if (
+                    !(entry.type == "flesh" || entry.type == "bone" || entry.type == "skin"
+                      || entry.type == "blood" || entry.type == "offal" || entry.type == "bionic"
+                      || entry.type == "bionic_group" || entry.type == "item_group")) {
                     if (!item_valid) { errorlist += ", "; }
                     errorlist += entry.type;
                 }
@@ -177,7 +184,11 @@ auto harvest_list::describe(int at_skill) const -> std::string {
             if (max_drops <= 0) { return std::string(); }
 
             std::string ss;
-            ss += "<bold>" + item::nname(itype_id(en.drop), max_drops) + "</bold>";
+            const auto drop_name =
+                en.type == "item_group"
+                    ? _("assorted items")
+                    : item::nname(itype_id(en.drop), max_drops);
+            ss += "<bold>" + drop_name + "</bold>";
             // If the number is unspecified, just list the type
             if (max_drops >= 1000 && min_drops <= 0) { return ss; }
             ss += ": ";

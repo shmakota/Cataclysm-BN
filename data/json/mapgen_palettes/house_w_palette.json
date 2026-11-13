@@ -253,7 +253,7 @@
       "d": "f_tourist_table",
       "e": "f_bookcase",
       "f": "f_statue",
-      "g": [ "f_boulder_medium", "f_boulder_large" ],
+      "g": [ [ "f_boulder_medium", 10 ], [ "f_boulder_large", 10 ], "f_dead_drop_boulder_harvest" ],
       "h": [ "f_indoor_plant", "f_indoor_plant_y" ],
       "i": "f_firering",
       "j": "f_brazier",

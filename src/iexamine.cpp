@@ -68,6 +68,7 @@
 #include "inventory.h"
 #include "item.h"
 #include "item_contents.h"
+#include "item_group.h"
 #include "item_stack.h"
 #include "iuse.h"
 #include "iuse_actor.h"
@@ -2424,7 +2425,14 @@ static bool harvest_common( player &p, const tripoint_bub_ms &examp, bool furn, 
         if( roll >= 1 ) {
             got_anything = true;
             for( int i = 0; i < roll; i++ ) {
-                handle_harvest( p, entry.drop, entry.no_auto_pickup );
+                if( entry.type == "item_group" ) {
+                    for( auto &drop : item_group::items_from( item_group_id( entry.drop ), calendar::turn ) ) {
+                        p.add_msg_if_player( _( "You find: %s." ), drop->tname() );
+                        here.add_item_or_charges( examp, std::move( drop ) );
+                    }
+                } else {
+                    handle_harvest( p, entry.drop, entry.no_auto_pickup );
+                }
             }
         }
     }

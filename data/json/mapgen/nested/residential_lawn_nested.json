@@ -404,7 +404,7 @@
         "___"
       ],
       "terrain": { "_": "t_dirtmound" },
-      "furniture": { "x": "f_boulder_medium", "_": "f_region_flower" }
+      "furniture": { "x": [ [ "f_boulder_medium", 19 ], "f_dead_drop_boulder_harvest" ], "_": "f_region_flower" }
     }
   },
   {
