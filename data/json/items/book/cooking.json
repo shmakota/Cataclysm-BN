@@ -108,6 +108,24 @@
     "time": "10 m"
   },
   {
+    "id": "cookbook_east_asian",
+    "type": "BOOK",
+    "copy-from": "base_book",
+    "name": { "str": "Everyday East Asian Cooking", "str_pl": "copies of Everyday East Asian Cooking" },
+    "description": "A practical cookbook of Chinese, Japanese, and Korean food, with recipes for rice, noodles, dumplings, fermented vegetables, and more.",
+    "weight": "850 g",
+    "volume": "750 ml",
+    "price": "35 USD",
+    "price_postapoc": "5 USD",
+    "bashing": 1,
+    "color": "light_red",
+    "skill": "cooking",
+    "required_level": 1,
+    "max_level": 4,
+    "intelligence": 7,
+    "time": "20 m"
+  },
+  {
     "id": "cookbook_sushi",
     "type": "BOOK",
     "copy-from": "base_book",
