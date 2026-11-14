@@ -1126,6 +1126,7 @@
           { "item": "folding_bicycle", "prob": 10 },
           { "item": "roller_blades", "prob": 10 },
           { "item": "folding_skateboard", "prob": 10 },
+          { "item": "folding_skateboard_electric", "prob": 2 },
           { "item": "folding_wagon", "prob": 10 },
           { "item": "wheel_skateboard", "prob": 5 },
           { "item": "wheel_mount_skateboard", "prob": 5 },

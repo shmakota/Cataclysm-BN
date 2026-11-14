@@ -795,9 +795,15 @@ int unfold_vehicle_iuse::use( player &p, item &it, bool, const tripoint_bub_ms &
         p.add_msg_if_player( _( unfold_msg ), it.tname() );
     }
     p.moves -= moves;
-    // Restore HP of parts if we stashed them previously.
-    if( it.has_var( "folding_bicycle_parts" ) ) {
-        // Brand new, no HP stored
+    // Restore part state if we stashed it when folding the vehicle.
+    if( !it.has_var( "folding_bicycle_parts" ) ) {
+        // Brand new folded vehicle, no part state stored.  Start its batteries full.
+        for( const vpart_reference &vpr : veh->get_all_parts() ) {
+            vehicle_part &part = vpr.part();
+            if( part.is_battery() ) {
+                part.ammo_set( itype_id( "battery" ), part.ammo_capacity() );
+            }
+        }
         return 1;
     }
     std::istringstream veh_data;
