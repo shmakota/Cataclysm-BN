@@ -162,6 +162,7 @@ std::string enum_to_string<m_flag>( m_flag data )
         case MF_INTERIOR_AMMO: return "INTERIOR_AMMO";
         case MF_NIGHT_INVISIBILITY: return "NIGHT_INVISIBILITY";
         case MF_CAMOUFLAGE: return "CAMOUFLAGE";
+        case MF_UNCANNY_DODGE: return "UNCANNY_DODGE";
         case MF_REVIVES_HEALTHY: return "REVIVES_HEALTHY";
         case MF_NO_NECRO: return "NO_NECRO";
         case MF_PACIFIST: return "PACIFIST";
@@ -215,6 +216,8 @@ std::string enum_to_string<m_flag>( m_flag data )
         case MF_COMBAT_MOUNT: return "COMBAT_MOUNT";
         case MF_CANT_TRAIN: return "CANT_TRAIN";
         case MF_POLICE_EYEBOT: return "POLICE_EYEBOT";
+        case MF_IRRADIATED: return "IRRADIATED";
+        case MF_NO_VEHICLE_COLLISION: return "NO_VEHICLE_COLLISION";
         // *INDENT-ON*
         case m_flag::MF_MAX:
             break;
@@ -814,6 +817,7 @@ void mtype::load( const JsonObject &jo, const std::string &src )
     assign( jo, "melee_dice_sides", melee_sides, strict, 0 );
 
     assign( jo, "grab_strength", grab_strength, strict, 0 );
+    assign( jo, "uncanny_dodge_cost", uncanny_dodge_cost, strict, 0 );
 
     assign( jo, "dodge", sk_dodge, strict, 0 );
     assign( jo, "armor_bash", armor_bash, strict, 0 );

@@ -165,6 +165,7 @@ enum m_flag : int {
     MF_PUSH_VEH,            // Monsters that can push vehicles out of their way
     MF_NIGHT_INVISIBILITY,  // Monsters that are invisible in poor light conditions
     MF_CAMOUFLAGE,          // Monsters that are invisible at a range greater than the player's current perception + half of survival skill rounded down.
+    MF_UNCANNY_DODGE,       // Monsters that have the uncanny dodge ability.
     MF_REVIVES_HEALTHY,     // When revived, this monster has full hitpoints and speed
     MF_NO_NECRO,            // This monster can't be revived by necros. It will still rise on its own.
     MF_AVOID_DANGER_1,      // This monster will path around some dangers instead of through them.
@@ -215,6 +216,8 @@ enum m_flag : int {
     MF_COMBAT_MOUNT,        // This monster is trained for combat
     MF_CANT_TRAIN,            // This monster can't be trained for combat
     MF_POLICE_EYEBOT,            // A drone capable of summoning reinforcements, see mattack::photograph
+    MF_IRRADIATED,         // Melee attacks can inflict radiation
+    MF_NO_VEHICLE_COLLISION, // Vehicles pass through this monster without hitting it.
 
     MF_MAX                  // Sets the length of the flags - obviously must be LAST
 };
@@ -350,6 +353,7 @@ struct mtype {
         int melee_sides = 0;    /** number of sides those dice have */
 
         int grab_strength = 1;    /**intensity of the effect_grabbed applied*/
+        int uncanny_dodge_cost = 100;    /**moves cost for uncanny dodge, if the monster can uncanny dodge*/
 
         // Pet food category this monster is in
         pet_food_data petfood;

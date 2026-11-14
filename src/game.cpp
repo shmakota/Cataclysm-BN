@@ -435,6 +435,7 @@ static const trait_id trait_THICKSKIN( "THICKSKIN" );
 static const trait_id trait_WEB_ROPE( "WEB_ROPE" );
 static const trait_id trait_INATTENTIVE( "INATTENTIVE" );
 static const trait_id trait_WAYFARER( "WAYFARER" );
+static const trait_id trait_WAYFARER_SELF( "WAYFARER_SELF" );
 static const trait_id trait_HAS_NEMESIS( "HAS_NEMESIS" );
 static const trait_id trait_DEBUG_INFINITE_SPEED( "DEBUG_INFINITE_SPEED" );
 
@@ -4307,8 +4308,6 @@ bool game::load( const save_t &name )
 
     cata::load_world_lua_state( get_active_world(), "lua_state.json" );
 
-    cata::run_on_game_load_hooks( *DynamicDataLoader::get_instance().lua );
-
     // Build caches once so any immediate post-load draws don't use uninitialized lighting/visibility,
     // then re-invalidate so the first real in-game draw rebuilds everything again.
     m.invalidate_map_cache( get_levz() );
@@ -5878,10 +5877,9 @@ void game::cleanup_dead()
         }
     }
 
-    if( monster_is_dead ) {
-        // From here on, pointers to creatures get invalidated as dead creatures get removed.
-        critter_tracker->remove_dead();
-    }
+    // From here on, pointers to dead and removed creatures get invalidated.  Run it every turn
+    // so creatures removed without dying (despawned, deleted dimensions) are freed too.
+    critter_tracker->remove_dead();
 
     if( npc_is_dead ) {
         for( auto it = active_npc.begin(); it != active_npc.end(); ) {
@@ -6788,6 +6786,11 @@ void game::monmove( const monster_activity_ai_mode mode, activity_monmove_cache 
                         ZoneScopedN( "monmove_controlled_move" );
                         critter.move();
                     }
+                }
+                // The action can despawn the monster, e.g. when it kills the player and a death
+                // hook moves the player to another dimension.
+                if( critter.is_dead() ) {
+                    break;
                 }
                 {
                     ZoneScopedN( "monmove_process_triggers" );
@@ -8144,6 +8147,10 @@ void game::control_vehicle()
                         ( veh->avail_part_with_feature( veh_part, "CONTROL_ANIMAL", true ) >= 0 &&
                           veh->has_engine_type( fuel_type_animal, false ) && veh->has_harnessed_animal() ) ) &&
                u.in_vehicle ) {
+        if( u.has_trait( trait_WAYFARER_SELF ) && veh->type != vproto_id( "none" ) ) {
+            add_msg( m_info, _( "You refuse to take control of this vehicle." ) );
+            return;
+        }
         if( u.has_trait( trait_WAYFARER ) ) {
             add_msg( m_info, _( "You refuse to take control of this vehicle." ) );
             return;
@@ -13532,7 +13539,8 @@ auto game::place_player( const tripoint_bub_ms &dest_loc ) -> point_rel_sm
     if( ( vp1.part_with_feature( "CONTROL_ANIMAL", true ) ||
           vp1.part_with_feature( "CONTROLS", true ) ) && u.in_vehicle && !u.is_mounted() ) {
         add_msg( _( "There are vehicle controls here." ) );
-        if( !u.has_trait( trait_id( "WAYFARER" ) ) ) {
+        if( !u.has_trait( trait_WAYFARER ) &&
+            ( !u.has_trait( trait_WAYFARER_SELF ) || vp1->vehicle().type == vproto_id( "none" ) ) ) {
             add_msg( m_info, _( "%s to drive." ), press_x( ACTION_CONTROL_VEHICLE ) );
         }
     } else if( vp1.part_with_feature( "CONTROLS", true ) && u.in_vehicle &&
@@ -14738,7 +14746,13 @@ void game::vertical_move( int movez, bool force, bool peeking )
     bool rope_ladder = false;
     // TODO: Remove the stairfinding, make the mapgen gen aligned maps
     // Don't check can_fly here, flight was handled earlier and doing that would just embed you in a wall instead
-    const bool special_move = climbing || swimming;
+    const bool on_stairs =
+        m.has_flag( TFLAG_GOES_UP, u.bub_pos() ) ||
+        m.has_flag( TFLAG_GOES_DOWN, u.bub_pos() ) ||
+        m.has_flag( TFLAG_RAMP, u.bub_pos() ) ||
+        m.has_flag( TFLAG_RAMP_UP, u.bub_pos() ) ||
+        m.has_flag( TFLAG_RAMP_DOWN, u.bub_pos() );
+    const bool special_move = climbing || swimming || ( can_fly && !on_stairs );
 
     if( !force && !special_move ) {
         const std::optional<tripoint_bub_ms> pnt = find_or_make_stairs( m, z_after, rope_ladder,
@@ -14983,6 +14997,10 @@ auto game::delete_dimension( const dimension_id &dim_id, const bool remove_zones
         grid_trackers_.erase( tracker_it );
     }
 
+    // A Lua death hook can delete the attacker's dimension while the attack is on the stack.
+    if( auto *const buffer = MAPBUFFER_REGISTRY.find( dim_id ) ) {
+        critter_tracker->adopt_removed( buffer->creature_tracker() );
+    }
     MAPBUFFER_REGISTRY.unload_dimension( dim_id );
     unload_overmapbuffer_dimension( dim_id );
 

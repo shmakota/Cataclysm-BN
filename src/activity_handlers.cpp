@@ -1,4 +1,5 @@
 #include "activity_handlers.h"
+#include "book_scanning.h"
 
 #include <algorithm>
 #include <climits>
@@ -36,6 +37,7 @@
 #include "crafting_quality.h"
 #include "creature.h"
 #include "damage.h"
+#include "digital_media.h"
 #include "debug.h"
 // TODO (https://github.com/cataclysmbn/Cataclysm-BN/issues/1612):
 // Remove that include after implementing repair_activity_actor.
@@ -264,6 +266,7 @@ using namespace activity_handlers;
 
 const std::map< activity_id, std::function<void( player_activity *, player * )> >
 activity_handlers::do_turn_functions = {
+    { activity_id( "ACT_SCAN_BOOK" ), scan_book_do_turn },
     { ACT_BURROW, burrow_do_turn },
     { ACT_CRAFT, craft_do_turn },
     { ACT_FILL_LIQUID, fill_liquid_do_turn },
@@ -328,6 +331,7 @@ activity_handlers::do_turn_functions = {
 
 const std::map< activity_id, std::function<void( player_activity *, player * )> >
 activity_handlers::finish_functions = {
+    { activity_id( "ACT_SCAN_BOOK" ), scan_book_finish },
     { ACT_BURROW, burrow_finish },
     { ACT_BUTCHER, butcher_finish },
     { ACT_BUTCHER_FULL, butcher_finish },
@@ -625,11 +629,9 @@ butchery_setup consider_butchery( const item &corpse_item, player &u, butcher_ty
     }
     // workshop butchery (full) prequisites
     if( action == BUTCHER_FULL ) {
-        const bool has_rope = inv.has_amount( itype_rope_30, 1 ) ||
-                              inv.has_amount( itype_rope_makeshift_30, 1 ) ||
-                              inv.has_amount( itype_hd_tow_cable, 1 ) ||
-                              inv.has_amount( itype_vine_30, 1 ) ||
-                              inv.has_amount( itype_grapnel, 1 );
+        const bool has_rope = inv.has_item_with( []( const item & it ) {
+            return it.has_flag( flag_BUTCHERY_ROPE );
+        } );
         const bool big_corpse = corpse.size >= creature_size::medium;
 
         if( big_corpse ) {
@@ -3428,6 +3430,23 @@ void activity_handlers::butcher_do_turn( player_activity *act, player *p )
 
 void activity_handlers::read_do_turn( player_activity *act, player *p )
 {
+    if( !act->targets.empty() && act->targets.front() &&
+        is_digital_file( *act->targets.front() ) ) {
+        const auto reader = digital_reader_for( *p, *act->targets.front() );
+        if( !reader ) {
+            p->add_msg_if_player( m_bad, _( "Your reader is no longer available.  You stop studying." ) );
+            act->set_to_null();
+            return;
+        }
+        const auto drain_interval_minutes = std::max<int64_t>( 1,
+                                            reader->get().get_var( "digital_read_charge_interval_minutes",
+                                                    int64_t{ 1 } ) );
+        const auto drain_interval = time_duration::from_minutes( drain_interval_minutes );
+        if( action_time_scale::once_every_this_tick( drain_interval ) ) {
+            auto &device = reader->get();
+            p->consume_charges( device, device.type->charges_to_use() );
+        }
+    }
     if( p->is_player() ) {
         if( !act->str_values.empty() && act->str_values[0] == "martial_art" && one_in( 3 ) ) {
             if( act->values.empty() ) {
@@ -4476,7 +4495,7 @@ void activity_handlers::train_pet_finish( player_activity *act, player *p )
         }
     } else {
         p->add_msg_if_player( m_neutral,
-                              _( "Training your %s takes time, it seems they are making a bit of progress at least." ),
+                              _( "Training your %s takes time, but they haven't learned anything new yet." ),
                               act->str_values[0] );
     }
     act->set_to_null();
