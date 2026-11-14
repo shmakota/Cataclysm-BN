@@ -715,7 +715,8 @@
     "calories": 360,
     "description": "A rich Mexican stew of tender meat braised in a chile broth with garlic and warm spices.  Often served with tortillas and its savory broth for dipping.",
     "material": [ "flesh", "veggy" ],
-    "fun": 8
+    "quench": 3,
+    "fun": 9
   },
   {
     "type": "COMESTIBLE",

@@ -26,7 +26,8 @@
     "id": "churros",
     "name": { "str_sp": "churros" },
     "description": "Crisp strips of fried dough coated in cinnamon sugar.  A popular sweet street food across Latin America and Spain.",
-    "fun": 7
+    "calories": 90,
+    "fun": 6
   },
   {
     "id": "sourdough_young_uncovered",

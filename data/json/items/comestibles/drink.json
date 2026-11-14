@@ -328,6 +328,7 @@
     "spoils_in": "1 day",
     "material": [ "milk", "junk" ],
     "primary_material": "milk",
+    "fun": 2,
     "description": "A questionable blend of cola and milk.  It looks worse than it tastes, which is not saying much."
   },
   {

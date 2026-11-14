@@ -8,6 +8,8 @@
     "container": "jar_glass",
     "material": [ "veggy" ],
     "spoils_in": "5 days",
+    "healthy": 2,
+    "fun": 3,
     "price": "2 USD",
     "price_postapoc": "1 USD"
   },
