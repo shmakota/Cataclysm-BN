@@ -279,6 +279,7 @@
     "power": 140,
     "muscle_power_factor": 30,
     "m2c": 45,
+    "seat_ejection_resist_penalty": 1200,
     "description": "A light wooden skateboard deck.  Other skateboard components can be mounted on it.",
     "breaks_into": [ { "item": "splinter", "count": [ 3, 5 ] } ],
     "requirements": {

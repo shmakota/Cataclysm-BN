@@ -1778,10 +1778,10 @@ auto map::shake_vehicle(vehicle& veh, const int velocity_before, const units::an
             if (veh.part(ps).info().has_flag("SEAT_REQUIRES_BALANCE")) {
                 // Much harder to resist being thrown on a skateboard-like vehicle.
                 // Penalty mitigated by Deft and Skater.
-                int resist_penalty = 500;
+                int resist_penalty = veh.part_info(ps).seat_ejection_resist_penalty;
                 if (psg->has_trait(trait_PROF_SKATER)) { resist_penalty -= 150; }
                 if (psg->has_trait(trait_DEFT)) { resist_penalty -= 150; }
-                move_resist -= resist_penalty;
+                move_resist = std::max(100, move_resist - resist_penalty);
             }
         } else {
             int pet_resist = 0;

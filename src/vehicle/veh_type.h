@@ -331,6 +331,9 @@ public:
     /** seatbelt (str), muffler (%), horn (vol), light (intensity), recharing (power) */
     int bonus = 0;
 
+    /** Resistance penalty for being thrown from a balance-required seat. */
+    int seat_ejection_resist_penalty = 500;
+
     /** Optional cone rotation data for lights that sweep instead of emitting continuously. */
     std::optional<vpart_rotating_light> rotating_light;
 

@@ -422,6 +422,7 @@ void vpart_info::load(const JsonObject& jo, const std::string& src) {
     assign(jo, "size", size);
     assign(jo, "difficulty", difficulty);
     assign(jo, "bonus", bonus);
+    assign(jo, "seat_ejection_resist_penalty", seat_ejection_resist_penalty);
     assign(jo, "cargo_weight_modifier", cargo_weight_modifier);
     assign(jo, "weight_modifier", weight_modifier);
     assign(jo, "flags", flags);
