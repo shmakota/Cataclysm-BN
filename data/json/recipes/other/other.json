@@ -137,6 +137,23 @@
   },
   {
     "type": "recipe",
+    "result": "folding_skateboard_electric",
+    "category": "CC_OTHER",
+    "subcategory": "CSC_OTHER_VEHICLE",
+    "skill_used": "mechanics",
+    "difficulty": 1,
+    "time": "30 m",
+    "reversible": true,
+    "autolearn": true,
+    "qualities": [ { "id": "SCREW_FINE", "level": 1 }, { "id": "WRENCH", "level": 1 } ],
+    "components": [
+      [ [ "folding_skateboard", 1 ] ],
+      [ [ "motor_tiny", 1 ] ],
+      [ [ "battery_motorbike_small", 1 ] ]
+    ]
+  },
+  {
+    "type": "recipe",
     "result": "folding_skateboard",
     "category": "CC_OTHER",
     "subcategory": "CSC_OTHER_OTHER",

@@ -304,6 +304,16 @@
     ]
   },
   {
+    "id": "skateboard_electric",
+    "type": "vehicle",
+    "name": "Electric Skateboard",
+    "blueprint": [ "$" ],
+    "parts": [
+      { "x": 0, "y": 0, "parts": [ "frame_wood_deck", "wheel_mount_skateboard", "wheel_skateboard" ] },
+      { "x": 0, "y": 0, "parts": [ "battery_motorbike_small", "engine_electric_tiny" ] }
+    ]
+  },
+  {
     "id": "skateboard",
     "type": "vehicle",
     "name": "Skateboard",

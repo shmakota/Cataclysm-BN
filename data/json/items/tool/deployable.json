@@ -141,6 +141,25 @@
     "flags": [ "ALLOWS_REMOTE_USE", "DESTROY_ON_DECHARGE" ]
   },
   {
+    "id": "folding_skateboard_electric",
+    "type": "TOOL",
+    "copy-from": "folding_skateboard",
+    "name": { "str": "electric skateboard" },
+    "description": "A normal skateboard fitted with a tiny electric motor and a small motorbike battery.  Faster than a foot-powered board, it still takes balance to ride.",
+    "weight": "5523 g",
+    "volume": "6 L",
+    "price": "600 USD",
+    "price_postapoc": "40 USD",
+    "looks_like": "folding_skateboard",
+    "use_action": {
+      "type": "unfold_vehicle",
+      "vehicle_name": "skateboard_electric",
+      "unfold_msg": "You lay the electric skateboard down on the ground.",
+      "full_battery": true,
+      "moves": 0
+    }
+  },
+  {
     "id": "folding_skateboard",
     "type": "TOOL",
     "category": "deployables",
