@@ -78,6 +78,7 @@
       [ "roller_blades", 20 ],
       [ "rollerskates", 10 ],
       [ "folding_skateboard", 10 ],
+      [ "folding_skateboard_electric", 2 ],
       [ "manual_throw", 12 ],
       {
         "item": "protein_powder",

@@ -1991,6 +1991,7 @@
     "items": [
       [ "folding_bicycle", 50 ],
       [ "folding_skateboard", 25 ],
+      [ "folding_skateboard_electric", 10 ],
       [ "folding_wagon", 25 ],
       [ "inflatable_boat", 75 ],
       [ "sea_scooter", 25 ],

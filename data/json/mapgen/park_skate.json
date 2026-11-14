@@ -7,6 +7,7 @@
       { "group": "trash", "prob": 6 },
       { "item": "roller_blades", "prob": 1 },
       { "item": "folding_skateboard", "prob": 1 },
+      { "item": "folding_skateboard_electric", "prob": 1 },
       { "item": "rollerskates", "prob": 1 },
       { "item": "knee_pads", "prob": 1 },
       { "item": "elbow_pads", "prob": 1 },
